@@ -42,7 +42,7 @@
                             <MoveToPoseOnField _while="player_role == 'striker' && player_id == 0" x="-1.7" y="1.0" theta="0.0"/>
                             <MoveToPoseOnField _while="player_role == 'striker' && player_id == 1" x="-1.7" y="0.0" theta="0.0"/>
                             <MoveToPoseOnField _while="player_role == 'striker' && player_id == 2" x="-1.7" y="-1.0" theta="0.0"/>
-                            <MoveToPoseOnField _while="player_role == 'goal_keeper'" x="-6.0" y="0.0" theta="0.0"/>
+                            <MoveToPoseOnField _while="player_role == 'goal_keeper'" x="-6.2" y="0.0" theta="0.0"/>
                         </ReactiveSequence>
 
                         <ReactiveSequence _while="gc_game_state=='SET'" name="set">

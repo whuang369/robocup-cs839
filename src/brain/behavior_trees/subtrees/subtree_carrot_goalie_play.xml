@@ -18,7 +18,7 @@
                            target_ball_y_out="{target_ball_y}"
                            kick_range_threshold="1.0" kick_angle_threshold="0.5" />
                <!-- <SubTree ID="FindBall" _while="decision=='find'" _autoremap="true" /> -->
-               <MoveToPoseOnField _while="decision == 'find'" x="-6.0" y="0.0" vtheta_limit="2.0"  vx_limit="0.4" />
+               <MoveToPoseOnField _while="decision == 'find'" x="-6.2" y="0.0" vtheta_limit="2.0"  vx_limit="0.4" />
                <KeepGoal _while="decision == 'keepgoal'" min_ball_dist="0.3" />
                <Approach _while="decision == 'approach'"
                            kick_dir="{kick_dir}" min_range="0.4" max_range="0.6"

@@ -30,12 +30,12 @@
                <Sequence  _while="decision == 'kick'">
                      <SetVelocity />
                      <Sleep msec="300" />
-                     <Kick vx_limit="0.8" vy_limit="0.6" min_msec_kick="1000"/>
+                     <Kick vx_limit="1.0" vy_limit="0.8" min_msec_kick="1000"/>
                </Sequence>
                <Sequence  _while="decision == 'dribble'">
                      <SetVelocity />
                      <Sleep msec="300" />
-                     <Kick vx_limit="0.4" vy_limit="0.2" min_msec_kick="1000"/>
+                     <Kick vx_limit="0.8" vy_limit="0.6" min_msec_kick="1000"/>
                </Sequence>
             </Sequence>
          </ReactiveSequence>
