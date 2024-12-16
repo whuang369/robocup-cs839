@@ -22,6 +22,8 @@
 #include "locator.h"
 #include "robot_client.h"
 
+#include "self_localization.h"
+
 using namespace std;
 
 /**
@@ -40,6 +42,8 @@ public:
     std::shared_ptr<RobotClient> client;
     // The locator object.
     std::shared_ptr<Locator> locator;
+    // The self locator object.
+    std::shared_ptr<SelfLocator> self_locator;
     // The BrainTree object, which contains the operations related to the BehaviorTree.
     std::shared_ptr<BrainTree> tree;
 
@@ -82,6 +86,7 @@ private:
     vector<GameObject> getGameObjects(const vision_interface::msg::Detections &msg);
     void detectProcessBalls(const vector<GameObject> &ballObjs);
     void detectProcessMarkings(const vector<GameObject> &markingObjs);
+    void detectProcessGoalPosts(const vector<GameObject> &goalpostObjs);
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joySubscription;
     rclcpp::Subscription<game_controller_interface::msg::GameControlData>::SharedPtr gameControlSubscription;

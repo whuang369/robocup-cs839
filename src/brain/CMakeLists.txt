@@ -21,6 +21,7 @@ find_package(booster_interface REQUIRED)
 find_package(booster_msgs REQUIRED)
 find_package(game_controller_interface REQUIRED)
 find_package(vision_interface REQUIRED)
+find_package(bhuman REQUIRED)
 
 # source files
 file(GLOB SOURCE_FILES src/*.cpp)
@@ -31,7 +32,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-narrowing -Wno-unused-parameter -Wn
 target_link_libraries(brain_node rerun_sdk)
 ament_target_dependencies(brain_node rclcpp std_msgs sensor_msgs geometry_msgs
   OpenCV EIGEN3 behaviortree_cpp
-  booster_msgs booster_interface game_controller_interface vision_interface)
+  booster_msgs booster_interface game_controller_interface vision_interface bhuman)
 
 target_include_directories(brain_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

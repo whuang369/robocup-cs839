@@ -82,12 +82,12 @@ void BrainTree::tick()
     cnt++;
     // print states
     if (cnt % 30 == 0)
-        prtDebug(format(
-            "GameState: %s\tIsKickOffSide: %d\nScore: %d\t JustScored: %d",
-            getEntry<string>("gc_game_state").c_str(),
-            getEntry<bool>("gc_is_kickoff_side"),
-            brain->data->lastScore,
-            getEntry<bool>("we_just_scored")));
+        // prtDebug(format(
+        //     "GameState: %s\tIsKickOffSide: %d\nScore: %d\t JustScored: %d",
+        //     getEntry<string>("gc_game_state").c_str(),
+        //     getEntry<bool>("gc_is_kickoff_side"),
+        //     brain->data->lastScore,
+        //     getEntry<bool>("we_just_scored")));
 
     tree.tickOnce();
 }
@@ -591,6 +591,9 @@ NodeStatus SelfLocate::tick()
     }
 
     // TODO other modes
+
+    brain->self_locator->motionUpdate(brain->data->robotPoseToOdom);
+    brain->self_locator->sensorUpdate(brain->data->goalposts, brain->data->markings);
 
     // Locate
     PoseBox2D constraints{xMin, xMax, yMin, yMax, thetaMin, thetaMax};

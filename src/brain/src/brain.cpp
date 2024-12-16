@@ -41,6 +41,7 @@ void Brain::init()
 
     data = std::make_shared<BrainData>();
     locator = std::make_shared<Locator>();
+    self_locator = std::make_shared<SelfLocator>(config->fieldDimensions);
 
     log = std::make_shared<BrainLog>(this);
     tree = std::make_shared<BrainTree>(this);
@@ -170,6 +171,7 @@ vector<double> Brain::getGoalPostAngles(const double margin)
     rightX = config->fieldDimensions.length / 2;
     rightY = -config->fieldDimensions.goalWidth / 2;
 
+    /* TODO: flip if attacking the other direction
     for (int i = 0; i < data->goalposts.size(); i++)
     {
         auto post = data->goalposts[i];
@@ -184,6 +186,7 @@ vector<double> Brain::getGoalPostAngles(const double margin)
             rightY = post.posToField.y;
         }
     }
+    */
 
     const double theta_l = atan2(leftY - margin - data->ball.posToField.y, leftX - data->ball.posToField.x);
     const double theta_r = atan2(rightY + margin - data->ball.posToField.y, rightX - data->ball.posToField.x);
@@ -369,6 +372,7 @@ void Brain::detectionsCallback(const vision_interface::msg::Detections &msg)
 
     detectProcessBalls(balls);
     detectProcessMarkings(markings);
+    detectProcessGoalPosts(goalPosts);
 
     if (!log->isEnabled())
         return;
@@ -454,6 +458,15 @@ void Brain::odometerCallback(const booster_interface::msg::Odometer &msg)
              rerun::Points2D({{data->robotPoseToField.x, -data->robotPoseToField.y}, {data->robotPoseToField.x + 0.1 * cos(data->robotPoseToField.theta), -data->robotPoseToField.y - 0.1 * sin(data->robotPoseToField.theta)}})
                  .with_radii({0.2, 0.1})
                  .with_colors({0xFF6666FF, 0xFF0000FF}));
+
+    // self_locator->motionUpdate(data->robotPoseToOdom);
+    auto pose = self_locator->getSample();
+    log->log("field/robot_pose_sample",
+         rerun::Points2D({{pose.translation.x(), -pose.translation.y()},
+                          {pose.translation.x() + 0.1 * cos(pose.rotation),
+                           -pose.translation.y() - 0.1 * sin(pose.rotation)}})
+             .with_radii({0.2, 0.1})
+             .with_colors({0x00FFFFFF, 0xFF0000FF}));
 }
 
 void Brain::lowStateCallback(const booster_interface::msg::LowState &msg)
@@ -655,5 +668,25 @@ void Brain::detectProcessMarkings(const vector<GameObject> &markingObjs)
             continue;
 
         data->markings.push_back(marking);
+    }
+}
+
+void Brain::detectProcessGoalPosts(const vector<GameObject> &goalpostObjs)
+{
+    const double confidenceValve = 0.1;
+
+    data->goalposts.clear();
+
+    for (int i = 0; i < goalpostObjs.size(); i++)
+    {
+        auto post = goalpostObjs[i];
+
+        if (post.confidence < confidenceValve)
+            continue;
+
+        if (post.posToRobot.x < -0.5 || post.posToRobot.x > 10.0)
+            continue;
+
+        data->goalposts.push_back(post);
     }
 }
