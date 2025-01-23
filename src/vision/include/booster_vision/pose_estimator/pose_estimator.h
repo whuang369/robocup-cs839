@@ -36,6 +36,7 @@ public:
     ~BallPoseEstimator() = default;
 
     void Init(const YAML::Node &node) override;
+    Pose EstimateByColor(const Pose &p_eye2base, const DetectionRes &detection, const cv::Mat &rgb) override;
     Pose EstimateByDepth(const Pose &p_eye2base, const DetectionRes &detection, const cv::Mat &depth) override;
 
 private:

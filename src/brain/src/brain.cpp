@@ -459,8 +459,7 @@ void Brain::odometerCallback(const booster_interface::msg::Odometer &msg)
                  .with_radii({0.2, 0.1})
                  .with_colors({0xFF6666FF, 0xFF0000FF}));
 
-    // self_locator->motionUpdate(data->robotPoseToOdom);
-    auto pose = self_locator->getSample();
+    auto pose = self_locator->getPose();
     log->log("field/robot_pose_sample",
          rerun::Points2D({{pose.translation.x(), -pose.translation.y()},
                           {pose.translation.x() + 0.1 * cos(pose.rotation),
@@ -473,6 +472,9 @@ void Brain::lowStateCallback(const booster_interface::msg::LowState &msg)
 {
     data->headYaw = msg.motor_state_serial[0].q;
     data->headPitch = msg.motor_state_serial[1].q;
+    data->headYawD = msg.motor_state_serial[0].dq;
+    data->headPitchD = msg.motor_state_serial[1].dq;
+    prtDebug("Head Yaw dq " + to_string(msg.motor_state_serial[0].dq) + " pitch dq " + to_string(msg.motor_state_serial[1].dq));
 
     log->setTimeNow();
 
@@ -684,7 +686,7 @@ void Brain::detectProcessGoalPosts(const vector<GameObject> &goalpostObjs)
         if (post.confidence < confidenceValve)
             continue;
 
-        if (post.posToRobot.x < -0.5 || post.posToRobot.x > 10.0)
+        if (post.posToRobot.x < -0.5 || post.posToRobot.x > 3.0 || post.posToRobot.y > 3.0)
             continue;
 
         data->goalposts.push_back(post);

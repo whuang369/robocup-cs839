@@ -9,12 +9,12 @@ brain_node:
       
     robot:
       robot_height: 1.0
-      odom_factor: 1.2
+      odom_factor: 1.0
       vx_factor: 0.90
-      yaw_offset: 0.10
+      yaw_offset: 0.0
       joystick: "logitech" # logitech | beitong
 
     rerunLog:
-      enable: false
+      enable: true
       server_addr: "127.0.0.1:9876"
       img_interval: 1

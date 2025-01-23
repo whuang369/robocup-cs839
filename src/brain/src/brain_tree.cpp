@@ -203,7 +203,14 @@ NodeStatus CamScanField::tick()
 
     int cycleTime = msec % msecCycle;
     double pitch = cycleTime > (msecCycle / 2.0) ? lowPitch : highPitch;
-    double yaw = cycleTime < (msecCycle / 2.0) ? (leftYaw - rightYaw) * (2.0 * cycleTime / msecCycle) + rightYaw : (leftYaw - rightYaw) * (2.0 * (msecCycle - cycleTime) / msecCycle) + rightYaw;
+    int i;
+    for (i = 1; i <= 6; i++)
+      	if (cycleTime < (msecCycle * i / 6))
+            break;
+    if (i > 3) i = 7 - i;
+    double yaw;
+    if (i == 1) yaw = rightYaw; else if (i == 2) yaw = 0; else yaw = leftYaw;
+    // double yaw = cycleTime < (msecCycle / 2.0) ? (leftYaw - rightYaw) * (2.0 * cycleTime / msecCycle) + rightYaw : (leftYaw - rightYaw) * (2.0 * (msecCycle - cycleTime) / msecCycle) + rightYaw;
 
     brain->client->moveHead(pitch, yaw);
     return NodeStatus::SUCCESS;
@@ -449,6 +456,7 @@ NodeStatus Kick::onStart()
     double vxLimit, vyLimit;
     getInput("vx_limit", vxLimit);
     getInput("vy_limit", vyLimit);
+    // getInput("vtheta_limit", vthetaLimit);
     int minMSecKick;
     getInput("min_msec_kick", minMSecKick);
     double vxFactor = brain->config->vxFactor;
@@ -475,12 +483,13 @@ NodeStatus Kick::onStart()
             vx = vxLimit;
         }
     }
+    double vtheta = brain->data->ball.yawToRobot;
 
     double speed = norm(vx, vy);
 
     _msecKick = speed > 1e-5 ? minMSecKick + static_cast<int>(brain->data->ball.range / speed * 1000) : minMSecKick;
-
-    brain->client->setVelocity(vx, vy, 0, false, false, false);
+	prtDebug(to_string(vtheta));
+    brain->client->setVelocity(vx, vy, vtheta, false, false, false);
     return NodeStatus::RUNNING;
 }
 
@@ -535,6 +544,24 @@ void RobotFindBall::onHalted()
 
 NodeStatus SelfLocate::tick()
 {
+  	brain->self_locator->motionUpdate(brain->data->robotPoseToOdom);
+    if ((abs(brain->data->headYawD) > 0.1) | (abs(brain->data->headPitchD) > 0.01)) {
+        // brain->self_locator->sensorUpdate({}, {});
+    }
+   	else {
+    	brain->self_locator->sensorUpdate(brain->data->goalposts, brain->data->markings);
+    }
+    auto pose = brain->self_locator->getPose();
+    brain->calibrateOdom(pose.translation.x(), pose.translation.y(), pose.rotation);
+    // brain->tree->setEntry<bool>("odom_calibrated", true);
+    if (brain->self_locator->isGood()) {
+      	brain->tree->setEntry<bool>("odom_calibrated", true);
+    }
+    else {
+      	brain->tree->setEntry<bool>("odom_calibrated", false);
+    }
+
+    /*
     string mode = getInput<string>("mode").value();
     double xMin = 0.0, xMax = 0.0, yMin = 0, yMax = 0.0, thetaMin = 0.0, thetaMax = 0.0;
     auto markers = brain->data->getMarkers();
@@ -592,9 +619,6 @@ NodeStatus SelfLocate::tick()
 
     // TODO other modes
 
-    brain->self_locator->motionUpdate(brain->data->robotPoseToOdom);
-    brain->self_locator->sensorUpdate(brain->data->goalposts, brain->data->markings);
-
     // Locate
     PoseBox2D constraints{xMin, xMax, yMin, yMax, thetaMin, thetaMax};
     double residual;
@@ -628,6 +652,7 @@ NodeStatus SelfLocate::tick()
     brain->tree->setEntry<bool>("odom_calibrated", true);
     brain->data->lastSuccessfulLocalizeTime = brain->get_clock()->now();
     prtDebug("locate success: " + to_string(res.pose.x) + " " + to_string(res.pose.y) + " " + to_string(rad2deg(res.pose.theta)) + " Dur: " + to_string(res.msecs));
+    */
 
     return NodeStatus::SUCCESS;
 }

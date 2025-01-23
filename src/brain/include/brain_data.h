@@ -29,6 +29,8 @@ public:
     // Head position, updated through lowStateCallback
     double headPitch; // The current head pitch, in radians. 0 is horizontal forward, positive is downward.
     double headYaw;   // The current head yaw, in radians. 0 is forward, positive is left.
+    double headPitchD; // The current head pitch differential.
+    double headYawD;   // The current head yaw differential.
 
     // Ball
     bool ballDetected = false;    // Whether the camera has detected the ball

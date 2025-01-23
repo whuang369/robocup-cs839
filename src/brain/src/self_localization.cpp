@@ -26,6 +26,9 @@ const float SelfLocator::majorDirTransWeight = 2;
 const float SelfLocator::minorDirTransWeight = 1;
 const float SelfLocator::validityFactorLandmarkMeasurement = 3;
 const int SelfLocator::numberOfConsideredFramesForValidity = 60;
+const float SelfLocator::minValidityForSuperbLocalizationQuality = 0.5;
+const float SelfLocator::maxTranslationDeviationForSuperbLocalizationQuality = 100.0;
+const Angle SelfLocator::maxRotationalDeviationForSuperbLocalizationQuality = Angle((30 / 180.f) * pi);
 const Pose2f SelfLocator::filterProcessDeviation = Pose2f(0.002, 2.0, 2.0);
 const Pose2f SelfLocator::odometryDeviation = Pose2f(0.3, 0.2, 0.2);
 const Vector2f SelfLocator::odometryRotationDeviation = Vector2f(0.00157, 0.00157);
@@ -81,7 +84,7 @@ SelfLocator::SelfLocator(const FieldDimensions& fd) : nextSampleNumber(0)
     // Create sample set with samples at the typical walk-in positions
     samples = new SampleSet<UKFRobotPoseHypothesis>(numberOfSamples);
     for(int i = 0; i < samples->size(); ++i)
-    	samples->at(i).init({0, static_cast<float>(((-fd.length / 2) + (-fd.circleRadius)) / 2), static_cast<float>(fd.width / 2 + 0.5)},
+    	samples->at(i).init({-M_PI / 2, static_cast<float>(((-fd.length / 2) + (-fd.circleRadius)) / 2), static_cast<float>(fd.width / 2 + 0.5)},
                             {M_PI / 6, static_cast<float>(abs((-fd.length / 2) - (-fd.circleRadius)) / 2), 0.5},
                             nextSampleNumber++,
                             0.5f);
@@ -95,21 +98,53 @@ SelfLocator::SelfLocator(const FieldDimensions& fd) : nextSampleNumber(0)
         Vector2f(0.0, -fd.circleRadius),
         Vector2f(0.0, fd.circleRadius)
     };
-    totalNumberOfAvailableLandmarks = goalPosts.size() + xMarkers.size();
+    penaltyMarkers = {
+      	Vector2f(fd.length / 2 - fd.penaltyDist, 0.0),
+      	Vector2f(-fd.length / 2 + fd.penaltyDist, 0.0)
+    };
+    odomInitialized = false;
 }
+
+Pose2f SelfLocator::getPose() {
+    UKFRobotPoseHypothesis& bestSample = getMostValidSample();
+    idOfLastBestSample = bestSample.id;
+    return bestSample.getPose();
+};
+
+bool SelfLocator::isGood() {
+  	UKFRobotPoseHypothesis& bestSample = getMostValidSample();
+    Matrix3f cov = bestSample.getCov();
+    const float translationalStandardDeviation = std::sqrt(std::max(cov(0, 0), cov(1, 1)));
+    const float rotationalStandardDeviation = std::sqrt(cov(2, 2));
+    prtDebug("Validity " + to_string(bestSample.validity) + " translational sd " + to_string(translationalStandardDeviation)
+             + " rotational sd " + to_string(rotationalStandardDeviation));
+    // if(bestSample.validity >= minValidityForSuperbLocalizationQuality &&
+    //    translationalStandardDeviation < maxTranslationDeviationForSuperbLocalizationQuality &&
+    //    rotationalStandardDeviation < maxRotationalDeviationForSuperbLocalizationQuality) {
+    if(bestSample.validity >= minValidityForSuperbLocalizationQuality) {
+      	return true;
+    }
+    else {
+      	return false;
+    }
+};
 
 SelfLocator::~SelfLocator()
 {
-  delete samples;
+    delete samples;
 }
 
 void SelfLocator::motionUpdate(const Pose2D& robotToOdom)
 {
   	Pose2f newOdometryData = Pose2f(robotToOdom.theta, robotToOdom.x, robotToOdom.y);
     Pose2f odometryOffset = newOdometryData - lastOdometryData;
-    const float distance = odometryOffset.translation.norm();
     lastOdometryData = newOdometryData;
+    if (!odomInitialized) {
+        odomInitialized = true;
+        return;
+    }
 
+    const float distance = odometryOffset.translation.norm();
     Matrix3f odometryOffsetCovariance;
     odometryOffsetCovariance.setZero();
     odometryOffsetCovariance(0, 0) = sigmaDistance * sigmaDistance * distance;
@@ -156,23 +191,41 @@ void SelfLocator::sensorUpdate(const std::vector<GameObject>& detectedGoalPosts,
                  [](const GameObject& obj) {
                      return obj.label == "XCross";
                  });
+    std::vector<GameObject> detectedPenaltyPoints;
+    std::copy_if(detectedMarkings.begin(), detectedMarkings.end(), std::back_inserter(detectedPenaltyPoints),
+                 [](const GameObject& obj) {
+                     return obj.label == "PenaltyPoint";
+                 });
+
+    totalNumberOfAvailableLandmarks = detectedXMarkers.size() + detectedPenaltyPoints.size() + detectedGoalPosts.size();
+
+    if (totalNumberOfAvailableLandmarks == 0) {
+      	return;
+    }
 
     for(int i = 0; i < numberOfSamples; ++i)
     {
         const Pose2f samplePose = samples->at(i).getPose();
         std::vector<RegisteredLandmark> landmarks;
+        int numRegisteredLandmarks = 0;
 
         if (detectedGoalPosts.size() > 0) {
             registerLandmarks(samplePose, detectedGoalPosts, goalPosts, landmarks);
+			prtDebug("Registered " + to_string(landmarks.size() - numRegisteredLandmarks) + " goal posts");
+            numRegisteredLandmarks = landmarks.size();
         }
 
         if (detectedXMarkers.size() > 0) {
             registerLandmarks(samplePose, detectedXMarkers, xMarkers, landmarks);
+            prtDebug("Registered " + to_string(landmarks.size() - numRegisteredLandmarks) + " X markers");
+            numRegisteredLandmarks = landmarks.size();
         }
 
-        int numRegisteredLandmarks = landmarks.size();
-
-        prtDebug("Registered " + to_string(numRegisteredLandmarks));
+        if (detectedPenaltyPoints.size() > 0) {
+            registerLandmarks(samplePose, detectedPenaltyPoints, penaltyMarkers, landmarks);
+            prtDebug("Registered " + to_string(landmarks.size() - numRegisteredLandmarks) + " penalty points");
+            numRegisteredLandmarks = landmarks.size();
+        }
 
         for(const auto& landmark : landmarks)
             samples->at(i).updateByLandmark(landmark);
@@ -239,9 +292,9 @@ double SelfLocator::solveAssignment(const MatrixXd& costMatrix, std::vector<int>
         return (val <= threshold) ? val : std::numeric_limits<double>::infinity();
     });
 
-    stringstream ss;
-    ss << cost;
-    prtDebug(ss.str());
+    // stringstream ss;
+    // ss << cost;
+    // prtDebug(ss.str());
 
     assignment.resize(n, -1);
 
@@ -304,6 +357,7 @@ double SelfLocator::solveAssignment(const MatrixXd& costMatrix, std::vector<int>
     for (int i = 0; i < n; i++) {
         if (assignment[i] > -1) {
             total_cost += cost(i, assignment[i]);
+            prtDebug("Assigned " + to_string(i) + " to " + to_string(assignment[i]));
         }
     }
     return total_cost;

@@ -86,6 +86,7 @@ private:
     int totalNumberOfAvailableLandmarks;
 
     Pose2f lastOdometryData;
+    bool odomInitialized;
 
     static const int numberOfSamples;
     static const float sigmaAngle;
@@ -97,6 +98,9 @@ private:
     static const float minorDirTransWeight;
     static const float validityFactorLandmarkMeasurement;
     static const int numberOfConsideredFramesForValidity;
+    static const float minValidityForSuperbLocalizationQuality;
+    static const float maxTranslationDeviationForSuperbLocalizationQuality;
+    static const Angle maxRotationalDeviationForSuperbLocalizationQuality;
     static const Pose2f filterProcessDeviation;
     static const Pose2f odometryDeviation;
     static const Vector2f odometryRotationDeviation;
@@ -119,11 +123,11 @@ public:
     /** Default constructor */
     SelfLocator(const FieldDimensions& fd);
 
-    Pose2f getSample() {
-        UKFRobotPoseHypothesis& bestSample = getMostValidSample();
-        idOfLastBestSample = bestSample.id;
-        return bestSample.getPose();
-    }; // TODO
+    Pose2f getPose();
+
+    bool isGood();
+
+    // TODO: resampling
 
     /** Integrate odometry offset into hypotheses */
     void motionUpdate(const Pose2D& robotToOdom);

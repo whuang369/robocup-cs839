@@ -40,6 +40,13 @@ void BallPoseEstimator::Init(const YAML::Node &node) {
     fitting_distance_threshold_ = as_or<float>(node["fitting_distance_threshold"], 0.01);
 }
 
+Pose BallPoseEstimator::EstimateByColor(const Pose &p_eye2base, const DetectionRes &detection, const cv::Mat &rgb) {
+    auto bbox = detection.bbox;
+    cv::Point2f target_uv = cv::Point2f(bbox.x + bbox.width / 2, bbox.y + bbox.height);
+    cv::Point3f target_xyz = CalculatePositionByIntersection(p_eye2base, target_uv, intr_);
+    return Pose(target_xyz.x, target_xyz.y, target_xyz.z, 0, 0, 0);
+}
+
 Pose BallPoseEstimator::EstimateByDepth(const Pose &p_eye2base, const DetectionRes &detection, const cv::Mat &depth) {
     if (!use_depth_ || depth.empty()) return Pose();
 

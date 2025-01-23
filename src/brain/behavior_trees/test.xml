@@ -2,11 +2,29 @@
     <include path="./subtrees/subtree_cam_find_and_track_ball.xml" />
     <BehaviorTree ID="MainTree">
         <Sequence name="root">
-            <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
-
-            <Sequence _while="control_state==3" >
-                <Adjust turn_threshold="0.4" max_range="0.6" min_range="0.4" vx_limit="0.2" vy_limit="0.2" vtheta_limit="1.0"  />
-            </Sequence>
+            <ReactiveSequence _while="control_state==2" name="pickup">
+                <CamScanField  _while="!odom_calibrated" high_pitch="0.2" low_pitch="0.4"/>
+                <SubTree ID="CamFindAndTrackBall" _autoremap="true" _while="odom_calibrated" />
+                <SelfLocate mode="enter_field" />
+            </ReactiveSequence>
+            <ReactiveSequence _while="control_state==3" name="control_state-3">
+                <ReactiveSequence name="play">
+                    <!-- <CamScanField _while="!odom_calibrated" high_pitch="0.3" low_pitch="0.8" /> -->
+                    <SubTree ID="CamFindAndTrackBall" _autoremap="true" _while="odom_calibrated" />
+                    <SelfLocate mode="trust_direction" />
+                    <Sequence>
+                        <StrikerDecide decision_out="{decision}" decision_in="{decision}" chase_threshold="1.2" />
+                        <RobotFindBall _while="decision == 'find'" vyaw_limit="1.0" />
+                        <Chase   _while="decision == 'chase'"  vx_limit="1.0"  vy_limit="0.4"  vtheta_limit="1.0"  dist="1.0"/>
+                        <Adjust  _while="decision == 'adjust'"  turn_threshold="0.4" max_range="0.6" min_range="0.4" vx_limit="0.4" vy_limit="0.4" vtheta_limit="1.0"  />
+                        <Sequence  _while="decision == 'kick'">
+                            <SetVelocity />
+                            <Sleep msec="1000" />
+                            <Kick vx_limit="1.2" vy_limit="0.4" min_msec_kick="1000"/>
+                        </Sequence>
+                    </Sequence>
+                </ReactiveSequence>
+            </ReactiveSequence>
         </Sequence>
     </BehaviorTree>
 </root>

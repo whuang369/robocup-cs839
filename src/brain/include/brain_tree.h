@@ -237,7 +237,7 @@ public:
             InputPort<double>("high_pitch", 0.2, "The minimum pitch when looking upwards"),
             InputPort<double>("left_yaw", 0.8, "The maximum yaw when looking to the left"),
             InputPort<double>("right_yaw", -0.8, " The minimum yaw when looking to the right"),
-            InputPort<int>("msec_cycle", 4000, "How many milliseconds it takes to complete one full rotation"),
+            InputPort<int>("msec_cycle", 6000, "How many milliseconds it takes to complete one full rotation"),
         };
     }
 
