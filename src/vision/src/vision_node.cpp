@@ -12,7 +12,14 @@
 #include "booster_vision/model/detector.h"
 #include "booster_vision/pose_estimator/pose_estimator.h"
 #include "booster_vision/base/misc_utils.hpp"
+#include "booster_vision/base/pointcloud_process.h"
 #include "booster_vision/img_bridge.h"
+
+#include <pcl/sample_consensus/model_types.h>
+#include <pcl/sample_consensus/method_types.h>
+#include <pcl/segmentation/sac_segmentation.h>
+
+#include <Eigen/Dense>  // Requires Eigen library
 
 namespace booster_vision {
 
@@ -118,6 +125,20 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
               << p_head2base.toCVMat() << std::endl;
     std::cout << "p_eye2base: \n"
               << p_eye2base.toCVMat() << std::endl;
+    std::vector<float> eye2base_angles = p_eye2base.getEulerAngles();
+    std::vector<float> eye2base_t = p_eye2base.getTranslation();
+    std::cout << "p_eye2base roll: \n"
+              << eye2base_angles[0] * 180.0 / M_PI << std::endl;
+    std::cout << "p_eye2base pitch: \n"
+              << eye2base_angles[1] * 180.0 / M_PI << std::endl;
+    std::cout << "p_eye2base yaw: \n"
+              << eye2base_angles[2] * 180.0 / M_PI << std::endl;
+
+    float roll = 0.0, pitch = 0.0;
+    EstimateCameraRollPitch(depth, roll, pitch);
+    if (roll != 0) {
+      	p_eye2base = Pose(eye2base_t[0], eye2base_t[1], eye2base_t[2], roll, pitch, eye2base_angles[2]);
+ 	}
 
     // inference
     auto detections = detector_->Inference(color);
@@ -208,6 +229,129 @@ void VisionNode::PoseCallBack(const geometry_msgs::msg::Pose::SharedPtr msg) {
     float qw = msg->orientation.w;
     auto pose = Pose(x, y, z, qx, qy, qz, qw);
     data_syncer_->AddPose(PoseDataBlock(pose, timestamp));
+}
+
+bool VisionNode::EstimateCameraRollPitch(const cv::Mat &depth_image, float &roll, float &pitch) {
+  	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    cv::Mat depth_image_float;
+    depth_image.convertTo(depth_image_float, CV_32F, 0.001);
+
+    int height = depth_image.rows;
+    int width = depth_image.cols;
+  	std::cout << height << "," << width << ", " << depth_image_float.type() << std::endl;
+
+    // Convert Depth Image (cv::Mat) to PCL Point Cloud
+    for (int v = height * 3 / 4; v < height; v += 2) {
+        for (int u = 0; u < width; u += 4) {
+            float Z = depth_image_float.at<float>(v, u);  // Get depth value
+            if (!std::isnan(Z) && (Z > 0.6) && (Z < 5)) {  // Ignore invalid depth values
+                float X = (u - intr_.cx) * Z / intr_.fx;
+                float Y = (v - intr_.cy) * Z / intr_.fy;
+
+                // reject points taller than the camera
+                if (Y > 0) {
+                	cloud->points.emplace_back(X, Y, Z);
+                }
+            }
+        }
+    }
+
+    if (cloud->points.size() < 100) {
+      	std::cout << "Fewer than 100 points." << std::endl;
+      	return false;
+	}
+
+    // cloud->width = cloud->points.size();
+    // cloud->height = 1;
+    // cloud->is_dense = false;
+
+    // Fit a Plane Using RANSAC
+    pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+    pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+    pcl::SACSegmentation<pcl::PointXYZ> seg;
+    seg.setOptimizeCoefficients(true);
+    seg.setModelType(pcl::SACMODEL_PLANE);
+    seg.setMethodType(pcl::SAC_RANSAC);
+    seg.setMaxIterations(100);
+    seg.setDistanceThreshold(0.05);  // Adjust based on noise level
+    seg.setInputCloud(cloud);
+    seg.segment(*inliers, *coefficients);
+
+    float confidence = static_cast<float>(inliers->indices.size()) / cloud->size();
+    std::cout << "inlier percentage: " << confidence << std::endl;
+
+    if (inliers->indices.empty()) {
+        std::cout << "Could not estimate a ground plane." << std::endl;
+        return false;
+    }
+
+    // Extract Plane Normal (A, B, C)
+    float A = coefficients->values[0];
+    float B = coefficients->values[1];
+    float C = coefficients->values[2];
+
+    Eigen::Vector3d v(A, B, C);
+    v.normalize();
+    // Target vector (0,0,1)
+    Eigen::Vector3d k(0, 0, 1);
+
+    // Compute rotation axis
+    Eigen::Vector3d axis = v.cross(k);
+    double sinTheta = axis.norm();
+    double cosTheta = v.dot(k);
+
+    // If already aligned, return identity
+    if (sinTheta == 0) {
+        return false;
+    }
+
+    axis.normalize();  // Normalize rotation axis
+
+    // Compute skew-symmetric cross-product matrix
+    Eigen::Matrix3d K;
+    K <<  0,         -axis.z(),  axis.y(),
+          axis.z(),   0,        -axis.x(),
+         -axis.y(),   axis.x(),  0;
+
+    // Compute rotation matrix using Rodrigues' formula
+    Eigen::Matrix3d R = Eigen::Matrix3d::Identity() + sinTheta * K + (1 - cosTheta) * K * K;
+    double yaw;
+
+    // Extract pitch (θ)
+    pitch = std::asin(-R(2, 0));  // R31
+
+    if (std::abs(pitch - M_PI/2) < 1e-6) {
+        // Gimbal lock case: pitch = +90 degrees
+        yaw = std::atan2(R(0, 1), R(0, 2));
+        roll = 0;  // Arbitrary, since roll is not uniquely defined
+    } else if (std::abs(pitch + M_PI/2) < 1e-6) {
+        // Gimbal lock case: pitch = -90 degrees
+        yaw = std::atan2(-R(0, 1), -R(0, 2));
+        roll = 0;
+    } else {
+        // Normal case
+        yaw = std::atan2(R(1, 0), R(0, 0));  // atan2(R21, R11)
+        roll = std::atan2(R(2, 1), R(2, 2)); // atan2(R32, R33)
+    }
+
+
+    // Normalize Normal Vector
+    // float norm = std::sqrt(A * A + B * B + C * C);
+    // A /= norm;
+    // B /= norm;
+    // C /= norm;
+
+    // Compute Roll and Pitch Angles
+    // roll = std::atan2(B, C);
+    // pitch = std::atan2(A, C);
+    std::cout << "Estimated Roll: " << roll * 180.0 / M_PI << " degrees" << std::endl;
+	std::cout << "Estimated Pitch: " << pitch * 180.0 / M_PI << " degrees" << std::endl;
+
+    if (confidence < 0.4) {
+        std::cout << "Confidence is too low." << std::endl;
+        return false;
+    }
+    return true;
 }
 
 } // namespace booster_vision
