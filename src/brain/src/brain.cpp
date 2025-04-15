@@ -211,6 +211,13 @@ void Brain::calibrateOdom(double x, double y, double theta)
         data->odomToField.x, data->odomToField.y, data->odomToField.theta,
         data->robotPoseToField.x, data->robotPoseToField.y, data->robotPoseToField.theta);
 
+    log->log("field/robot_pose_sample",
+         rerun::Points2D({{x, -y},
+                          {x + 0.1 * cos(theta),
+                           -y - 0.1 * sin(theta)}})
+             .with_radii({0.2, 0.1})
+             .with_colors({0x00FFFFFF, 0xFF0000FF}));
+
     double placeHolder;
     // ball
     transCoord(
@@ -444,6 +451,13 @@ void Brain::detectionsCallback(const vision_interface::msg::Detections &msg)
 void Brain::odometerCallback(const booster_interface::msg::Odometer &msg)
 {
 
+  	double new_odom_x = msg.x * config->robotOdomFactor;
+    double new_odom_y = msg.y * config->robotOdomFactor;
+    if (abs(new_odom_x - data->robotPoseToOdom.x) > 0.01 || abs(new_odom_y - data->robotPoseToOdom.y) > 0.01)
+        data->walking = true;
+    else
+        data->walking = false;
+
     data->robotPoseToOdom.x = msg.x * config->robotOdomFactor;
     data->robotPoseToOdom.y = msg.y * config->robotOdomFactor;
     data->robotPoseToOdom.theta = msg.theta;
@@ -458,14 +472,6 @@ void Brain::odometerCallback(const booster_interface::msg::Odometer &msg)
              rerun::Points2D({{data->robotPoseToField.x, -data->robotPoseToField.y}, {data->robotPoseToField.x + 0.1 * cos(data->robotPoseToField.theta), -data->robotPoseToField.y - 0.1 * sin(data->robotPoseToField.theta)}})
                  .with_radii({0.2, 0.1})
                  .with_colors({0xFF6666FF, 0xFF0000FF}));
-
-    auto pose = self_locator->getPose();
-    log->log("field/robot_pose_sample",
-         rerun::Points2D({{pose.translation.x(), -pose.translation.y()},
-                          {pose.translation.x() + 0.1 * cos(pose.rotation),
-                           -pose.translation.y() - 0.1 * sin(pose.rotation)}})
-             .with_radii({0.2, 0.1})
-             .with_colors({0x00FFFFFF, 0xFF0000FF}));
 }
 
 void Brain::lowStateCallback(const booster_interface::msg::LowState &msg)
@@ -515,7 +521,6 @@ void Brain::imageCallback(const sensor_msgs::msg::Image &msg)
 
 void Brain::headPoseCallback(const geometry_msgs::msg::Pose &msg)
 {
-
     // --- for test:
     // if (config->rerunLogEnable) {
     if (false)
@@ -666,7 +671,7 @@ void Brain::detectProcessMarkings(const vector<GameObject> &markingObjs)
         if (marking.confidence < confidenceValve)
             continue;
 
-        if (marking.posToRobot.x < -0.5 || marking.posToRobot.x > 10.0)
+        if (marking.posToRobot.x < -0.5 || marking.posToRobot.x > 5.0)
             continue;
 
         data->markings.push_back(marking);

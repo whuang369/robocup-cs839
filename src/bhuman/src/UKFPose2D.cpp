@@ -10,6 +10,7 @@
 #include "UKFPose2D.h"
 #include "Math/BHMath.h"
 #include "Math/Covariance.h"
+#include <iostream>
 
 void UKFPose2D::motionUpdate(const Pose2f& odometryOffset, const Pose2f& filterProcessDeviation,
                              const Pose2f& odometryDeviation, const Vector2f& odometryRotationDeviation)
@@ -138,8 +139,10 @@ void UKFPose2D::landmarkSensorUpdate(const Vector2f& landmarkPosition, const Vec
 
   const Matrix3x2f kalmanGain = landmarkReadingAndMeanCov.transpose() * (landmarkReadingCov + readingCov).inverse();
   Vector2f innovation = reading - landmarkReadingMean;
-  const Vector3f correction = kalmanGain * innovation;
+  Vector3f correction = kalmanGain * innovation;
+  correction = correction.cwiseMax(Vector3f::Constant(-0.1f)).cwiseMin(Vector3f::Constant(0.1f));
   mean += correction;
+  // std::cout << "Correction: " << correction << std::endl;
   mean.z() = Angle::normalize(mean.z());
   cov -= kalmanGain * landmarkReadingAndMeanCov;
   Covariance::fixCovariance<3>(cov);

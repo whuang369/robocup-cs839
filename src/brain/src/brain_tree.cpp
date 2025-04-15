@@ -413,6 +413,11 @@ NodeStatus GoalieDecide::tick()
     bool angleIsGood = (dir_rb_f > -M_PI / 2 && dir_rb_f < M_PI / 2);
     double ballRange = brain->data->ball.range;
     double ballYaw = brain->data->ball.yawToRobot;
+    bool ballInPenalty = (brain->data->ball.posToField.x - brain->config->fieldDimensions.penaltyAreaLength < -brain->config->fieldDimensions.length / 2) &&
+                         (abs(brain->data->ball.posToField.y) < brain->config->fieldDimensions.penaltyAreaWidth / 2);
+    double goalAreaX = -(brain->config->fieldDimensions.length / 2 - brain->config->fieldDimensions.goalAreaLength);
+    bool robotInGoalArea = (abs(brain->data->robotPoseToField.x - goalAreaX) < brain->config->fieldDimensions.goalAreaLength) &&
+						   (abs(brain->data->robotPoseToField.y) < brain->config->fieldDimensions.goalAreaWidth / 2);
 
     string newDecision;
     auto color = 0xFFFFFFFF; // for log
@@ -420,7 +425,38 @@ NodeStatus GoalieDecide::tick()
     {
         newDecision = "find";
         color = 0x0000FFFF;
+        setOutput("x_out", goalAreaX);
+        setOutput("y_out", 0.0);
     }
+    // TODO: consider self and opponent position, stop if close enough to goal
+    else if ((! ballInPenalty) && (! robotInGoalArea))
+    {
+        newDecision = "retreat";
+        color = 0xFF00FFFF;
+        setOutput("x_out", goalAreaX);
+        setOutput("y_out", 0.0);
+    }
+    else if ((! ballInPenalty) && robotInGoalArea)
+    {
+       	newDecision = "wait";
+        color= 0xFFFFFFFF;
+    }
+    else if (ballRange > chaseRangeThreshold)
+    {
+      	newDecision = "chase";
+        color = 0x00FF00FF;
+    }
+    else if ((angleIsGood) && (ballRange <= chaseRangeThreshold))
+    {
+        newDecision = "kick";
+        color = 0xFF0000FF;
+    }
+    else
+    {
+        newDecision = "adjust";
+        color = 0x00FFFFFF;
+    }
+    /*
     else if (brain->data->ball.posToField.x > 0 - static_cast<double>(lastDecision == "retreat"))
     {
         newDecision = "retreat";
@@ -441,6 +477,7 @@ NodeStatus GoalieDecide::tick()
         newDecision = "adjust";
         color = 0x00FFFFFF;
     }
+    */
 
     setOutput("decision_out", newDecision);
     brain->log->logToScreen("tree/Decide",
@@ -545,11 +582,13 @@ void RobotFindBall::onHalted()
 NodeStatus SelfLocate::tick()
 {
   	brain->self_locator->motionUpdate(brain->data->robotPoseToOdom);
-    if ((abs(brain->data->headYawD) > 0.1) | (abs(brain->data->headPitchD) > 0.01)) {
+    // brain->self_locator->sensorUpdate(brain->data->goalposts, brain->data->markings);
+    if ((abs(brain->data->headYawD) > 0.1) || (abs(brain->data->headPitchD) > 0.01) || brain->data->walking) {
         // brain->self_locator->sensorUpdate({}, {});
+        prtDebug("Skipping sensor update");
     }
-   	else {
-    	brain->self_locator->sensorUpdate(brain->data->goalposts, brain->data->markings);
+    else {
+        brain->self_locator->sensorUpdate(brain->data->goalposts, brain->data->markings);
     }
     auto pose = brain->self_locator->getPose();
     brain->calibrateOdom(pose.translation.x(), pose.translation.y(), pose.rotation);

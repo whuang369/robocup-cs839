@@ -65,21 +65,12 @@ cv::Point3f Intrinsics::BackProject(const cv::Point2f &point, float depth) const
         float x = (point.x - cx) / fx;
         float y = (point.y - cy) / fy;
 
-        float xo = x;
-        float yo = y;
-
-        // need to loop until convergence
-        // 10 iterations determined empirically
-        for (int i = 0; i < 10; i++) {
-            float r2 = x * x + y * y;
-            float icdist = (float)1 / (float)(1 + ((distortion_coeffs[4] * r2 + distortion_coeffs[1]) * r2 + distortion_coeffs[0]) * r2);
-            float xq = x / icdist;
-            float yq = y / icdist;
-            float delta_x = 2 * distortion_coeffs[2] * xq * yq + distortion_coeffs[3] * (r2 + 2 * xq * xq);
-            float delta_y = 2 * distortion_coeffs[3] * xq * yq + distortion_coeffs[2] * (r2 + 2 * yq * yq);
-            x = (xo - delta_x) * icdist;
-            y = (yo - delta_y) * icdist;
-        }
+        float r2 = x * x + y * y;
+        float f = 1 + distortion_coeffs[0] * r2 + distortion_coeffs[1] * r2*r2 + distortion_coeffs[4] * r2*r2*r2;
+        float ux = x * f + 2 * distortion_coeffs[2] * x*y + distortion_coeffs[3] * (r2 + 2 * x*x);
+        float uy = y * f + 2 * distortion_coeffs[3] * x*y + distortion_coeffs[2] * (r2 + 2 * y*y);
+        x = ux;
+        y = uy;
         xyz = cv::Point3f(x, y, 1) * depth;
     }
     }

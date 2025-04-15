@@ -34,7 +34,7 @@ public:
     void SegmentationCallback(const sensor_msgs::msg::Image::ConstSharedPtr &msg);
     void DepthCallback(const sensor_msgs::msg::Image::ConstSharedPtr &msg);
     void PoseCallBack(const geometry_msgs::msg::Pose::SharedPtr msg);
-    bool EstimateCameraRollPitch(const cv::Mat &depth_image, float &roll, float &pitch);
+    bool EstimateCameraRollPitch(const cv::Mat &depth_image, float &roll, float &pitch, float &height);
 
 private:
     bool use_depth_ = false;

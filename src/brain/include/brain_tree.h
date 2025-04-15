@@ -81,6 +81,8 @@ public:
             InputPort<double>("adjust_y_tolerance", 0.1, "Consider the y-direction adjustment successful if the offset is smaller than this value"),
             InputPort<string>("decision_in", "", "Used to read the last decision"),
             OutputPort<string>("decision_out"),
+            OutputPort<double>("x_out"),
+          	OutputPort<double>("y_out"),
         };
     }
 

@@ -116,8 +116,8 @@ bool SelfLocator::isGood() {
     Matrix3f cov = bestSample.getCov();
     const float translationalStandardDeviation = std::sqrt(std::max(cov(0, 0), cov(1, 1)));
     const float rotationalStandardDeviation = std::sqrt(cov(2, 2));
-    prtDebug("Validity " + to_string(bestSample.validity) + " translational sd " + to_string(translationalStandardDeviation)
-             + " rotational sd " + to_string(rotationalStandardDeviation));
+    // prtDebug("Validity " + to_string(bestSample.validity) + " translational sd " + to_string(translationalStandardDeviation)
+    //          + " rotational sd " + to_string(rotationalStandardDeviation));
     // if(bestSample.validity >= minValidityForSuperbLocalizationQuality &&
     //    translationalStandardDeviation < maxTranslationDeviationForSuperbLocalizationQuality &&
     //    rotationalStandardDeviation < maxRotationalDeviationForSuperbLocalizationQuality) {
@@ -183,9 +183,6 @@ void SelfLocator::motionUpdate(const Pose2D& robotToOdom)
 void SelfLocator::sensorUpdate(const std::vector<GameObject>& detectedGoalPosts,
                                const std::vector<GameObject>& detectedMarkings)
 {
-    prtDebug("Sensor update");
-
-
     std::vector<GameObject> detectedXMarkers;
     std::copy_if(detectedMarkings.begin(), detectedMarkings.end(), std::back_inserter(detectedXMarkers),
                  [](const GameObject& obj) {
@@ -267,13 +264,13 @@ void SelfLocator::registerLandmarks(const Pose2f& samplePose,
 
     std::vector<int> assignment;
   	int numRegistered = 0;
-    double totalCost = solveAssignment(costMatrix, assignment, 2.0);
+    double totalCost = solveAssignment(costMatrix, assignment, 5.0);
     for (int i = 0; i < detectedObjs.size(); ++i) {
         if (assignment[i] != -1) {
             RegisteredLandmark newLandmark;
             newLandmark.percept = Vector2f(detectedObjs[i].posToRobot.x, detectedObjs[i].posToRobot.y);
             newLandmark.model = groundTruthObjs[assignment[i]];
-            // TODO: covariance
+            newLandmark.covPercept = (Matrix2f() << 1.f, 0.f, 0.f, 1.f).finished();
             landmarks.push_back(newLandmark);
             numRegistered++;
         }
@@ -402,7 +399,7 @@ UKFRobotPoseHypothesis& SelfLocator::getMostValidSample()
             }
         }
     }
-    if(lastBestSample && returnSample->validity <= validityOfLastBestSample * 1.1f) // Bonus for stability
+    if(lastBestSample && returnSample->validity <= validityOfLastBestSample * 1.5f) // Bonus for stability
       	return *lastBestSample;
     else
       	return *returnSample;

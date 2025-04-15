@@ -127,18 +127,22 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
               << p_eye2base.toCVMat() << std::endl;
     std::vector<float> eye2base_angles = p_eye2base.getEulerAngles();
     std::vector<float> eye2base_t = p_eye2base.getTranslation();
-    std::cout << "p_eye2base roll: \n"
-              << eye2base_angles[0] * 180.0 / M_PI << std::endl;
-    std::cout << "p_eye2base pitch: \n"
-              << eye2base_angles[1] * 180.0 / M_PI << std::endl;
-    std::cout << "p_eye2base yaw: \n"
-              << eye2base_angles[2] * 180.0 / M_PI << std::endl;
+    std::cout << "p_eye2base roll: " << eye2base_angles[0] * 180.0 / M_PI << std::endl;
+    std::cout << "p_eye2base pitch: " << eye2base_angles[1] * 180.0 / M_PI << std::endl;
+    std::cout << "p_eye2base yaw: " << eye2base_angles[2] * 180.0 / M_PI << std::endl;
 
-    float roll = 0.0, pitch = 0.0;
-    EstimateCameraRollPitch(depth, roll, pitch);
-    if (roll != 0) {
-      	p_eye2base = Pose(eye2base_t[0], eye2base_t[1], eye2base_t[2], roll, pitch, eye2base_angles[2]);
- 	}
+    bool estimateCameraRollPitch = false;
+	Pose p_eye2base_from_depth;
+    if (estimateCameraRollPitch) {
+    	float roll = 0.0, pitch = 0.0, height = 0.0;
+        bool success = EstimateCameraRollPitch(depth, roll, pitch, height);
+        if (success) {
+            p_eye2base_from_depth = Pose(eye2base_t[0], eye2base_t[1], eye2base_t[2], roll, pitch, eye2base_angles[2]);
+            std::cout << "p_eye2base_from_depth: \n" << p_eye2base_from_depth.toCVMat() << std::endl;
+            // p_eye2base = p_eye2base_from_depth;
+ 	    }
+        else estimateCameraRollPitch = false;
+    }
 
     // inference
     auto detections = detector_->Inference(color);
@@ -164,6 +168,18 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
         auto pose_estimator = get_estimator(detection.class_name);
         Pose pose_obj_by_color = pose_estimator->EstimateByColor(p_eye2base, detection, color);
         Pose pose_obj_by_depth = pose_estimator->EstimateByDepth(p_eye2base, detection, depth);
+
+        if (estimateCameraRollPitch) {
+            Pose pose_obj_by_color_est = pose_estimator->EstimateByColor(p_eye2base_from_depth, detection, color);
+            Pose pose_obj_by_depth_est = pose_estimator->EstimateByDepth(p_eye2base_from_depth, detection, depth);
+		    if (detection.class_name == "XCross" || detection.class_name == "PenaltyPoint") {
+       	        std::cout << detection.class_name << " kinematics color: " << pose_obj_by_color.getTranslation()[0] << ", " << pose_obj_by_color.getTranslation()[1] << std::endl;
+                std::cout << detection.class_name << " kinematics depth: " << pose_obj_by_depth.getTranslation()[0] << ", " << pose_obj_by_depth.getTranslation()[1] << std::endl;
+       	        std::cout << detection.class_name << " estimated color: " << pose_obj_by_color_est.getTranslation()[0] << ", " << pose_obj_by_color_est.getTranslation()[1] << std::endl;
+                std::cout << detection.class_name << " estimated depth: " << pose_obj_by_depth_est.getTranslation()[0] << ", " << pose_obj_by_depth_est.getTranslation()[1] << std::endl;
+            }
+        }
+
         detection_obj.position_projection = pose_obj_by_color.getTranslation();
         detection_obj.position = pose_obj_by_depth.getTranslation();
 
@@ -184,6 +200,8 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
     // publish msg
     detection_pub_->publish(detection_msg);
 
+    std::cout << detection_msg.detected_objects.size() << std::endl;
+
     // show vision results
     if (show_res_) {
         cv::Mat img_out = YoloV8Detector::DrawDetection(color, detections);
@@ -196,7 +214,7 @@ void VisionNode::DepthCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
     std::cout << "new depth received" << std::endl;
     cv::Mat img;
     try {
-        img = toCVMat(*msg);
+        img = cv::Mat(msg->height, msg->width, CV_16UC1, const_cast<unsigned char*>(msg->data.data()));
     } catch (std::exception &e) {
         std::cerr << "cv_bridge exception " << e.what() << std::endl;
         return;
@@ -212,8 +230,11 @@ void VisionNode::DepthCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
         return;
     }
 
+    cv::Mat depth_image_float;
+    img.convertTo(depth_image_float, CV_32F, 0.0008);
+
     double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
-    data_syncer_->AddDepth(DepthDataBlock(img, timestamp));
+    data_syncer_->AddDepth(DepthDataBlock(depth_image_float, timestamp));
 }
 
 void VisionNode::PoseCallBack(const geometry_msgs::msg::Pose::SharedPtr msg) {
@@ -231,26 +252,20 @@ void VisionNode::PoseCallBack(const geometry_msgs::msg::Pose::SharedPtr msg) {
     data_syncer_->AddPose(PoseDataBlock(pose, timestamp));
 }
 
-bool VisionNode::EstimateCameraRollPitch(const cv::Mat &depth_image, float &roll, float &pitch) {
+bool VisionNode::EstimateCameraRollPitch(const cv::Mat &depth_image, float &roll, float &pitch, float &height) {
   	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    cv::Mat depth_image_float;
-    depth_image.convertTo(depth_image_float, CV_32F, 0.001);
-
-    int height = depth_image.rows;
-    int width = depth_image.cols;
-  	std::cout << height << "," << width << ", " << depth_image_float.type() << std::endl;
 
     // Convert Depth Image (cv::Mat) to PCL Point Cloud
-    for (int v = height * 3 / 4; v < height; v += 2) {
-        for (int u = 0; u < width; u += 4) {
-            float Z = depth_image_float.at<float>(v, u);  // Get depth value
+    for (int v = depth_image.rows * 3 / 4; v < depth_image.rows; v += 2) {
+        for (int u = 0; u < depth_image.cols; u += 4) {
+            float Z = depth_image.at<float>(v, u);  // Get depth value
             if (!std::isnan(Z) && (Z > 0.6) && (Z < 5)) {  // Ignore invalid depth values
-                float X = (u - intr_.cx) * Z / intr_.fx;
-                float Y = (v - intr_.cy) * Z / intr_.fy;
+                cv::Point2f uv = cv::Point2f(u, v);
+                cv::Point3f point2eye = intr_.BackProject(uv, Z);
 
                 // reject points taller than the camera
-                if (Y > 0) {
-                	cloud->points.emplace_back(X, Y, Z);
+                if (point2eye.y > 0) {
+                	cloud->points.emplace_back(point2eye.x, point2eye.y, point2eye.z);
                 }
             }
         }
@@ -260,10 +275,6 @@ bool VisionNode::EstimateCameraRollPitch(const cv::Mat &depth_image, float &roll
       	std::cout << "Fewer than 100 points." << std::endl;
       	return false;
 	}
-
-    // cloud->width = cloud->points.size();
-    // cloud->height = 1;
-    // cloud->is_dense = false;
 
     // Fit a Plane Using RANSAC
     pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
@@ -285,10 +296,10 @@ bool VisionNode::EstimateCameraRollPitch(const cv::Mat &depth_image, float &roll
         return false;
     }
 
-    // Extract Plane Normal (A, B, C)
     float A = coefficients->values[0];
     float B = coefficients->values[1];
     float C = coefficients->values[2];
+    float D = coefficients->values[3];
 
     Eigen::Vector3d v(A, B, C);
     v.normalize();
@@ -335,20 +346,23 @@ bool VisionNode::EstimateCameraRollPitch(const cv::Mat &depth_image, float &roll
     }
 
 
-    // Normalize Normal Vector
-    // float norm = std::sqrt(A * A + B * B + C * C);
-    // A /= norm;
-    // B /= norm;
-    // C /= norm;
-
-    // Compute Roll and Pitch Angles
-    // roll = std::atan2(B, C);
-    // pitch = std::atan2(A, C);
     std::cout << "Estimated Roll: " << roll * 180.0 / M_PI << " degrees" << std::endl;
 	std::cout << "Estimated Pitch: " << pitch * 180.0 / M_PI << " degrees" << std::endl;
+	float normal_magnitude = std::sqrt(A * A + B * B + C * C);
+    if (normal_magnitude == 0) {
+    	std::cerr << "Invalid plane coefficients!" << std::endl;
+    	return false;
+    }
+    height = std::abs(D) / normal_magnitude;
+    std::cout << "Estimated height: " << height << std::endl;
 
     if (confidence < 0.4) {
         std::cout << "Confidence is too low." << std::endl;
+        return false;
+    }
+
+    if ((roll * 180.0 / M_PI < 0) && (roll * 180.0 / M_PI > -70) || (roll * 180.0 / M_PI > 0) && (roll * 180.0 / M_PI > 20)) {
+      	std::cout << "Estimated plane may be a wall." << std::endl;
         return false;
     }
     return true;
