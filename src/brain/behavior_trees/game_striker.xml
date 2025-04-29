@@ -5,20 +5,20 @@
             <ReactiveSequence _while="control_state==2" name="pickup">
                 <CamScanField  _while="!odom_calibrated"/>
                 <SubTree ID="CamFindAndTrackBall" _autoremap="true" _while="odom_calibrated" />
-                <SelfLocate mode="enter_field" />
+                <SelfLocate />
             </ReactiveSequence>
             <ReactiveSequence _while="control_state==3" name="control_state-3">
                 <ReactiveSequence _while="gc_game_state=='INITIAL'" name="init">
                     <CamScanField _while="!odom_calibrated"/>
                     <SubTree ID="CamFindAndTrackBall" _autoremap="true" _while="odom_calibrated" />
-                    <SelfLocate mode="enter_field" />
+                    <SelfLocate />
                 </ReactiveSequence>
 
                 <ReactiveSequence _while="gc_game_state=='READY'" name="ready">
                     <CamScanField />
                     <MoveToPoseOnField x="-2.0" _while="player_role == 'striker'" vtheta_limit="2.0"  vx_limit="0.4" />
                     <MoveToPoseOnField x="-5.5" _while="player_role == 'goal_keeper'" vtheta_limit="2.0"  vx_limit="0.4" />
-                    <SelfLocate mode="trust_direction" />
+                    <SelfLocate />
                 </ReactiveSequence>
 
                 <ReactiveSequence _while="gc_game_state=='SET'" name="set">
@@ -28,7 +28,7 @@
 
                 <ReactiveSequence _while="gc_game_state=='PLAY'" name="play">
                     <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
-                    <SelfLocate mode="trust_direction" />
+                    <SelfLocate />
                     <Sequence>
                         <StrikerDecide decision_out="{decision}" decision_in="{decision}" chase_threshold="1.2" />
                         <RobotFindBall _while="decision == 'find'" vyaw_limit="1.0" />

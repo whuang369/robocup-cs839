@@ -660,7 +660,7 @@ void Brain::detectProcessBalls(const vector<GameObject> &ballObjs)
 
 void Brain::detectProcessMarkings(const vector<GameObject> &markingObjs)
 {
-    const double confidenceValve = 0.1;
+    const double confidenceValve = 20;
 
     data->markings.clear();
 
@@ -671,7 +671,7 @@ void Brain::detectProcessMarkings(const vector<GameObject> &markingObjs)
         if (marking.confidence < confidenceValve)
             continue;
 
-        if (marking.posToRobot.x < -0.5 || marking.posToRobot.x > 5.0)
+        if (marking.posToRobot.x < -0.5 || marking.posToRobot.x > 10.0)
             continue;
 
         data->markings.push_back(marking);
@@ -680,7 +680,7 @@ void Brain::detectProcessMarkings(const vector<GameObject> &markingObjs)
 
 void Brain::detectProcessGoalPosts(const vector<GameObject> &goalpostObjs)
 {
-    const double confidenceValve = 0.1;
+    const double confidenceValve = 20;
 
     data->goalposts.clear();
 

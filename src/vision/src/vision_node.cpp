@@ -167,8 +167,8 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
 
         auto pose_estimator = get_estimator(detection.class_name);
         Pose pose_obj_by_color = pose_estimator->EstimateByColor(p_eye2base, detection, color);
-        Pose pose_obj_by_depth = pose_estimator->EstimateByDepth(p_eye2base, detection, depth);
-
+        // Pose pose_obj_by_depth = pose_estimator->EstimateByDepth(p_eye2base, detection, depth);
+		/*
         if (estimateCameraRollPitch) {
             Pose pose_obj_by_color_est = pose_estimator->EstimateByColor(p_eye2base_from_depth, detection, color);
             Pose pose_obj_by_depth_est = pose_estimator->EstimateByDepth(p_eye2base_from_depth, detection, depth);
@@ -179,9 +179,10 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
                 std::cout << detection.class_name << " estimated depth: " << pose_obj_by_depth_est.getTranslation()[0] << ", " << pose_obj_by_depth_est.getTranslation()[1] << std::endl;
             }
         }
+		*/
 
         detection_obj.position_projection = pose_obj_by_color.getTranslation();
-        detection_obj.position = pose_obj_by_depth.getTranslation();
+        // detection_obj.position = pose_obj_by_depth.getTranslation();
 
         auto xyz = p_head2base.getTranslation();
         auto rpy = p_head2base.getEulerAngles();
