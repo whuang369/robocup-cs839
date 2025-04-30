@@ -121,6 +121,7 @@ bool SelfLocator::isGood() {
     // if(bestSample.validity >= minValidityForSuperbLocalizationQuality &&
     //    translationalStandardDeviation < maxTranslationDeviationForSuperbLocalizationQuality &&
     //    rotationalStandardDeviation < maxRotationalDeviationForSuperbLocalizationQuality) {
+	prtDebug("Validity " + to_string(bestSample.validity));
     if(bestSample.validity >= minValidityForSuperbLocalizationQuality) {
       	return true;
     }
@@ -206,19 +207,19 @@ void SelfLocator::sensorUpdate(const std::vector<GameObject>& detectedGoalPosts,
         std::vector<RegisteredLandmark> landmarks;
         int numRegisteredLandmarks = 0;
 
-        if (detectedGoalPosts.size() > 0) {
+        if (detectedGoalPosts.size() > 0 && (i == idOfLastBestSample)) {
             registerLandmarks(samplePose, detectedGoalPosts, goalPosts, landmarks);
 			prtDebug("Registered " + to_string(landmarks.size() - numRegisteredLandmarks) + " goal posts");
             numRegisteredLandmarks = landmarks.size();
         }
 
-        if (detectedXMarkers.size() > 0) {
+        if (detectedXMarkers.size() > 0 && (i == idOfLastBestSample)) {
             registerLandmarks(samplePose, detectedXMarkers, xMarkers, landmarks);
-            prtDebug("Registered " + to_string(landmarks.size() - numRegisteredLandmarks) + " X markers");
+            prtDebug("Registered " + to_string(landmarks.size() - numRegisteredLandmarks) + " from " + to_string(detectedXMarkers.size()) + "X markers");
             numRegisteredLandmarks = landmarks.size();
         }
 
-        if (detectedPenaltyPoints.size() > 0) {
+        if (detectedPenaltyPoints.size() > 0 && (i == idOfLastBestSample)) {
             registerLandmarks(samplePose, detectedPenaltyPoints, penaltyMarkers, landmarks);
             prtDebug("Registered " + to_string(landmarks.size() - numRegisteredLandmarks) + " penalty points");
             numRegisteredLandmarks = landmarks.size();
@@ -354,7 +355,7 @@ double SelfLocator::solveAssignment(const MatrixXd& costMatrix, std::vector<int>
     for (int i = 0; i < n; i++) {
         if (assignment[i] > -1) {
             total_cost += cost(i, assignment[i]);
-            prtDebug("Assigned " + to_string(i) + " to " + to_string(assignment[i]));
+            // prtDebug("Assigned " + to_string(i) + " to " + to_string(assignment[i]));
         }
     }
     return total_cost;

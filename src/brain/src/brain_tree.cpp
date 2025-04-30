@@ -203,14 +203,15 @@ NodeStatus CamScanField::tick()
 
     int cycleTime = msec % msecCycle;
     double pitch = cycleTime > (msecCycle / 2.0) ? lowPitch : highPitch;
-    int i;
-    for (i = 1; i <= 6; i++)
-      	if (cycleTime < (msecCycle * i / 6))
-            break;
-    if (i > 3) i = 7 - i;
-    double yaw;
-    if (i == 1) yaw = rightYaw; else if (i == 2) yaw = 0; else yaw = leftYaw;
-    // double yaw = cycleTime < (msecCycle / 2.0) ? (leftYaw - rightYaw) * (2.0 * cycleTime / msecCycle) + rightYaw : (leftYaw - rightYaw) * (2.0 * (msecCycle - cycleTime) / msecCycle) + rightYaw;
+    double yaw = cycleTime < (msecCycle / 2.0) ? (leftYaw - rightYaw) * (2.0 * cycleTime / msecCycle) + rightYaw : (leftYaw - rightYaw) * (2.0 * (msecCycle - cycleTime) / msecCycle) + rightYaw;
+
+    // int i;
+    // for (i = 1; i <= 6; i++)
+    //   	if (cycleTime < (msecCycle * i / 6))
+    //         break;
+    // if (i > 3) i = 7 - i;
+    // double yaw;
+    // if (i == 1) yaw = rightYaw; else if (i == 2) yaw = 0; else yaw = leftYaw;
 
     brain->client->moveHead(pitch, yaw);
     return NodeStatus::SUCCESS;
@@ -582,14 +583,13 @@ void RobotFindBall::onHalted()
 NodeStatus SelfLocate::tick()
 {
   	brain->self_locator->motionUpdate(brain->data->robotPoseToOdom);
-    // brain->self_locator->sensorUpdate(brain->data->goalposts, brain->data->markings);
-    if ((abs(brain->data->headYawD) > 0.1) || (abs(brain->data->headPitchD) > 0.01) || brain->data->walking) {
-        // brain->self_locator->sensorUpdate({}, {});
-        prtDebug("Skipping sensor update");
-    }
-    else {
-        brain->self_locator->sensorUpdate(brain->data->goalposts, brain->data->markings);
-    }
+    brain->self_locator->sensorUpdate(brain->data->goalposts, brain->data->markings);
+    // if ((abs(brain->data->headYawD) > 0.1) || (abs(brain->data->headPitchD) > 0.01) || brain->data->walking) {
+    //     prtDebug("Skipping sensor update");
+    // }
+    // else {
+    //     brain->self_locator->sensorUpdate(brain->data->goalposts, brain->data->markings);
+    // }
     auto pose = brain->self_locator->getPose();
     brain->calibrateOdom(pose.translation.x(), pose.translation.y(), pose.rotation);
     // brain->tree->setEntry<bool>("odom_calibrated", true);
@@ -711,7 +711,6 @@ NodeStatus MoveToPoseOnField::tick()
     getInput("x_tolerance", xTolerance);
     getInput("y_tolerance", yTolerance);
     getInput("theta_tolerance", thetaTolerance);
-
     brain->client->moveToPoseOnField(tx, ty, ttheta, longRangeThreshold, turnThreshold, vxLimit, vyLimit, vthetaLimit, xTolerance, yTolerance, thetaTolerance);
     return NodeStatus::SUCCESS;
 }

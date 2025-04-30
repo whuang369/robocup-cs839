@@ -480,7 +480,7 @@ void Brain::lowStateCallback(const booster_interface::msg::LowState &msg)
     data->headPitch = msg.motor_state_serial[1].q;
     data->headYawD = msg.motor_state_serial[0].dq;
     data->headPitchD = msg.motor_state_serial[1].dq;
-    prtDebug("Head Yaw dq " + to_string(msg.motor_state_serial[0].dq) + " pitch dq " + to_string(msg.motor_state_serial[1].dq));
+    // prtDebug("Head Yaw dq " + to_string(msg.motor_state_serial[0].dq) + " pitch dq " + to_string(msg.motor_state_serial[1].dq));
 
     log->setTimeNow();
 
