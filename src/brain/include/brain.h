@@ -95,4 +95,6 @@ private:
     rclcpp::Subscription<booster_interface::msg::LowState>::SharedPtr lowStateSubscription;
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr imageSubscription;
     rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr headPoseSubscription;
+    rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr ballToRobotPub;
+    rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr goalToRobotPub;
 };

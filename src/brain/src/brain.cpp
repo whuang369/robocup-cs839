@@ -64,6 +64,9 @@ void Brain::init()
     lowStateSubscription = create_subscription<booster_interface::msg::LowState>("/low_state", 1, bind(&Brain::lowStateCallback, this, _1));
     imageSubscription = create_subscription<sensor_msgs::msg::Image>("/camera/camera/color/image_raw", 1, bind(&Brain::imageCallback, this, _1));
     headPoseSubscription = create_subscription<geometry_msgs::msg::Pose>("/head_pose", 1, bind(&Brain::headPoseCallback, this, _1));
+
+    ballToRobotPub = create_publisher<geometry_msgs::msg::Point>("/brain/ball_to_robot", 10);
+    goalToRobotPub = create_publisher<geometry_msgs::msg::Point>("/brain/goal_to_robot", 10);
 }
 
 void Brain::loadConfig()
@@ -161,6 +164,20 @@ void Brain::updateBallMemory()
                  .with_colors({tree->getEntry<bool>("ball_location_known") ? 0xFFFFFFFF : 0xFF0000FF})
                  .with_radii({0.005})
                  .with_draw_order(30));
+
+    geometry_msgs::msg::Point ballPosToRobot;
+    ballPosToRobot.x = data->ball.posToRobot.x;
+    ballPosToRobot.y = data->ball.posToRobot.y;
+    ballPosToRobot.z = 0;
+    ballToRobotPub->publish(ballPosToRobot);
+
+    geometry_msgs::msg::Point goalCenterToRobot;
+    Pose2D goalPoseToField = Pose2D{0.0, 0.0, 0.0};
+    Pose2D goalPoseToRobot = data->field2robot(goalPoseToField);
+    goalCenterToRobot.x = goalPoseToRobot.x;
+    goalCenterToRobot.y = goalPoseToRobot.y;
+    goalCenterToRobot.z = 0;
+    goalToRobotPub->publish(goalCenterToRobot);
 }
 
 vector<double> Brain::getGoalPostAngles(const double margin)
@@ -220,20 +237,20 @@ void Brain::calibrateOdom(double x, double y, double theta)
 
     double placeHolder;
     // ball
-    transCoord(
-        data->ball.posToRobot.x, data->ball.posToRobot.y, 0,
-        data->robotPoseToField.x, data->robotPoseToField.y, data->robotPoseToField.theta,
-        data->ball.posToField.x, data->ball.posToField.y, placeHolder);
+    // transCoord(
+    //     data->ball.posToRobot.x, data->ball.posToRobot.y, 0,
+    //     data->robotPoseToField.x, data->robotPoseToField.y, data->robotPoseToField.theta,
+    //     data->ball.posToField.x, data->ball.posToField.y, placeHolder);
 
     // opponents
-    for (int i = 0; i < data->opponents.size(); i++)
-    {
-        auto obj = data->opponents[i];
-        transCoord(
-            obj.posToRobot.x, obj.posToRobot.y, 0,
-            data->robotPoseToField.x, data->robotPoseToField.y, data->robotPoseToField.theta,
-            obj.posToField.x, obj.posToField.y, placeHolder);
-    }
+    // for (int i = 0; i < data->opponents.size(); i++)
+    // {
+    //     auto obj = data->opponents[i];
+    //     transCoord(
+    //         obj.posToRobot.x, obj.posToRobot.y, 0,
+    //         data->robotPoseToField.x, data->robotPoseToField.y, data->robotPoseToField.theta,
+    //         obj.posToField.x, obj.posToField.y, placeHolder);
+    // }
 }
 
 double Brain::msecsSince(rclcpp::Time time)

@@ -25,7 +25,9 @@ struct FieldDimensions
                               // Note: The penalty area is larger than the goal area; the actual lengths and widths of the penalty area and the goal area are smaller. This naming is to be consistent with the competition rules.
 };
 const FieldDimensions FD_KIDSIZE{9, 6, 1.5, 2.6, 0.75, 2, 5, 1, 3};
+// const FieldDimensions FD_ADULTSIZE{8.03, 5.95, 1.29, 1.9, 0.75, 0.595, 2.19, 1.64, 3.985};
 const FieldDimensions FD_ADULTSIZE{14, 9, 2.1, 2.6, 1.5, 3, 6, 1, 4};
+// const FieldDimensions FD_ADULTSIZE{14, 8.5, 2.1, 2.6, 1.5, 3, 6, 1, 4};
 
 // Pose2D, used to record a point on a plane and its orientation
 struct Pose2D
