@@ -125,8 +125,8 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
               << p_head2base.toCVMat() << std::endl;
     std::cout << "p_eye2base: \n"
               << p_eye2base.toCVMat() << std::endl;
-    std::vector<float> eye2base_angles = p_eye2base.getEulerAngles();
-    std::vector<float> eye2base_t = p_eye2base.getTranslation();
+    std::vector<float> eye2base_angles = p_eye2base.getEulerAnglesVec();
+    std::vector<float> eye2base_t = p_eye2base.getTranslationVec();
     std::cout << "p_eye2base roll: " << eye2base_angles[0] * 180.0 / M_PI << std::endl;
     std::cout << "p_eye2base pitch: " << eye2base_angles[1] * 180.0 / M_PI << std::endl;
     std::cout << "p_eye2base yaw: " << eye2base_angles[2] * 180.0 / M_PI << std::endl;
@@ -167,6 +167,7 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
 
         auto pose_estimator = get_estimator(detection.class_name);
         Pose pose_obj_by_color = pose_estimator->EstimateByColor(p_eye2base, detection, color);
+
         // Pose pose_obj_by_depth = pose_estimator->EstimateByDepth(p_eye2base, detection, depth);
 		/*
         if (estimateCameraRollPitch) {
@@ -181,11 +182,11 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
         }
 		*/
 
-        detection_obj.position_projection = pose_obj_by_color.getTranslation();
-        // detection_obj.position = pose_obj_by_depth.getTranslation();
+        detection_obj.position_projection = pose_obj_by_color.getTranslationVec();
+        // detection_obj.position = pose_obj_by_depth.getTranslationVec();
 
-        auto xyz = p_head2base.getTranslation();
-        auto rpy = p_head2base.getEulerAngles();
+        auto xyz = p_head2base.getTranslationVec();
+        auto rpy = p_head2base.getEulerAnglesVec();
         std::vector<float> xyzrpy = {xyz[0], xyz[1], xyz[2], static_cast<float>(rpy[0] / CV_PI * 180), static_cast<float>(rpy[1] / CV_PI * 180), static_cast<float>(rpy[2] / CV_PI * 180)};
         detection_obj.received_pos = xyzrpy;
 

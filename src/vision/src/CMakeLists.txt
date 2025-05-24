@@ -1,6 +1,7 @@
 add_subdirectory(base)
 add_subdirectory(model)
 add_subdirectory(pose_estimator)
+add_subdirectory(calibration)
 
 set(BOOSTER_ROBOTICS_SDK_DEPENDENCIES booster_robotics_sdk.a fastrtps fastcdr)
 

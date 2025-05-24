@@ -4,6 +4,7 @@
     <include path="./subtrees/subtree_goal_keeper_play.xml" />
     <include path="./subtrees/subtree_striker_freekick.xml" />
     <include path="./subtrees/subtree_goal_keeper_freekick.xml" />
+    <include path="./subtrees/subtree_auto_standup_and_locate.xml" />
     <BehaviorTree ID="MainTree">
         <Sequence name="root">
             <RunOnce> <Script code="treat_person_as_robot:=false" /> </RunOnce>
@@ -15,7 +16,7 @@
             </ReactiveSequence>
 
             <ReactiveSequence _while="control_state==3" name="control_state-3">
-                
+                <SubTree ID="AutoGetUpAndLocate" _autoremap="true" />
                 <ReactiveSequence _while="gc_is_under_penalty" name="penalty">
                     <SetVelocity />
                     <SelfLocate mode="enter_field" _while="!odom_calibrated" />

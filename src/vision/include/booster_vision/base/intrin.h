@@ -31,6 +31,25 @@ struct Intrinsics {
         return (cv::Mat_<float>(3, 3) << fx, 0, cx, 0, fy, cy, 0, 0, 1);
     }
 
+    // overload << operator for printing
+    friend std::ostream &operator<<(std::ostream &os, const Intrinsics &intr) {
+        os << "fx: " << intr.fx << std::endl
+           << "fy: " << intr.fy << std::endl
+           << "cx: " << intr.cx << std::endl
+           << "cy: " << intr.cy << std::endl;
+        os << "distortion_model: " << static_cast<int>(intr.model) << std::endl;
+        if (intr.model == DistortionModel::kNone) {
+            os << "distortion_coeffs: none" << std::endl;
+        } else if (intr.model == DistortionModel::kBrownConrady) {
+            os << "distortion_coeffs: ";
+            for (size_t i = 0; i < intr.distortion_coeffs.size(); i++) {
+                os << intr.distortion_coeffs[i] << " ";
+            }
+            os << std::endl;
+        }
+        return os;
+    }
+
     float fx = 0;
     float fy = 0;
     float cx = 0;
@@ -40,3 +59,37 @@ struct Intrinsics {
 };
 
 } // namespace booster_vision
+
+// encode and decode for converting between Intrinsics and YAML
+namespace YAML {
+// Specialize the convert template for Pose
+template <>
+struct convert<booster_vision::Intrinsics> {
+    static Node encode(const booster_vision::Intrinsics &intrin) {
+        Node node;
+        node["fx"] = intrin.fx;
+        node["fy"] = intrin.fy;
+        node["cx"] = intrin.cx;
+        node["cy"] = intrin.cy;
+        node["distortion_model"] = static_cast<int>(intrin.model);
+        node["distortion_coeffs"] = intrin.distortion_coeffs;
+        return node;
+    }
+
+    static bool decode(const Node &node, booster_vision::Intrinsics &intr) {
+        if (!node) {
+            throw std::runtime_error("Intrinsics: Invalid YAML node");
+        }
+        intr.fx = node["fx"].as<float>();
+        intr.fy = node["fy"].as<float>();
+        intr.cx = node["cx"].as<float>();
+        intr.cy = node["cy"].as<float>();
+        intr.model = static_cast<booster_vision::Intrinsics::DistortionModel>(node["distortion_model"].as<int>());
+        if (!node["distortion_coeffs"].IsSequence() || node["distortion_coeffs"].size() < 5) {
+            return false;
+        }
+        intr.distortion_coeffs = node["distortion_coeffs"].as<std::vector<float>>();
+        return true;
+    }
+};
+} // namespace YAML

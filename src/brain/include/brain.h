@@ -14,6 +14,10 @@
 
 #include "booster_interface/msg/odometer.hpp"
 #include "booster_interface/msg/low_state.hpp"
+#include "booster_interface/msg/raw_bytes_msg.hpp"
+
+#include "RoboCupGameControlData.h"
+#include "team_communication_msg.h"
 
 #include "brain_config.h"
 #include "brain_data.h"
@@ -21,6 +25,7 @@
 #include "brain_tree.h"
 #include "locator.h"
 #include "robot_client.h"
+#include "brain_communication.h"
 
 #include "self_localization.h"
 
@@ -46,6 +51,8 @@ public:
     std::shared_ptr<SelfLocator> self_locator;
     // The BrainTree object, which contains the operations related to the BehaviorTree.
     std::shared_ptr<BrainTree> tree;
+    // The BrainCommunication object, which contains the operations related to communication each other and to GameController.
+    std::shared_ptr<BrainCommunication> communication;
 
     Brain();
 
@@ -87,6 +94,7 @@ private:
     void detectProcessBalls(const vector<GameObject> &ballObjs);
     void detectProcessMarkings(const vector<GameObject> &markingObjs);
     void detectProcessGoalPosts(const vector<GameObject> &goalpostObjs);
+    void recoveryStateCallback(const booster_interface::msg::RawBytesMsg &msg);
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joySubscription;
     rclcpp::Subscription<game_controller_interface::msg::GameControlData>::SharedPtr gameControlSubscription;
@@ -97,4 +105,5 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr headPoseSubscription;
     rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr ballToRobotPub;
     rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr goalToRobotPub;
+    rclcpp::Subscription<booster_interface::msg::RawBytesMsg>::SharedPtr recoveryStateSubscription;
 };
