@@ -1,11 +1,23 @@
 #pragma once
 
 #include <vector>
+#include <chrono>
+#include <sstream>
 
 #include <yaml-cpp/yaml.h>
 
 #include <opencv2/opencv.hpp>
 
+namespace booster_vision {
+std::string getTimeString() {
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    std::tm tm = *std::localtime(&now_c);
+    std::stringstream ss;
+    ss << std::put_time(&tm, "%Y-%m-%d-%H-%M-%S");
+    return ss.str();
+}
+}
 namespace YAML {
 template <>
 struct convert<std::vector<double>> {

@@ -301,6 +301,49 @@ private:
     Brain *brain;
 };
 
+// 条件起身
+class CheckAndStandUp : public SyncActionNode
+{
+public:
+CheckAndStandUp(const string &name, const NodeConfig &config, Brain *_brain) : SyncActionNode(name, config), brain(_brain) {}
+
+    static PortsList providedPorts() {
+        return {};
+    }
+
+    NodeStatus tick() override;
+
+private:
+    Brain *brain;
+};
+
+// 起身后的转身定位
+class RotateForRelocate : public StatefulActionNode
+{
+public:
+    RotateForRelocate(const string &name, const NodeConfig &config, Brain *_brain) : StatefulActionNode(name, config), brain(_brain) {}
+
+    static PortsList providedPorts()
+    {
+        return {
+            InputPort<double>("vyaw_limit", 1.0, "转向的速度上限"),
+            InputPort<int>("max_msec_locate", 5000, "最长重新定位时间"),
+        };
+    }
+
+    NodeStatus onStart() override;
+
+    NodeStatus onRunning() override;
+
+    void onHalted() override;
+
+private:
+    Brain *brain;
+    rclcpp::Time _lastSuccessfulLocalizeTime;
+    rclcpp::Time _startTime;
+};
+
+
 /**
  * @brief Set the robot's velocity.
  *

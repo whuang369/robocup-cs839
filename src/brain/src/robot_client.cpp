@@ -31,6 +31,20 @@ int RobotClient::waveHand(bool doWaveHand)
     return 0;
 }
 
+int RobotClient::standUp()
+{
+    auto msg = booster_msgs::CreateGetUpMsg();
+    publisher->publish(msg);
+    return 0;
+}
+
+int RobotClient::enterDamping()
+{
+    auto msg = booster_msgs::CreateChangeModeMsg(booster::robot::RobotMode::kDamping);
+    publisher->publish(msg);
+    return 0;
+}
+
 int RobotClient::setVelocity(double x, double y, double theta, bool applyMinX, bool applyMinY, bool applyMinTheta)
 {
     brain->log->setTimeNow();

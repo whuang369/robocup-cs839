@@ -29,6 +29,8 @@ Brain::Brain() : rclcpp::Node("brain_node")
     declare_parameter<string>("rerunLog.server_addr", "");
     declare_parameter<int>("rerunLog.img_interval", 10);
 
+    declare_parameter<bool>("enable_com", true);
+
     // The tree_file_path is configured in launch.py and not placed in config.yaml.
     declare_parameter<string>("tree_file_path", "");
 }
@@ -45,6 +47,7 @@ void Brain::init()
     log = std::make_shared<BrainLog>(this);
     tree = std::make_shared<BrainTree>(this);
     client = std::make_shared<RobotClient>(this);
+    communication = std::make_shared<BrainCommunication>(this);
 
     locator->init(config->fieldDimensions, 4, 0.5);
 
@@ -53,6 +56,8 @@ void Brain::init()
     client->init();
 
     log->prepare();
+
+    communication->initUDPBroadcast();
 
     data->lastSuccessfulLocalizeTime = get_clock()->now();
 
@@ -63,6 +68,8 @@ void Brain::init()
     lowStateSubscription = create_subscription<booster_interface::msg::LowState>("/low_state", 1, bind(&Brain::lowStateCallback, this, _1));
     imageSubscription = create_subscription<sensor_msgs::msg::Image>("/camera/camera/color/image_raw", 1, bind(&Brain::imageCallback, this, _1));
     headPoseSubscription = create_subscription<geometry_msgs::msg::Pose>("/head_pose", 1, bind(&Brain::headPoseCallback, this, _1));
+    recoveryStateSubscription = create_subscription<booster_interface::msg::RawBytesMsg>("fall_down_recovery_state", 1, bind(&Brain::recoveryStateCallback, this, _1));
+
 }
 
 void Brain::loadConfig()
@@ -533,6 +540,38 @@ void Brain::headPoseCallback(const geometry_msgs::msg::Pose &msg)
                  rerun::Scalar(yaw));
     }
 }
+
+void Brain::recoveryStateCallback(const booster_interface::msg::RawBytesMsg &msg)
+{
+    // uint8_t state; // IS_READY = 0, IS_FALLING = 1, HAS_FALLEN = 2, IS_GETTING_UP = 3,  
+    // uint8_t is_recovery_available; // 1 for available, 0 for not available
+    // 使用 RobotRecoveryState 结构，将msg里面的msg转换为RobotRecoveryState
+    try
+    {
+        const std::vector<unsigned char>& buffer = msg.msg;
+        RobotRecoveryStateData recoveryState;
+        memcpy(&recoveryState, buffer.data(), buffer.size());
+
+        vector<RobotRecoveryState> recoveryStateMap = {
+            RobotRecoveryState::IS_READY,
+            RobotRecoveryState::IS_FALLING,
+            RobotRecoveryState::HAS_FALLEN,
+            RobotRecoveryState::IS_GETTING_UP
+        };
+        this->data->recoveryState = recoveryStateMap[static_cast<int>(recoveryState.state)];
+        this->data->isRecoveryAvailable = static_cast<bool>(recoveryState.is_recovery_available);
+        this->data->currentRobotModeIndex = static_cast<int>(recoveryState.current_planner_index);
+        
+        // cout << "recoveryState: " << static_cast<int>(recoveryState.state) << endl;
+        // cout << "recovery is available: " << static_cast<int>(recoveryState.is_recovery_available) << endl;
+        // cout << "current planner idx: " << static_cast<int>(recoveryState.current_planner_index) << endl;
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+}
+
 
 vector<GameObject> Brain::getGameObjects(const vision_interface::msg::Detections &detections)
 {

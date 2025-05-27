@@ -44,7 +44,7 @@ Pose BallPoseEstimator::EstimateByDepth(const Pose &p_eye2base, const DetectionR
     if (!use_depth_ || depth.empty()) return Pose();
 
     auto pose = PoseEstimator::EstimateByColor(p_eye2base, detection, cv::Mat());
-    if (pose.getTranslation()[0] > 3) return pose;
+    if (pose.getTranslationVec()[0] > 3) return pose;
 
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
     CreatePointCloud(cloud, depth, cv::Mat(), detection.bbox, intr_);

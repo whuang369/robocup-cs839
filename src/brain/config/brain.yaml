@@ -13,6 +13,8 @@ brain_node:
       vx_factor: 0.90
       yaw_offset: 0.10
       joystick: "logitech" # logitech | beitong
+    
+    enable_com: true
 
     rerunLog:
       enable: false

@@ -1,4 +1,6 @@
 #pragma once
+
+#include <iostream>
 #include <vector>
 
 #include <yaml-cpp/yaml.h>
@@ -16,9 +18,17 @@ public:
          const float &roll, const float &pitch, const float &yaw);
     Pose(cv::Mat &pose) :
         mat_pose(pose){};
+    Pose(const cv::Mat &rot, const cv::Mat &trans);
     Pose(float x, float y, float z,
          float qx, float qy, float qz, float qw);
     Pose(const geometry_msgs::msg::TransformStamped &msg);
+
+    // inverse
+    Pose inverse() const {
+        Pose result;
+        result.mat_pose = mat_pose.inv();
+        return result;
+    }
 
     cv::Mat toCVMat() const {
         return mat_pose;
@@ -30,17 +40,35 @@ public:
         return mat_pose(cv::Rect(0, 0, 3, 3)).clone();
     }
 
-    std::vector<double> getRotationQuaternion() const; // x,y,z,w
-    std::vector<float> getEulerAngles() const;         // roll, pitch, yaw
-    std::vector<float> getTranslation() const {
+    cv::Mat getTranslationVecMatrix() const {
+        return mat_pose(cv::Rect(3, 0, 1, 3)).clone();
+    }
+
+    std::vector<double> getQuaternionVec() const;  // x,y,z,w
+    std::vector<float> getEulerAnglesVec() const; // roll, pitch, yaw
+    std::vector<float> getTranslationVec() const {
         return {mat_pose.at<float>(0, 3), mat_pose.at<float>(1, 3), mat_pose.at<float>(2, 3)};
     }
 
-    // operator * overload
     Pose operator*(const Pose &other) const {
         Pose result;
         result.mat_pose = mat_pose * other.mat_pose;
         return result;
+    }
+
+    cv::Point3f operator*(const cv::Point3f &point) const {
+        cv::Mat mat_point = (cv::Mat_<float>(4, 1) << point.x, point.y, point.z, 1);
+        cv::Mat result = mat_pose * mat_point;
+        return cv::Point3f(result.at<float>(0, 0), result.at<float>(1, 0), result.at<float>(2, 0));
+    }
+
+    bool operator==(const Pose &other) const {
+        return cv::countNonZero(mat_pose != other.mat_pose) == 0;
+    }
+
+    friend std::ostream &operator<<(std::ostream &os, const Pose &pose) {
+        os << pose.mat_pose;
+        return os;
     }
 
 private:
@@ -50,11 +78,24 @@ private:
 } // namespace booster_vision
 
 namespace YAML {
-// Specialize the convert template for cv::Mat
+// Specialize the convert template for Pose
 template <>
 struct convert<booster_vision::Pose> {
+    static Node encode(const booster_vision::Pose &pose) {
+        Node node;
+        cv::Mat mat = pose.toCVMat();
+        for (int i = 0; i < 4; ++i) {
+            Node row(NodeType::Sequence);
+            for (int j = 0; j < 4; ++j) {
+                row.push_back(mat.at<float>(i, j));
+            }
+            node.push_back(row);
+        }
+        return node;
+    }
+
     static bool decode(const Node &node, booster_vision::Pose &pose) {
-        if (!node.IsSequence() || node.size() != 4) {
+        if (node.size() != 4) {
             return false; // Or throw an exception
         }
         cv::Mat mat = cv::Mat::zeros(4, 4, CV_32F);
@@ -71,4 +112,5 @@ struct convert<booster_vision::Pose> {
         return true;
     }
 };
+
 } // namespace YAML

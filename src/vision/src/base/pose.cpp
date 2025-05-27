@@ -26,6 +26,19 @@ Pose::Pose(const float &x, const float &y, const float &z,
     mat_pose.at<float>(2, 3) = z;
 }
 
+Pose::Pose(const cv::Mat& rot, const cv::Mat& trans) {
+    if (rot.rows == 3 && rot.cols == 3) {
+        rot.copyTo(mat_pose(cv::Rect(0, 0, 3, 3)));
+    } else if (rot.rows == 3 && rot.cols == 1) {
+        cv::Mat R;
+        cv::Rodrigues(rot, R);
+        R.copyTo(mat_pose(cv::Rect(0, 0, 3, 3)));
+    } else {
+        std::cerr << "Invalid rotation matrix size." << std::endl;
+    }
+    trans.copyTo(mat_pose(cv::Rect(3, 0, 1, 3)));
+}
+
 Pose::Pose(const geometry_msgs::msg::TransformStamped &msg) {
     mat_pose.at<float>(0, 3) = msg.transform.translation.x;
     mat_pose.at<float>(1, 3) = msg.transform.translation.y;
@@ -81,7 +94,7 @@ geometry_msgs::msg::TransformStamped Pose::toRosTFMsg() {
     return msg;
 }
 
-std::vector<float> Pose::getEulerAngles() const {
+std::vector<float> Pose::getEulerAnglesVec() const {
     cv::Mat R = getRotationMatrix();
 
     float sy = sqrt(R.at<float>(0, 0) * R.at<float>(0, 0) + R.at<float>(1, 0) * R.at<float>(1, 0));
@@ -101,7 +114,7 @@ std::vector<float> Pose::getEulerAngles() const {
     return {x, y, z};
 }
 
-std::vector<double> Pose::getRotationQuaternion() const {
+std::vector<double> Pose::getQuaternionVec() const {
     tf2::Matrix3x3 tf_rotation(mat_pose.at<float>(0, 0), mat_pose.at<float>(0, 1), mat_pose.at<float>(0, 2),
                                mat_pose.at<float>(1, 0), mat_pose.at<float>(1, 1), mat_pose.at<float>(1, 2),
                                mat_pose.at<float>(2, 0), mat_pose.at<float>(2, 1), mat_pose.at<float>(2, 2));

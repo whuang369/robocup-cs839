@@ -61,6 +61,16 @@ public:
      */
     int waveHand(bool doWaveHand);
 
+    /**
+     * @brief 起身
+     */
+    int standUp();
+
+    /**
+     * @brief 进阻尼
+     */
+    int enterDamping();
+
 private:
     rclcpp::Publisher<booster_msgs::msg::RpcReqMsg>::SharedPtr publisher;
     Brain *brain;

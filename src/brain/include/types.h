@@ -76,3 +76,18 @@ struct GameObject
     double pitchToRobot, yawToRobot; // The pitch and yaw of the object relative to the front of the robot, in rad. Downward and leftward are positive.
     rclcpp::Time timePoint;          // The time when the object was detected.
 };
+
+// 起身
+struct RobotRecoveryStateData {
+    uint8_t state; // IS_READY = 0, IS_FALLING = 1, HAS_FALLEN = 2, IS_GETTING_UP = 3,  
+    uint8_t is_recovery_available; // 1 for available, 0 for not available
+    uint8_t current_planner_index;
+};
+
+
+enum class RobotRecoveryState {
+    IS_READY = 0,
+    IS_FALLING = 1,
+    HAS_FALLEN = 2,
+    IS_GETTING_UP = 3
+};

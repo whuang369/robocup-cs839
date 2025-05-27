@@ -34,6 +34,8 @@ void BrainTree::init()
     REGISTER_BUILDER(CamScanField)
     REGISTER_BUILDER(SelfLocate)
     REGISTER_BUILDER(SetVelocity)
+    REGISTER_BUILDER(CheckAndStandUp)
+    REGISTER_BUILDER(RotateForRelocate)
     REGISTER_BUILDER(MoveToPoseOnField)
     REGISTER_BUILDER(GoalieDecide)
     REGISTER_BUILDER(WaveHand)
@@ -71,6 +73,9 @@ void BrainTree::initEntry()
     setEntry<bool>("treat_person_as_robot", false);
     setEntry<int>("control_state", 0);
     setEntry<bool>("B_pressed", false);
+
+    // fallRecovery相关
+    setEntry<bool>("should_recalibrate_after_fall_recovery", false);
 
     setEntry<bool>("we_just_scored", false);
     setEntry<bool>("wait_for_opponent_kickoff", false);
@@ -390,6 +395,110 @@ NodeStatus StrikerDecide::tick()
     return NodeStatus::SUCCESS;
 }
 
+NodeStatus CheckAndStandUp::tick()
+{
+    if (brain->tree->getEntry<bool>("gc_is_under_penalty") || brain->data->currentRobotModeIndex == 1) {
+        brain->data->needManualRelocate = false;
+        brain->tree->setEntry<bool>("should_recalibrate_after_fall_recovery", false);
+        brain->data->recoveryPerformed = false;
+        brain->data->enterDampingPerformed = false;
+        brain->log->log("recovery", rerun::TextLog("reset recovery"));
+        return NodeStatus::SUCCESS;
+    }
+    
+    if (brain->data->needManualRelocate)
+    {
+        brain->log->log("recovery", rerun::TextLog("need manual relocate"));
+        return NodeStatus::FAILURE;
+    }
+    
+    if (brain->data->recoveryState == RobotRecoveryState::HAS_FALLEN &&
+        // brain->data->isRecoveryAvailable && // 倒了就直接尝试RL起身，（不需要关注是否recoveryAailable）
+        brain->data->currentRobotModeIndex != 1 && // not in prepare
+        !brain->data->recoveryPerformed &&
+        !brain->data->enterDampingPerformed) {
+        brain->client->standUp();
+        brain->data->recoveryPerformed = true;
+        brain->data->lastRecoveryTime = brain->get_clock()->now();
+        brain->log->log("recovery", rerun::TextLog("Fall detect and stand up"));
+    }
+
+    // 如果没有起来, 且已经过了 5 秒, 就进入阻尼模式，且只进入一次
+    auto now = brain->get_clock()->now();
+    auto seconds_elaps = now.seconds() - brain->data->lastRecoveryTime.seconds();
+    if (brain->data->recoveryPerformed &&
+        !brain->data->enterDampingPerformed &&
+        seconds_elaps >10 &&
+        brain->data->recoveryState != RobotRecoveryState::IS_READY) {
+
+        brain->client->enterDamping();
+        brain->data->enterDampingPerformed = true;
+        brain->tree->setEntry<bool>("should_recalibrate_after_fall_recovery", false);
+        brain->log->log("recovery", rerun::TextLog("Enter Damping, seconds_elaps: " + to_string(seconds_elaps) +
+        "recoveryState: " + to_string(static_cast<int>(brain->data->recoveryState))));
+
+        // std::cout << "Enter Damping, seconds_elaps: " << seconds_elaps << " recoveryState: " << static_cast<int>(brain->data->recoveryState) << std::endl;
+    }
+
+    if (brain->data->recoveryPerformed &&
+        !brain->data->enterDampingPerformed &&
+        brain->data->recoveryState == RobotRecoveryState::IS_READY) {
+        brain->tree->setEntry<bool>("should_recalibrate_after_fall_recovery", true);
+        brain->log->log("recovery", rerun::TextLog("Standup success, seconds_elaps: " + to_string(seconds_elaps) +
+        "recoveryState: " + to_string(static_cast<int>(brain->data->recoveryState))));
+    }
+
+    // 机器人站着且是robocup步态，可以重置跌到爬起的状态
+    if (brain->data->recoveryState == RobotRecoveryState::IS_READY &&
+        brain->data->currentRobotModeIndex == 8) { // in robocup gait
+        brain->data->recoveryPerformed = false;
+        brain->data->enterDampingPerformed = false;
+        brain->log->log("recovery", rerun::TextLog("Reset recovery, recoveryState: " + to_string(static_cast<int>(brain->data->recoveryState))));
+    }
+
+    return NodeStatus::SUCCESS;
+}
+
+NodeStatus RotateForRelocate::onStart()
+{
+    this->_lastSuccessfulLocalizeTime = brain->data->lastSuccessfulLocalizeTime;
+    this->_startTime = brain->get_clock()->now();
+    return NodeStatus::RUNNING;
+}
+
+NodeStatus RotateForRelocate::onRunning()
+{
+    double vyaw_limit;
+    getInput("vyaw_limit", vyaw_limit);
+    int max_msec_locate;
+    getInput("max_msec_locate", max_msec_locate);
+    
+    brain->client->moveHead(0.4, 0.0);
+    brain->client->setVelocity(0, 0, vyaw_limit);
+
+    if (this->_lastSuccessfulLocalizeTime.nanoseconds() != brain->data->lastSuccessfulLocalizeTime.nanoseconds()) {
+        brain->tree->setEntry<bool>("should_recalibrate_after_fall_recovery", false);
+        brain->log->log("recovery", rerun::TextLog("Relocated successfully"));
+        return NodeStatus::SUCCESS;
+    }
+
+    if (brain->msecsSince(this->_startTime) > max_msec_locate) {
+        brain->tree->setEntry<bool>("should_recalibrate_after_fall_recovery", false);
+        brain->data->needManualRelocate = true;
+        brain->client->enterDamping();
+        brain->log->log("recovery", rerun::TextLog("Relocated failed for timeout"));
+        return NodeStatus::SUCCESS;
+    }
+
+    return NodeStatus::RUNNING;
+}
+
+void RotateForRelocate::onHalted()
+{
+    brain->tree->setEntry<bool>("should_recalibrate_after_fall_recovery", false);
+}
+
+
 NodeStatus GoalieDecide::tick()
 {
 
@@ -588,7 +697,21 @@ NodeStatus SelfLocate::tick()
         yMax = min(brain->config->fieldDimensions.width / 2, brain->data->robotPoseToField.y + maxDrift);
         thetaMin = brain->data->robotPoseToField.theta - M_PI / 18;
         thetaMax = brain->data->robotPoseToField.theta + M_PI / 18;
+    } 
+    else if (mode == "fall_recovery") 
+    {
+        int msec = static_cast<int>(brain->msecsSince(brain->data->lastSuccessfulLocalizeTime));
+        double maxDriftSpeed = 0.1;                      // m/s
+        double maxDrift = msec / 1000.0 * maxDriftSpeed; // 在这个时间内, odom 最多漂移了多少距离
+
+        xMin = -brain->config->fieldDimensions.length / 2 - 2;
+        xMax = brain->config->fieldDimensions.length / 2 + 2;
+        yMin = -brain->config->fieldDimensions.width / 2 - 2;
+        yMax = brain->config->fieldDimensions.width / 2 + 2;
+        thetaMin = brain->data->robotPoseToField.theta - M_PI / 180;
+        thetaMax = brain->data->robotPoseToField.theta + M_PI / 180;
     }
+
 
     // TODO other modes
 

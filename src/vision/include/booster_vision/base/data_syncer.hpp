@@ -26,6 +26,24 @@ using DepthDataBlock = DataBlock<cv::Mat>;
 using PoseDataBlock = DataBlock<Pose>;
 
 struct SyncedDataBlock {
+    SyncedDataBlock() = default;
+    SyncedDataBlock(const SyncedDataBlock &other) :
+        pose_data(other.pose_data) {
+        color_data.timestamp = other.color_data.timestamp;
+        if (other.color_data.data.empty()) {
+            color_data.data = cv::Mat();
+        } else {
+            other.color_data.data.copyTo(color_data.data);
+        }
+
+        depth_data.timestamp = other.depth_data.timestamp;
+        if (other.depth_data.data.empty()) {
+            depth_data.data = cv::Mat();
+        } else {
+            other.depth_data.data.copyTo(depth_data.data);
+        }
+    }
+
     ColorDataBlock color_data;
     DepthDataBlock depth_data;
     PoseDataBlock pose_data;
@@ -54,15 +72,23 @@ public:
         enable_depth_(enable_depth) {
     }
 
+    void LoadData(const std::string &data_dir);
+
     void AddDepth(const DepthDataBlock &depth_data);
     void AddPose(const PoseDataBlock &pose_data);
 
     SyncedDataBlock getSyncedDataBlock(const ColorDataBlock &color_data);
+    SyncedDataBlock getSyncedDataBlock();
 
 private:
     bool enable_depth_;
+
     std::mutex depth_buffer_mutex_;
     std::mutex pose_buffer_mutex_;
+
+    int data_index_;
+    std::string data_dir_;
+    std::vector<double> time_stamp_list_;
 
     using DepthBuffer = DataBuffer<kDepthBufferLength, DepthDataBlock>;
     using PoseBuffer = DataBuffer<kPoseBufferLength, PoseDataBlock>;
