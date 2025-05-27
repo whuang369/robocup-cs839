@@ -30,37 +30,33 @@
  * @tparam Enum The enumeration type.
  * @tparam EnumInfo The structure that contains information on the enumeration.
  */
-template<typename Elem, typename Enum, typename EnumInfo>
-class EnumIndexedArray : public std::array<Elem, EnumInfo::numOfElements>, public Streamable
-{
-public:
-  template<typename... Args>
-  EnumIndexedArray(Args&&... args) :
-    std::array<Elem, EnumInfo::numOfElements>({{std::forward<Args>(args)...}})
-  {}
+template <typename Elem, typename Enum, typename EnumInfo>
+class EnumIndexedArray : public std::array<Elem, EnumInfo::numOfElements>, public Streamable {
+ public:
+  template <typename... Args>
+  EnumIndexedArray(Args&&... args)
+      : std::array<Elem, EnumInfo::numOfElements>({{std::forward<Args>(args)...}}) {}
 
-protected:
-  void read(In& stream) override
-  {
+ protected:
+  void read(In& stream) override {
     PUBLISH(EnumInfo::reg);
     PUBLISH(reg);
-    for(int i = 0; i < EnumInfo::numOfElements; ++i)
+    for (int i = 0; i < EnumInfo::numOfElements; ++i)
       Streaming::streamIt(stream, TypeRegistry::getEnumName(static_cast<Enum>(i)), (*this)[i]);
   }
 
-  void write(Out& stream) const override
-  {
+  void write(Out& stream) const override {
     PUBLISH(EnumInfo::reg);
     PUBLISH(reg);
-    for(int i = 0; i < EnumInfo::numOfElements; ++i)
+    for (int i = 0; i < EnumInfo::numOfElements; ++i)
       Streaming::streamIt(stream, TypeRegistry::getEnumName(static_cast<Enum>(i)), (*this)[i]);
   }
 
-private:
-  static void reg()
-  {
+ private:
+  static void reg() {
     REG_CLASS(EnumIndexedArray);
-    for(int i = 0; i < EnumInfo::numOfElements; ++i)
-      TypeRegistry::addAttribute(_type, typeid(Elem).name(), TypeRegistry::getEnumName(static_cast<Enum>(i)));
+    for (int i = 0; i < EnumInfo::numOfElements; ++i)
+      TypeRegistry::addAttribute(_type, typeid(Elem).name(),
+                                 TypeRegistry::getEnumName(static_cast<Enum>(i)));
   }
 };

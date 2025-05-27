@@ -33,35 +33,30 @@
  * The class is simple backend for the stream classes that work on
  * the "ConfigMap" format.
  */
-class SimpleMap
-{
-public:
+class SimpleMap {
+ public:
   /**< Base class for syntax tree nodes. */
-  class Value
-  {
-  public:
+  class Value {
+   public:
     mutable bool accessed = false; /**< Was this value accessed? */
     virtual ~Value() = default;
   };
 
   /** A class representing a literal. */
-  class Literal : public Value, public std::string
-  {
-  public:
+  class Literal : public Value, public std::string {
+   public:
     Literal(const std::string& literal) : std::string(literal) {}
   };
 
   /** A class representing a record of attributes, i.e. a mapping of names to values. */
-  class Record : public Value, public std::unordered_map<std::string, Value*>
-  {
-  public:
+  class Record : public Value, public std::unordered_map<std::string, Value*> {
+   public:
     ~Record() override;
   };
 
   /**< A class representing an array of values, i.e. a mapping of indices to values. */
-  class Array : public Value, public std::vector<Value*>
-  {
-  public:
+  class Array : public Value, public std::vector<Value*> {
+   public:
     ~Array() override;
   };
 
@@ -78,30 +73,36 @@ public:
    */
   ~SimpleMap();
 
-  operator const Value*() const {return root;} /**< Returns the root of the syntax tree. 0 if parsing failed. */
+  operator const Value*() const {
+    return root;
+  } /**< Returns the root of the syntax tree. 0 if parsing failed. */
 
-private:
+ private:
   /** Lexicographical symbols. */
-  ENUM(Symbol,
-  {,
-    literal, equals,
-    comma, semicolon,
-    lBracket, rBracket,
-    lBrace, rBrace,
-    eof,
-  });
+  ENUM(Symbol, {
+                   ,
+                   literal,
+                   equals,
+                   comma,
+                   semicolon,
+                   lBracket,
+                   rBracket,
+                   lBrace,
+                   rBrace,
+                   eof,
+               });
 
-  In& stream; /**< The stream from which is read. */
-  char c = 0; /**< The current character. 0 means EOF reached. */
-  int row = 1; /**< The current row in the stream. */
-  int column = 0; /**< The current column in the stream. */
-  Symbol symbol = eof; /**< The current lexicographical symbol. */
-  std::string string; /**< The string if the current symbol is "literal". */
+  In& stream;            /**< The stream from which is read. */
+  char c = 0;            /**< The current character. 0 means EOF reached. */
+  int row = 1;           /**< The current row in the stream. */
+  int column = 0;        /**< The current column in the stream. */
+  Symbol symbol = eof;   /**< The current lexicographical symbol. */
+  std::string string;    /**< The string if the current symbol is "literal". */
   Value* root = nullptr; /**< The root of the syntax tree. 0 if parsing failed. */
-  const bool jsonMode; /**< Whether the parser should be in JSON(-like) mode. */
+  const bool jsonMode;   /**< Whether the parser should be in JSON(-like) mode. */
 
-  void nextChar(); /**< Read the next character into "c". */
-  void nextSymbol(); /**< Read the next symbol into "symbol". */
+  void nextChar();         /**< Read the next character into "c". */
+  void nextSymbol();       /**< Read the next symbol into "symbol". */
   void unexpectedSymbol(); /**< Throw an exception for an unexpected symbol. */
 
   /**
@@ -111,5 +112,5 @@ private:
    */
   void expectSymbol(Symbol expected);
   Record* parseRecord(); /**< Parse a record. */
-  Array* parseArray(); /**< Parse an array. */
+  Array* parseArray();   /**< Parse an array. */
 };

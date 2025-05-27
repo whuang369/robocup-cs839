@@ -3,9 +3,9 @@
 
 #include <stdint.h>
 
-#define SPL_STANDARD_MESSAGE_STRUCT_HEADER  "SPL "
+#define SPL_STANDARD_MESSAGE_STRUCT_HEADER "SPL "
 #define SPL_STANDARD_MESSAGE_STRUCT_VERSION 6
-#define SPL_STANDARD_MESSAGE_DATA_SIZE      780
+#define SPL_STANDARD_MESSAGE_DATA_SIZE 780
 #define SPL_STANDARD_MESSAGE_MAX_NUM_OF_PLAYERS 5
 
 /*
@@ -20,14 +20,13 @@
    - Speed:      Millimeters per second (mm/s)
 */
 
-
-struct SPLStandardMessage
-{
-  char header[4];        // "SPL "
-  uint8_t version;       // has to be set to SPL_STANDARD_MESSAGE_STRUCT_VERSION
-  int8_t playerNum;      // [MANDATORY FIELD] 1-5 in drop-in games, 1-6 in normal games
-  int8_t teamNum;        // [MANDATORY FIELD] the number of the team (as provided by the organizers)
-  int8_t fallen;         // [MANDATORY FIELD] 1 means that the robot is fallen, 0 means that the robot can play
+struct SPLStandardMessage {
+  char header[4];    // "SPL "
+  uint8_t version;   // has to be set to SPL_STANDARD_MESSAGE_STRUCT_VERSION
+  int8_t playerNum;  // [MANDATORY FIELD] 1-5 in drop-in games, 1-6 in normal games
+  int8_t teamNum;    // [MANDATORY FIELD] the number of the team (as provided by the organizers)
+  int8_t fallen;  // [MANDATORY FIELD] 1 means that the robot is fallen, 0 means that the robot can
+                  // play
 
   // [MANDATORY FIELD]
   // position and orientation of robot
@@ -36,7 +35,7 @@ struct SPLStandardMessage
   // +ve x-axis points towards the goal we are attempting to score on
   // +ve y-axis is 90 degrees counter clockwise from the +ve x-axis
   // angle in radians, 0 along the +x axis, increasing counter clockwise
-  float pose[3];      // x,y,theta
+  float pose[3];  // x,y,theta
 
   // [MANDATORY FIELD]
   // the robot's target position on the field
@@ -51,7 +50,7 @@ struct SPLStandardMessage
   float shootingTo[2];
 
   // ball information
-  float ballAge;        // seconds since this robot last saw the ball. -1.f if we haven't seen it
+  float ballAge;  // seconds since this robot last saw the ball. -1.f if we haven't seen it
 
   // position of ball relative to the robot
   // coordinates in millimeters
@@ -82,7 +81,8 @@ struct SPLStandardMessage
   // 1 - wants to be keeper
   // 2 - wants to play defense
   // 3 - wants to play the ball
-  // 4 - robot is lost (i.e. cannot decide what to do now, maybe because of disorientation [see confidence fields])
+  // 4 - robot is lost (i.e. cannot decide what to do now, maybe because of disorientation [see
+  // confidence fields])
   int8_t intention;
 
   // [MANDATORY]
@@ -119,22 +119,20 @@ struct SPLStandardMessage
 
 #ifdef __cplusplus
   // constructor
-  SPLStandardMessage() :
-    version(SPL_STANDARD_MESSAGE_STRUCT_VERSION),
-    playerNum(-1),
-    teamNum(-1),
-    fallen(-1),
-    ballAge(-1.f),
-    intention(-1),
-    averageWalkSpeed(-1),
-    maxKickDistance(-1),
-    currentPositionConfidence(-1),
-    currentSideConfidence(-1),
-    numOfDataBytes(0)
-  {
+  SPLStandardMessage()
+      : version(SPL_STANDARD_MESSAGE_STRUCT_VERSION),
+        playerNum(-1),
+        teamNum(-1),
+        fallen(-1),
+        ballAge(-1.f),
+        intention(-1),
+        averageWalkSpeed(-1),
+        maxKickDistance(-1),
+        currentPositionConfidence(-1),
+        currentSideConfidence(-1),
+        numOfDataBytes(0) {
     const char* init = SPL_STANDARD_MESSAGE_STRUCT_HEADER;
-    for(unsigned int i = 0; i < sizeof(header); ++i)
-      header[i] = init[i];
+    for (unsigned int i = 0; i < sizeof(header); ++i) header[i] = init[i];
     pose[0] = 0.f;
     pose[1] = 0.f;
     pose[2] = 0.f;
@@ -146,10 +144,9 @@ struct SPLStandardMessage
     ball[1] = 0.f;
     ballVel[0] = 0.f;
     ballVel[1] = 0.f;
-    for(int i = 0; i < SPL_STANDARD_MESSAGE_MAX_NUM_OF_PLAYERS; ++i)
-      suggestion[i] = -1;
+    for (int i = 0; i < SPL_STANDARD_MESSAGE_MAX_NUM_OF_PLAYERS; ++i) suggestion[i] = -1;
   }
 #endif
 };
 
-#endif // SPLSTANDARDMESSAGE_H
+#endif  // SPLSTANDARDMESSAGE_H

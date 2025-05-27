@@ -27,15 +27,13 @@
 #include <vector>
 
 /** The constants of an enumeration. */
-struct Enum
-{
-  std::vector<std::string> byOrder; /**< In the sequence they are defined. */
+struct Enum {
+  std::vector<std::string> byOrder;            /**< In the sequence they are defined. */
   std::unordered_map<std::string, int> byName; /**< Indexed by the constants' names. */
 };
 
 /** An attribute of a class. */
-struct Attribute
-{
+struct Attribute {
   const char* type; /**< The type of the attribute. */
   const char* name; /**< The name of the attribute. */
 
@@ -51,104 +49,79 @@ struct Attribute
 };
 
 /** The base class and all attributes of a class. */
-struct Class
-{
-  const char* base; /**< The base class or nullptr if the class has none. */
+struct Class {
+  const char* base;                  /**< The base class or nullptr if the class has none. */
   std::vector<Attribute> attributes; /**< The list of attribute in the order they are defined. */
 };
 
 /** All primitive data types. */
 static std::unordered_set<const char*> primitives(
-{
-  typeid(bool).name(),
-  typeid(char).name(),
-  typeid(signed char).name(),
-  typeid(unsigned char).name(),
-  typeid(short).name(),
-  typeid(unsigned short).name(),
-  typeid(int).name(),
-  typeid(unsigned int).name(),
-  typeid(float).name(),
-  typeid(double).name(),
-  typeid(std::string).name(),
-  typeid(Angle).name()
-});
+    {typeid(bool).name(), typeid(char).name(), typeid(signed char).name(),
+     typeid(unsigned char).name(), typeid(short).name(), typeid(unsigned short).name(),
+     typeid(int).name(), typeid(unsigned int).name(), typeid(float).name(), typeid(double).name(),
+     typeid(std::string).name(), typeid(Angle).name()});
 
-static std::unordered_map<const char*, Enum> enums; /**< All enumeration types. */
+static std::unordered_map<const char*, Enum> enums;    /**< All enumeration types. */
 static std::unordered_map<const char*, Class> classes; /**< All classes and structures. */
 
-void TypeRegistry::addEnum(const char* enumeration)
-{
+void TypeRegistry::addEnum(const char* enumeration) {
   enums[enumeration].byOrder.clear();
 }
 
-void TypeRegistry::addEnumConstant(const char* enumeration, const char* name)
-{
+void TypeRegistry::addEnumConstant(const char* enumeration, const char* name) {
   Enum& e = enums[enumeration];
   const char* p = name;
-  while(std::isalnum(*p) || *p == '_')
-    ++p;
+  while (std::isalnum(*p) || *p == '_') ++p;
   std::string n = std::string(name).substr(0, p - name);
-  if(!*p)
-  {
+  if (!*p) {
     e.byName[n] = static_cast<int>(e.byOrder.size());
     e.byOrder.emplace_back(n);
-  }
-  else
-  {
+  } else {
     ASSERT(!e.byOrder.empty());
     e.byName[n] = static_cast<int>(e.byOrder.size() - 1);
     e.byOrder.back() = n;
   }
 }
 
-void TypeRegistry::addClass(const char* theClass, const char* base)
-{
+void TypeRegistry::addClass(const char* theClass, const char* base) {
   classes[theClass].attributes.clear();
   classes[theClass].base = base;
 }
 
-void TypeRegistry::addAttribute(const char* theClass, const char* type, const char* attribute)
-{
+void TypeRegistry::addAttribute(const char* theClass, const char* type, const char* attribute) {
   const char* p = attribute + std::strlen(attribute);
-  while(p > attribute && (std::isalnum(p[-1]) || p[-1] == '_' || p[-1] == '.'))
-    --p;
+  while (p > attribute && (std::isalnum(p[-1]) || p[-1] == '_' || p[-1] == '.')) --p;
   classes[theClass].attributes.emplace_back(type, p);
 }
 
-const char* TypeRegistry::getEnumName(const char* enumeration, int value)
-{
-  if(*enumeration) // This is a real type name
+const char* TypeRegistry::getEnumName(const char* enumeration, int value) {
+  if (*enumeration)  // This is a real type name
   {
     auto e = enums.find(enumeration);
     ASSERT(e != enums.end());
-    if(value >= 0 && value < static_cast<int>(e->second.byOrder.size()))
+    if (value >= 0 && value < static_cast<int>(e->second.byOrder.size()))
       return e->second.byOrder[value].c_str();
-  }
-  else // This entry was created by the DebugDataStreamer
+  } else  // This entry was created by the DebugDataStreamer
   {
-    const std::vector<std::string>* constants = reinterpret_cast<const std::vector<std::string>* const*>(enumeration)[1];
-    if(value >= 0 && value < static_cast<int>(constants->size()))
+    const std::vector<std::string>* constants =
+        reinterpret_cast<const std::vector<std::string>* const*>(enumeration)[1];
+    if (value >= 0 && value < static_cast<int>(constants->size()))
       return (*constants)[value].c_str();
   }
   return nullptr;
 }
 
-int TypeRegistry::getEnumValue(const char* enumeration, const std::string& name)
-{
-  if(*enumeration) // This is a real type name
+int TypeRegistry::getEnumValue(const char* enumeration, const std::string& name) {
+  if (*enumeration)  // This is a real type name
   {
     auto e = enums.find(enumeration);
     ASSERT(e != enums.end());
     auto c = e->second.byName.find(name);
-    if(c != e->second.byName.end())
-      return c->second;
-  }
-  else // This entry was created by the DebugDataStreamer
+    if (c != e->second.byName.end()) return c->second;
+  } else  // This entry was created by the DebugDataStreamer
   {
-    for(int i = 0; getEnumName(enumeration, i); ++i)
-      if(getEnumName(enumeration, i) == name)
-        return i;
+    for (int i = 0; getEnumName(enumeration, i); ++i)
+      if (getEnumName(enumeration, i) == name) return i;
   }
   return -1;
 }
@@ -168,14 +141,14 @@ static std::regex matchComma(", ");
 static std::regex matchAngularBracket(" >");
 static std::regex matchBracket(" \\[");
 static std::regex matchAsterisk(" *\\(\\*[^)]*\\)");
-static std::regex matchString("std::basic_string<char,std::char_traits<char>,std::allocator<char>>");
+static std::regex matchString(
+    "std::basic_string<char,std::char_traits<char>,std::allocator<char>>");
 static std::regex matchArray("std::array<(.*),([0-9][0-9]*)>");
 static std::regex matchList("std::list<(.*),std::allocator<\\1>>");
 static std::regex matchOptional("std::optional<(.*)>");
 static std::regex matchVector("std::vector<(.*),(std::allocator|Eigen::aligned_allocator)<\\1>>");
 
-std::string TypeRegistry::demangle(std::string type)
-{
+std::string TypeRegistry::demangle(std::string type) {
 #ifdef WINDOWS
   type = std::regex_replace(type, matchClass, "");
   type = std::regex_replace(type, matchEnum, "");
@@ -186,10 +159,9 @@ std::string TypeRegistry::demangle(std::string type)
   int status;
   size_t length;
   char* buffer = abi::__cxa_demangle(type.c_str(), nullptr, &length, &status);
-  if(!buffer)
+  if (!buffer)
     return "UNKNOWN";
-  else
-  {
+  else {
     type = buffer;
     std::free(buffer);
     type = std::regex_replace(type, matchAnonymousNamespace, "");
@@ -204,63 +176,53 @@ std::string TypeRegistry::demangle(std::string type)
   type = std::regex_replace(type, matchAsterisk, "");
   type = std::regex_replace(type, matchString, "std::string");
   std::string oldType;
-  do
-  {
+  do {
     oldType = type;
     type = std::regex_replace(type, matchArray, "$1[$2]");
     type = std::regex_replace(type, matchList, "$1*");
     type = std::regex_replace(type, matchVector, "$1*");
     type = std::regex_replace(type, matchOptional, "$1*");
-  }
-  while(oldType != type);
+  } while (oldType != type);
 
   return type;
 }
 
-void TypeRegistry::print()
-{
-  for(const std::string p : primitives)
-    std::cout << demangle(p) << std::endl;
+void TypeRegistry::print() {
+  for (const std::string p : primitives) std::cout << demangle(p) << std::endl;
 
-  for(const auto& [name, constants] : enums)
-  {
+  for (const auto& [name, constants] : enums) {
     std::cout << "enum " << demangle(name) << " {";
-    for(const std::string& c : constants.byOrder)
+    for (const std::string& c : constants.byOrder)
       std::cout << (&c == constants.byOrder.data() ? "" : ", ") << c;
     std::cout << "}" << std::endl;
   }
 
-  for(const auto& [name, info] : classes)
-  {
-    std::cout << "class " << demangle(name) << (info.base ? " : " + demangle(info.base) : "") << " {";
-    for(const Attribute& a : info.attributes)
-      std::cout << (&a == info.attributes.data() ? "" : " ") << demangle(a.type) << " " << a.name << ";";
+  for (const auto& [name, info] : classes) {
+    std::cout << "class " << demangle(name) << (info.base ? " : " + demangle(info.base) : "")
+              << " {";
+    for (const Attribute& a : info.attributes)
+      std::cout << (&a == info.attributes.data() ? "" : " ") << demangle(a.type) << " " << a.name
+                << ";";
     std::cout << "}" << std::endl;
   }
 }
 
-void TypeRegistry::fill(TypeInfo& typeInfo)
-{
-  for(const char* primitive : primitives)
-    typeInfo.primitives.insert(demangle(primitive));
+void TypeRegistry::fill(TypeInfo& typeInfo) {
+  for (const char* primitive : primitives) typeInfo.primitives.insert(demangle(primitive));
 
-  for(const auto& [name, constants] : enums)
-  {
+  for (const auto& [name, constants] : enums) {
     std::vector<std::string>& targetConstants = typeInfo.enums[demangle(name)];
     targetConstants.reserve(constants.byOrder.size());
-    for(const std::string& constant : constants.byOrder)
-      targetConstants.emplace_back(constant);
+    for (const std::string& constant : constants.byOrder) targetConstants.emplace_back(constant);
   }
 
-  for(const auto& [name, _] : classes)
-  {
+  for (const auto& [name, _] : classes) {
     std::vector<TypeInfo::Attribute>& attributes = typeInfo.classes[demangle(name)];
     std::list<const char*> hierarchy;
     hierarchy.push_front(name);
-    while(classes[hierarchy.front()].base)
-      hierarchy.push_front(classes[hierarchy.front()].base);
-    for(const auto& entry : hierarchy)
-      for(const auto& attribute : classes[entry].attributes)
+    while (classes[hierarchy.front()].base) hierarchy.push_front(classes[hierarchy.front()].base);
+    for (const auto& entry : hierarchy)
+      for (const auto& attribute : classes[entry].attributes)
         attributes.emplace_back(demangle(attribute.type), attribute.name);
   }
 }

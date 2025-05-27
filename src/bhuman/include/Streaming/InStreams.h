@@ -19,9 +19,8 @@ class File;
  * The base class for physical in streams. Derivates of PhysicalInStream only handle the
  * reading of data from a medium, not of formatting data.
  */
-class PhysicalInStream
-{
-public:
+class PhysicalInStream {
+ public:
   /**
    * The function reads a number of bytes from a stream.
    * @param p The address the data is written to. Note that p
@@ -42,7 +41,7 @@ public:
    * This function is relevant if the stream represents a file.
    * @return Does the stream exist?
    */
-  virtual bool exists() const {return true;}
+  virtual bool exists() const { return true; }
 
   /**
    * The function states whether the end of the stream has been reached.
@@ -69,9 +68,8 @@ public:
  * Generic class for formatted reading of data to be used in streams.
  * The physical reading is then done by PhysicalOutStream derivates.
  */
-class StreamReader
-{
-protected:
+class StreamReader {
+ protected:
   /**
    * reads a bool from a stream
    * @param d the data to read from the stream
@@ -193,41 +191,38 @@ protected:
  * Formatted reading of text data to be used in streams.
  * The physical reading is done by PhysicalInStream derivates.
  */
-class InText : public StreamReader
-{
-protected:
+class InText : public StreamReader {
+ protected:
   /** The last character read. */
-  char theChar = ' ',
-       theNextChar = ' ';
-private:
-  std::string buf; /**< A buffer to convert read strings. */
-  bool eof = false,  /**< Stores whether the end of file was reached during the last call to nextChar. */
-       nextEof = false;
+  char theChar = ' ', theNextChar = ' ';
 
-public:
-  InText() {buf.reserve(200);};
+ private:
+  std::string buf;  /**< A buffer to convert read strings. */
+  bool eof = false, /**< Stores whether the end of file was reached during the last call to
+                       nextChar. */
+      nextEof = false;
+
+ public:
+  InText() { buf.reserve(200); };
 
   /**
    * Resets theChar to be able to use the same instance of InText or InConfig
    * more than once.
    */
-  void reset()
-  {
+  void reset() {
     theChar = theNextChar = ' ';
     eof = nextEof = false;
   }
 
-protected:
+ protected:
   /**
    * The function initializes the end-of-file flag.
    * It has to be called only once after the stream was initialized.
    * @param stream The stream.
    */
-  virtual void initEof(PhysicalInStream& stream)
-  {
+  virtual void initEof(PhysicalInStream& stream) {
     eof = nextEof = stream.getEof();
-    if(stream.exists())
-      nextChar(stream);
+    if (stream.exists()) nextChar(stream);
   }
 
   /**
@@ -344,18 +339,14 @@ protected:
   /**
    * The function reads the next character from the stream.
    */
-  virtual void nextChar(PhysicalInStream& stream)
-  {
-    if(!eof)
-    {
+  virtual void nextChar(PhysicalInStream& stream) {
+    if (!eof) {
       eof = nextEof;
       theChar = theNextChar;
-      if(stream.getEof())
-      {
+      if (stream.getEof()) {
         nextEof = true;
         theNextChar = ' ';
-      }
-      else
+      } else
         stream.readFromStream(&theNextChar, 1);
     }
   }
@@ -370,7 +361,7 @@ protected:
    */
   void readData(void* p, size_t size, PhysicalInStream& stream) override;
 
-private:
+ private:
   /**
    * Tries to read the given string from the stream.
    * @param str The string which is expected.
@@ -380,7 +371,9 @@ private:
   bool expectString(const std::string& str, PhysicalInStream& stream);
 };
 
-inline bool InText::isEof(const PhysicalInStream&) const { return eof; }
+inline bool InText::isEof(const PhysicalInStream&) const {
+  return eof;
+}
 
 inline void InText::readEndl(PhysicalInStream&) {}
 
@@ -393,12 +386,11 @@ inline void InText::readEndl(PhysicalInStream&) {}
  * # comment till endl
  * Note that "/" is not allowed elsewhere in the stream.
  */
-class InConfig : public InText
-{
-private:
+class InConfig : public InText {
+ private:
   bool readSection = false;  ///< Are we reading a section?
 
-protected:
+ protected:
   /**
    * Creates the reader.
    * @param sectionName If given the section is searched
@@ -422,7 +414,7 @@ protected:
    */
   void nextChar(PhysicalInStream& stream) override;
 
-private:
+ private:
   /**
    * The functions skip all characters to the end of the line.
    */
@@ -440,9 +432,8 @@ private:
  * Formatted reading of binary data to be used in streams.
  * The physical reading is done by PhysicalInStream derivates.
  */
-class InBinary : public StreamReader
-{
-protected:
+class InBinary : public StreamReader {
+ protected:
   /**
    * The function returns whether the end of stream has been reached.
    * @return End of stream reached?
@@ -454,8 +445,7 @@ protected:
    * @param d The value that is read.
    * @param stream A stream to read from.
    */
-  void readBool(bool& d, PhysicalInStream& stream) override
-  {
+  void readBool(bool& d, PhysicalInStream& stream) override {
     char c;
     stream.readFromStream(&c, sizeof(d));
     d = c != 0;
@@ -466,8 +456,7 @@ protected:
    * @param d The value that is read.
    * @param stream A stream to read from.
    */
-  void readChar(char& d, PhysicalInStream& stream) override
-  {
+  void readChar(char& d, PhysicalInStream& stream) override {
     stream.readFromStream(&d, sizeof(d));
   }
 
@@ -476,8 +465,7 @@ protected:
    * @param d The value that is read.
    * @param stream A stream to read from.
    */
-  void readSChar(signed char& d, PhysicalInStream& stream) override
-  {
+  void readSChar(signed char& d, PhysicalInStream& stream) override {
     stream.readFromStream(&d, sizeof(d));
   }
 
@@ -486,8 +474,7 @@ protected:
    * @param d The value that is read.
    * @param stream A stream to read from.
    */
-  void readUChar(unsigned char& d, PhysicalInStream& stream) override
-  {
+  void readUChar(unsigned char& d, PhysicalInStream& stream) override {
     stream.readFromStream(&d, sizeof(d));
   }
 
@@ -496,8 +483,7 @@ protected:
    * @param d The value that is read.
    * @param stream A stream to read from.
    */
-  void readShort(short& d, PhysicalInStream& stream) override
-  {
+  void readShort(short& d, PhysicalInStream& stream) override {
     stream.readFromStream(&d, sizeof(d));
   }
 
@@ -506,8 +492,7 @@ protected:
    * @param d The value that is read.
    * @param stream A stream to read from.
    */
-  void readUShort(unsigned short& d, PhysicalInStream& stream) override
-  {
+  void readUShort(unsigned short& d, PhysicalInStream& stream) override {
     stream.readFromStream(&d, sizeof(d));
   }
 
@@ -516,18 +501,14 @@ protected:
    * @param d The value that is read.
    * @param stream A stream to read from.
    */
-  void readInt(int& d, PhysicalInStream& stream) override
-  {
-    stream.readFromStream(&d, sizeof(d));
-  }
+  void readInt(int& d, PhysicalInStream& stream) override { stream.readFromStream(&d, sizeof(d)); }
 
   /**
    * The function reads an unsigned int from the stream.
    * @param d The value that is read.
    * @param stream A stream to read from.
    */
-  void readUInt(unsigned int& d, PhysicalInStream& stream) override
-  {
+  void readUInt(unsigned int& d, PhysicalInStream& stream) override {
     stream.readFromStream(&d, sizeof(d));
   }
 
@@ -536,8 +517,7 @@ protected:
    * @param d The value that is read.
    * @param stream A stream to read from.
    */
-  void readFloat(float& d, PhysicalInStream& stream) override
-  {
+  void readFloat(float& d, PhysicalInStream& stream) override {
     stream.readFromStream(&d, sizeof(d));
   }
 
@@ -546,8 +526,7 @@ protected:
    * @param d The value that is read.
    * @param stream A stream to read from.
    */
-  void readDouble(double& d, PhysicalInStream& stream) override
-  {
+  void readDouble(double& d, PhysicalInStream& stream) override {
     stream.readFromStream(&d, sizeof(d));
   }
 
@@ -556,13 +535,11 @@ protected:
    * @param d The value that is read.
    * @param stream A stream to read from.
    */
-  void readString(std::string& d, PhysicalInStream& stream) override
-  {
+  void readString(std::string& d, PhysicalInStream& stream) override {
     size_t size = 0;
     stream.readFromStream(&size, sizeof(unsigned));
     d.resize(size);
-    if(size)
-      stream.readFromStream(&d[0], size);
+    if (size) stream.readFromStream(&d[0], size);
   }
 
   /**
@@ -587,8 +564,7 @@ protected:
    * @param size The number of bytes to be read.
    * @param stream A stream to read from.
    */
-  void readData(void* p, size_t size, PhysicalInStream& stream) override
-  {
+  void readData(void* p, size_t size, PhysicalInStream& stream) override {
     stream.readFromStream(p, size);
   }
 
@@ -597,10 +573,7 @@ protected:
    * @param size The number of bytes to be skipped.
    * @param stream The stream to read from.
    */
-  void skipData(size_t size, PhysicalInStream& stream) override
-  {
-    stream.skipInStream(size);
-  }
+  void skipData(size_t size, PhysicalInStream& stream) override { stream.skipInStream(size); }
 };
 
 inline void InBinary::readEndl(PhysicalInStream&) {}
@@ -610,12 +583,11 @@ inline void InBinary::readEndl(PhysicalInStream&) {}
  *
  * An PhysicalInStream that reads the data from a file.
  */
-class InFile : public PhysicalInStream
-{
-private:
+class InFile : public PhysicalInStream {
+ private:
   File* stream = nullptr; /**< Object representing the file. */
 
-public:
+ public:
   InFile() = default;
 
   /** No copy constructor. */
@@ -625,7 +597,7 @@ public:
    * Move copy constructor.
    * @param other The stream the contents of which are moved to this one.
    */
-  InFile(InFile&& other) noexcept : stream(other.stream) {other.stream = nullptr;}
+  InFile(InFile&& other) noexcept : stream(other.stream) { other.stream = nullptr; }
 
   /** Destructor. */
   ~InFile();
@@ -668,9 +640,9 @@ public:
    * The function gives access to the underlying File object.
    * @return The address of the File object or nullptr if it does not exist.
    */
-  File* getFile() {return stream;}
+  File* getFile() { return stream; }
 
-protected:
+ protected:
   /**
    * opens the file.
    * @param name The name of the file to open. It will be interpreted
@@ -699,19 +671,18 @@ protected:
  *
  * An PhysicalInStream that reads the data from a memory region.
  */
-class InMemory : public PhysicalInStream
-{
-private:
-  const char* memory = nullptr, /**< Points to the next byte to read from memory. */
-            * start = nullptr, /**< Points to the begin of the memory block. */
-            * end = nullptr; /**< Points to the end of the memory block. */
+class InMemory : public PhysicalInStream {
+ private:
+  const char *memory = nullptr, /**< Points to the next byte to read from memory. */
+      *start = nullptr,         /**< Points to the begin of the memory block. */
+          *end = nullptr;       /**< Points to the end of the memory block. */
 
-public:
+ public:
   /**
    * The function states whether the stream actually exists.
    * @return Does the stream exist? This is always true for memory streams.
    */
-  bool exists() const override {return (memory != nullptr);}
+  bool exists() const override { return (memory != nullptr); }
 
   /**
    * The function states whether the end of the file has been reached.
@@ -719,24 +690,21 @@ public:
    * specified during the construction of the stream.
    * @return End of file reached?
    */
-  bool getEof() const override
-  {
-    return memory != nullptr && memory >= end;
-  }
+  bool getEof() const override { return memory != nullptr && memory >= end; }
 
   /**
    * The function returns the size of stream in bytes.
    * @return The size in bytes or 0 if it is unknown.
    */
-  virtual size_t getSize() const override {return end - start;}
+  virtual size_t getSize() const override { return end - start; }
 
   /**
    * Returns the current position in the stream.
    * @return The number of bytes away from the begin of the stream.
    */
-  virtual size_t getPosition() const override {return memory - start;}
+  virtual size_t getPosition() const override { return memory - start; }
 
-protected:
+ protected:
   /**
    * Opens the stream.
    * @param mem The address of the memory block from which is read.
@@ -745,10 +713,8 @@ protected:
    *             specified, eof() will always return true, but reading
    *             from the stream is still possible.
    */
-  void open(const void* mem, size_t size = 0)
-  {
-    if(memory == nullptr)
-    {
+  void open(const void* mem, size_t size = 0) {
+    if (memory == nullptr) {
       start = memory = reinterpret_cast<const char*>(mem);
       end = memory + size;
     }
@@ -767,7 +733,7 @@ protected:
    * The function skips a number of bytes.
    * @param size The number of bytes to be skipped.
    */
-  void skipInStream(size_t size) override {memory += size;}
+  void skipInStream(size_t size) override { memory += size; }
 };
 
 /**
@@ -775,9 +741,9 @@ protected:
  *
  * Generic class for classes that do both formatted and physical reading of data from streams.
  */
-template<typename S, typename R> class InStream : public S, public R, public In
-{
-public:
+template <typename S, typename R>
+class InStream : public S, public R, public In {
+ public:
   /**
    * The function reads a number of bytes from a stream.
    * @param p The address the data is written to. Note that p
@@ -785,22 +751,17 @@ public:
    *          "size" bytes large.
    * @param size The number of bytes to be read.
    */
-  void read(void* p, size_t size) override
-  {
-    R::readData(p, size, *this);
-  }
+  void read(void* p, size_t size) override { R::readData(p, size, *this); }
 
   /**
    * Reads the complete remaining stream and returns it as a single string.
    * @return The string containing the remaining contents of the stream.
    */
-  std::string readAll()
-  {
+  std::string readAll() {
     static_assert(std::is_base_of_v<InText, R>, "readAll can only be used in text streams");
     std::string result;
     std::string buffer;
-    while(!eof())
-    {
+    while (!eof()) {
       *this >> buffer;
       result += buffer;
     }
@@ -811,121 +772,79 @@ public:
    * The function skips a number of bytes in the stream.
    * @param size The number of bytes to be skipped.
    */
-  void skip(size_t size) override
-  {
-    R::skipData(size, *this);
-  }
+  void skip(size_t size) override { R::skipData(size, *this); }
 
   /**
    * Determines whether the end of file has been reached.
    */
   bool eof() const override { return R::isEof(*this); }
 
-protected:
+ protected:
   /**
    * Virtual redirection for operator>>(bool& value).
    */
-  void inBool(bool& d) override
-  {
-    R::readBool(d, *this);
-  }
+  void inBool(bool& d) override { R::readBool(d, *this); }
 
   /**
    * Virtual redirection for operator>>(char& value).
    */
-  void inChar(char& d) override
-  {
-    R::readChar(d, *this);
-  }
+  void inChar(char& d) override { R::readChar(d, *this); }
 
   /**
    * Virtual redirection for operator>>(signed char& value).
    */
-  void inSChar(signed char& d) override
-  {
-    R::readSChar(d, *this);
-  }
+  void inSChar(signed char& d) override { R::readSChar(d, *this); }
 
   /**
    * Virtual redirection for operator>>(unsigned char& value).
    */
-  void inUChar(unsigned char& d) override
-  {
-    R::readUChar(d, *this);
-  }
+  void inUChar(unsigned char& d) override { R::readUChar(d, *this); }
 
   /**
    * Virtual redirection for operator>>(short& value).
    */
-  void inShort(short& d) override
-  {
-    R::readShort(d, *this);
-  }
+  void inShort(short& d) override { R::readShort(d, *this); }
 
   /**
    * Virtual redirection for operator>>(unsigned short& value).
    */
-  void inUShort(unsigned short& d) override
-  {
-    R::readUShort(d, *this);
-  }
+  void inUShort(unsigned short& d) override { R::readUShort(d, *this); }
 
   /**
    * Virtual redirection for operator>>(int& value).
    */
-  void inInt(int& d) override
-  {
-    R::readInt(d, *this);
-  }
+  void inInt(int& d) override { R::readInt(d, *this); }
 
   /**
    * Virtual redirection for operator>>(unsigned int& value).
    */
-  void inUInt(unsigned int& d) override
-  {
-    R::readUInt(d, *this);
-  }
+  void inUInt(unsigned int& d) override { R::readUInt(d, *this); }
 
   /**
    * Virtual redirection for operator>>(float& value).
    */
-  void inFloat(float& d) override
-  {
-    R::readFloat(d, *this);
-  }
+  void inFloat(float& d) override { R::readFloat(d, *this); }
 
   /**
    * Virtual redirection for operator>>(double& value).
    */
-  void inDouble(double& d) override
-  {
-    R::readDouble(d, *this);
-  }
+  void inDouble(double& d) override { R::readDouble(d, *this); }
 
   /**
    * Virtual redirection for operator>>(std::string& value).
    */
-  void inString(std::string& d) override
-  {
-    R::readString(d, *this);
-  }
+  void inString(std::string& d) override { R::readString(d, *this); }
 
   /**
    * Virtual redirection for operator>>(Angle& value).
    */
-  void inAngle(Angle& d) override
-  {
-    R::readAngle(d, *this);
-  }
+  void inAngle(Angle& d) override { R::readAngle(d, *this); }
 
   /**
    * Virtual redirection for operator>>(In& (*f)(In&)) that reads
    * the symbol "endl";
    */
-  void inEndL() override
-  {
-    R::readEndl(*this);
-  }
+  void inEndL() override { R::readEndl(*this); }
 };
 
 /**
@@ -933,21 +852,20 @@ protected:
  *
  * A binary stream from a file.
  */
-class InBinaryFile : public InStream<InFile, InBinary>
-{
-public:
+class InBinaryFile : public InStream<InFile, InBinary> {
+ public:
   /**
    * Constructor.
    * @param name The name of the file to open. It will be interpreted
    *             as relative to the configuration directory.
    */
-  InBinaryFile(const std::string& name) {open(name);}
+  InBinaryFile(const std::string& name) { open(name); }
 
   /**
    * The function returns whether this is a binary stream.
    * @return Does it output data in binary format?
    */
-  bool isBinary() const override {return true;}
+  bool isBinary() const override { return true; }
 };
 
 /**
@@ -955,9 +873,8 @@ public:
  *
  * A Binary Stream from a memory region.
  */
-class InBinaryMemory : public InStream<InMemory, InBinary>
-{
-public:
+class InBinaryMemory : public InStream<InMemory, InBinary> {
+ public:
   /**
    * Constructor.
    * @param mem The address of the memory block from which is read.
@@ -966,13 +883,13 @@ public:
    *             specified, eof() will always return true, but reading
    *             from the stream is still possible.
    */
-  InBinaryMemory(const void* mem, size_t size = 0) {open(mem, size);}
+  InBinaryMemory(const void* mem, size_t size = 0) { open(mem, size); }
 
   /**
    * The function returns whether this is a binary stream.
    * @return Does it output data in binary format?
    */
-  bool isBinary() const override {return true;}
+  bool isBinary() const override { return true; }
 };
 
 /**
@@ -980,16 +897,14 @@ public:
  *
  * A binary stream from a file.
  */
-class InTextFile : public InStream<InFile, InText>
-{
-public:
+class InTextFile : public InStream<InFile, InText> {
+ public:
   /**
    * Constructor.
    * @param name The name of the file to open. It will be interpreted
    *             as relative to the configuration directory.
    */
-  InTextFile(const std::string& name)
-  {
+  InTextFile(const std::string& name) {
     open(name);
     initEof(*this);
   }
@@ -1000,17 +915,15 @@ public:
  *
  * A Binary Stream from a memory region.
  */
-class InTextMemory : public InStream<InMemory, InText>
-{
-public:
+class InTextMemory : public InStream<InMemory, InText> {
+ public:
   /**
    * Constructor.
    * @param mem The address of the memory block from which is read.
    * @param size The size of the memory block. It is only used to
    *             implement the function eof().
    */
-  InTextMemory(const void* mem, size_t size)
-  {
+  InTextMemory(const void* mem, size_t size) {
     open(mem, size);
     initEof(*this);
   }
@@ -1021,9 +934,8 @@ public:
  *
  * A config-file-style-formatted text stream from a file.
  */
-class InConfigFile : public InStream<InFile, InConfig>
-{
-public:
+class InConfigFile : public InStream<InFile, InConfig> {
+ public:
   /**
    * Constructor.
    * @param name The name of the file to open. It will be interpreted
@@ -1032,8 +944,7 @@ public:
    *             to gain the same results on all supported platforms.
    * @param sectionName If given the section is searched
    */
-  InConfigFile(const std::string& name, const std::string& sectionName = "")
-  {
+  InConfigFile(const std::string& name, const std::string& sectionName = "") {
     open(name);
     initEof(*this);
     create(sectionName, *this);
@@ -1045,9 +956,8 @@ public:
  *
  * A config-file-style-formatted text stream from a memory region.
  */
-class InConfigMemory : public InStream<InMemory, InConfig>
-{
-public:
+class InConfigMemory : public InStream<InMemory, InConfig> {
+ public:
   /**
    * Constructor.
    * @param mem The address of the memory block from which is read.
@@ -1057,8 +967,7 @@ public:
    *             from the stream is still possible.
    * @param sectionName If given the section is searched
    */
-  InConfigMemory(const void* mem, size_t size = 0, const std::string& sectionName = "")
-  {
+  InConfigMemory(const void* mem, size_t size = 0, const std::string& sectionName = "") {
     open(mem, size);
     initEof(*this);
     create(sectionName, *this);
@@ -1070,41 +979,40 @@ public:
  *
  * A stream that reads data from a text in config map format.
  */
-class InMap : public In
-{
-public:
+class InMap : public In {
+ public:
   /**
    * A list of possible errors during parsing and streaming from a map.
    */
-  enum ErrorType
-  {
+  enum ErrorType {
     wrongLiteralFormat, /**< Error message when a literal can not be parsed. */
-    wrongValueType, /**< Error message when a value has the wrong type (i.e. the map is structurally wrong). */
+    wrongValueType, /**< Error message when a value has the wrong type (i.e. the map is structurally
+                       wrong). */
     missingAttribute, /**< Error message when an attribute of a record is missing. */
-    outOfRange, /**< Error message when an array element beyond the end is selected. */
-    unusedElement, /**< Error message when an array element is not read. */
-    unusedAttribute /**< Error message when an attribute of a record is not read. */
+    outOfRange,       /**< Error message when an array element beyond the end is selected. */
+    unusedElement,    /**< Error message when an array element is not read. */
+    unusedAttribute   /**< Error message when an attribute of a record is not read. */
   };
 
-private:
+ private:
   /**
    * An entry representing a position in the ConfigMap.
    */
-  class Entry
-  {
-  public:
-    const char* key; /**< The name of the current key (used by printError()). */
+  class Entry {
+   public:
+    const char* key;               /**< The name of the current key (used by printError()). */
     const SimpleMap::Value* value; /**< The current value in the map. */
-    int type; /**< The type of the entry. -2: value or record, -1: array , >= 0: array element index. */
-    const char* enumType; /**< The type of the elements as string if it is an enum. Otherwise nullptr. */
+    int type; /**< The type of the entry. -2: value or record, -1: array , >= 0: array element
+                 index. */
+    const char*
+        enumType; /**< The type of the elements as string if it is an enum. Otherwise nullptr. */
 
-    Entry(const char* key, const SimpleMap::Value* value, int type, const char* enumType) :
-      key(key), value(value), type(type), enumType(enumType)
-    {}
+    Entry(const char* key, const SimpleMap::Value* value, int type, const char* enumType)
+        : key(key), value(value), type(type), enumType(enumType) {}
   };
 
   SimpleMap* map = nullptr; /**< The configuration map that was read. */
-  std::string name; /**< The name of the opened file. */
+  std::string name;         /**< The name of the opened file. */
   std::vector<Entry> stack; /**< The hierarchy of values to read. */
   unsigned errorMask; /**< The kinds of error messages to show if specification does not match. */
 
@@ -1120,36 +1028,29 @@ private:
    * The entry has been selected by select() before.
    * @param value The value that is read.
    */
-  template<typename T> void in(T& value)
-  {
+  template <typename T>
+  void in(T& value) {
     Entry& e = stack.back();
-    if(e.value)
-    {
+    if (e.value) {
       const auto* literal = dynamic_cast<const SimpleMap::Literal*>(e.value);
-      if(literal)
-      {
+      if (literal) {
         In* stream = createLiteralStream(*literal);
         *stream >> value;
-        if(!stream->eof())
-          printError("wrong format", wrongLiteralFormat);
+        if (!stream->eof()) printError("wrong format", wrongLiteralFormat);
         delete stream;
-      }
-      else
+      } else
         printError("literal expected", wrongValueType);
     }
   }
 
-protected:
+ protected:
   /**
    * Constructor.
    * @param errorMask The kinds of error messages to show if specification does not match.
    */
   InMap(unsigned errorMask) : errorMask(errorMask) {}
 
-  ~InMap() override
-  {
-    delete map;
-  }
+  ~InMap() override { delete map; }
 
   /** No assignment operator. */
   InMap& operator=(const InMap&) = delete;
@@ -1164,17 +1065,17 @@ protected:
   /**
    * Virtual redirection for operator>>(bool& value).
    */
-  void inBool(bool& value) override {in(value);}
+  void inBool(bool& value) override { in(value); }
 
   /**
    * Virtual redirection for operator>>(char& value).
    */
-  void inChar(char& value) override {in(value);}
+  void inChar(char& value) override { in(value); }
 
   /**
    * Virtual redirection for operator>>(unsigned char& value).
    */
-  void inSChar(signed char& value) override {in(value);}
+  void inSChar(signed char& value) override { in(value); }
 
   /**
    * Virtual redirection for operator>>(unsigned char& value).
@@ -1184,17 +1085,17 @@ protected:
   /**
    * Virtual redirection for operator>>(short& value).
    */
-  void inShort(short& value) override {in(value);}
+  void inShort(short& value) override { in(value); }
 
   /**
    * Virtual redirection for operator>>(unsigned short& value).
    */
-  void inUShort(unsigned short& value) override {in(value);}
+  void inUShort(unsigned short& value) override { in(value); }
 
   /**
    * Virtual redirection for operator>>(int& value).
    */
-  void inInt(int& value) override {in(value);}
+  void inInt(int& value) override { in(value); }
 
   /**
    * Virtual redirection for operator>>(unsigned int& value).
@@ -1204,22 +1105,22 @@ protected:
   /**
    * Virtual redirection for operator>>(float& value).
    */
-  void inFloat(float& value) override {in(value);}
+  void inFloat(float& value) override { in(value); }
 
   /**
    * Virtual redirection for operator>>(double& value).
    */
-  void inDouble(double& value) override {in(value);}
+  void inDouble(double& value) override { in(value); }
 
   /**
    * Virtual redirection for operator>>(std::string& value).
    */
-  void inString(std::string& value) override {in(value);}
+  void inString(std::string& value) override { in(value); }
 
   /**
    * Virtual redirection for operator>>(Angle& value).
    */
-  void inAngle(Angle& value) override {in(value);}
+  void inAngle(Angle& value) override { in(value); }
 
   /**
    * Virtual redirection for operator>>(In& (*f)(In&)) that reads
@@ -1232,12 +1133,11 @@ protected:
    * @param literal The string from which to create the stream.
    * @return A pointer to the new stream (must be freed by the caller).
    */
-  virtual In* createLiteralStream(const std::string& literal)
-  {
+  virtual In* createLiteralStream(const std::string& literal) {
     return new InTextMemory(literal.c_str(), literal.length());
   }
 
-public:
+ public:
   /**
    * The function reads a number of bytes from a stream.
    * Not allowed for this stream!
@@ -1276,9 +1176,10 @@ public:
    * This is only the case if the file does not exist or
    * reading failed.
    */
-  bool eof() const override {return (const SimpleMap::Value*) *map == nullptr;}
+  bool eof() const override { return (const SimpleMap::Value*)*map == nullptr; }
 
-  friend class DebugDataStreamer; // needs access to printError to report suppressible error message
+  friend class DebugDataStreamer;  // needs access to printError to report suppressible error
+                                   // message
 };
 
 /**
@@ -1286,12 +1187,11 @@ public:
  *
  * A stream that reads data from a text file in config map format.
  */
-class InMapFile : public InMap
-{
-private:
+class InMapFile : public InMap {
+ private:
   InBinaryFile stream;
 
-public:
+ public:
   /**
    * Constructor.
    * @param name The name of the config file to read.
@@ -1303,7 +1203,7 @@ public:
    * The function states whether this stream actually exists.
    * @return Does the stream exist?
    */
-  bool exists() const {return stream.exists();}
+  bool exists() const { return stream.exists(); }
 };
 
 /**
@@ -1311,12 +1211,11 @@ public:
  *
  * A stream that reads data from memory in config map format.
  */
-class InMapMemory : public InMap
-{
-private:
+class InMapMemory : public InMap {
+ private:
   InBinaryMemory stream;
 
-public:
+ public:
   /**
    * Constructor.
    * @param memory The block of memory to read from.

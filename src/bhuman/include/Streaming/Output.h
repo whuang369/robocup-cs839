@@ -22,10 +22,9 @@
  * A macro for sending warning messages.
  * @param message A message streamable as text.
  */
-#define OUTPUT_WARNING(message) \
-  do \
-    std::cerr << "Warning: " << message << std::endl; \
-  while(false)
+#define OUTPUT_WARNING(message)                        \
+  do std::cerr << "Warning: " << message << std::endl; \
+  while (false)
 
 /**
  * A macro for sending error messages.
@@ -33,10 +32,9 @@
  * target is used to build.
  * @param message A message streamable as text.
  */
-#define OUTPUT_ERROR(message) \
-  do \
-    std::cerr << "Error: " << message << std::endl; \
-  while(false)
+#define OUTPUT_ERROR(message)                        \
+  do std::cerr << "Error: " << message << std::endl; \
+  while (false)
 #else
 #include "Streaming/Global.h"
 #include "Streaming/MessageQueue.h"
@@ -55,8 +53,7 @@
  * OUTPUT_TEXT("i: " << i << ", j:" << j);
  * </pre>
  */
-#define OUTPUT(type, format, expression) \
-  Global::getDebugOut().format(type) << expression
+#define OUTPUT(type, format, expression) Global::getDebugOut().format(type) << expression
 
 /**
  * Shortcut for outputting text messages.
@@ -71,16 +68,13 @@
 #ifdef NDEBUG
 #define OUTPUT_WARNING(message) static_cast<void>(0)
 #else
-#define OUTPUT_WARNING(message) \
-  do \
-  { \
-    if(Global::debugOutExists()) \
-      OUTPUT_TEXT("Warning: " << message); \
-    OutTextRawMemory _stream; \
-    _stream << "Warning: " << message; \
-    Output::print(_stream.data()); \
-  } \
-  while(false)
+#define OUTPUT_WARNING(message)                                        \
+  do {                                                                 \
+    if (Global::debugOutExists()) OUTPUT_TEXT("Warning: " << message); \
+    OutTextRawMemory _stream;                                          \
+    _stream << "Warning: " << message;                                 \
+    Output::print(_stream.data());                                     \
+  } while (false)
 #endif
 
 /**
@@ -89,23 +83,19 @@
  * target is used to build.
  * @param message A message streamable as text.
  */
-#define OUTPUT_ERROR(message) \
-  do \
-  { \
-    if(Global::debugOutExists()) \
-      OUTPUT_TEXT("Error: " << message); \
-    OutTextRawMemory _stream; \
-    _stream << "Error: " << message; \
-    Output::print(_stream.data()); \
-  } \
-  while(false)
+#define OUTPUT_ERROR(message)                                        \
+  do {                                                               \
+    if (Global::debugOutExists()) OUTPUT_TEXT("Error: " << message); \
+    OutTextRawMemory _stream;                                        \
+    _stream << "Error: " << message;                                 \
+    Output::print(_stream.data());                                   \
+  } while (false)
 
-namespace Output
-{
-  /**
-   * Prints a message to stderr.
-   * @param message The error to print.
-   */
-  void print(const char* message);
-}
+namespace Output {
+/**
+ * Prints a message to stderr.
+ * @param message The error to print.
+ */
+void print(const char* message);
+}  // namespace Output
 #endif

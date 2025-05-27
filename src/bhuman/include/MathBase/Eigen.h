@@ -1,8 +1,9 @@
 #pragma once
 
-#include "Platform/BHAssert.h" // Our Eigen extensions use ASSERT
+#include "Platform/BHAssert.h"  // Our Eigen extensions use ASSERT
 
-// Extend the Eigen classes with our own methods (see: http://eigen.tuxfamily.org/dox-devel/TopicCustomizingEigen.html)
+// Extend the Eigen classes with our own methods (see:
+// http://eigen.tuxfamily.org/dox-devel/TopicCustomizingEigen.html)
 #define EIGEN_MATRIXBASE_PLUGIN "MathBase/EigenMatrixBaseExtensions.h"
 #define EIGEN_ARRAY_PLUGIN "MathBase/EigenArrayExtensions.h"
 

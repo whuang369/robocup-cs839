@@ -16,28 +16,24 @@
 /**
  * Representation for 3x3 RotationMatrices
  */
-class RotationMatrix : public Matrix3f
-{
-public:
+class RotationMatrix : public Matrix3f {
+ public:
   RotationMatrix() : Matrix3f(Matrix3f::Identity()) {}
   RotationMatrix(const Matrix3f& other) : Matrix3f(other) {}
   RotationMatrix(const AngleAxisf& angleAxis) : Matrix3f(angleAxis.toRotationMatrix()) {}
   RotationMatrix(const Quaternionf& quat) : Matrix3f(quat.toRotationMatrix()) {}
 
-  RotationMatrix& operator=(const Matrix3f& other)
-  {
+  RotationMatrix& operator=(const Matrix3f& other) {
     Matrix3f::operator=(other);
     return *this;
   }
 
-  RotationMatrix& operator=(const AngleAxisf& angleAxis)
-  {
+  RotationMatrix& operator=(const AngleAxisf& angleAxis) {
     Matrix3f::operator=(angleAxis.toRotationMatrix());
     return *this;
   }
 
-  RotationMatrix& operator=(const Quaternionf& quat)
-  {
+  RotationMatrix& operator=(const Quaternionf& quat) {
     Matrix3f::operator=(quat.toRotationMatrix());
     return *this;
   }
@@ -47,10 +43,7 @@ public:
    * @param  vector  The vector this one is multiplied by
    * @return         A new vector containing the result
    */
-  Vector3f operator*(const Vector3f& vector) const
-  {
-    return Matrix3f::operator*(vector);
-  }
+  Vector3f operator*(const Vector3f& vector) const { return Matrix3f::operator*(vector); }
 
   /**
    * Multiplication of this rotation matrix by another rotation matrix.
@@ -58,25 +51,21 @@ public:
    * @return        A new matrix containing the result
    *                of the calculation.
    */
-  RotationMatrix operator*(const RotationMatrix& other) const
-  {
+  RotationMatrix operator*(const RotationMatrix& other) const {
     return RotationMatrix(Base::operator*(other));
   }
 
-  RotationMatrix& operator*=(const AngleAxisf& rot)
-  {
+  RotationMatrix& operator*=(const AngleAxisf& rot) {
     Matrix3f::operator*=(rot.toRotationMatrix());
     return *this;
   }
 
-  RotationMatrix& operator*=(const Quaternionf& rot)
-  {
+  RotationMatrix& operator*=(const Quaternionf& rot) {
     Matrix3f::operator*=(rot.toRotationMatrix());
     return *this;
   }
 
-  RotationMatrix& operator*=(const RotationMatrix& rot)
-  {
+  RotationMatrix& operator*=(const RotationMatrix& rot) {
     Matrix3f::operator*=(rot);
     return *this;
   }
@@ -86,29 +75,24 @@ public:
    *
    * @note: Inverted rotation matrix is transposed matrix.
    */
-  RotationMatrix& invert()
-  {
+  RotationMatrix& invert() {
     transposeInPlace();
     return *this;
   }
 
-  RotationMatrix inverse() const
-  {
-    return RotationMatrix(transpose());
-  }
+  RotationMatrix inverse() const { return RotationMatrix(transpose()); }
 
-  void normalize()
-  {
-    *this = Quaternionf(*this).normalized();
-  }
+  void normalize() { *this = Quaternionf(*this).normalized(); }
 
-  RotationMatrix normalized() const
-  {
+  RotationMatrix normalized() const {
     RotationMatrix out = Quaternionf(*this).normalized();
     ASSERT(std::abs(out.determinant() - 1.f) <= 10.f * std::numeric_limits<float>::epsilon());
-    ASSERT(std::abs(out.row(0) * out.row(1).transpose()) <= 10.f * std::numeric_limits<float>::epsilon());
-    ASSERT(std::abs(out.row(0) * out.row(2).transpose()) <= 10.f * std::numeric_limits<float>::epsilon());
-    ASSERT(std::abs(out.row(1) * out.row(2).transpose()) <= 10.f * std::numeric_limits<float>::epsilon());
+    ASSERT(std::abs(out.row(0) * out.row(1).transpose()) <=
+           10.f * std::numeric_limits<float>::epsilon());
+    ASSERT(std::abs(out.row(0) * out.row(2).transpose()) <=
+           10.f * std::numeric_limits<float>::epsilon());
+    ASSERT(std::abs(out.row(1) * out.row(2).transpose()) <=
+           10.f * std::numeric_limits<float>::epsilon());
     return out;
   }
 
@@ -203,12 +187,12 @@ public:
   static RotationMatrix fromEulerAngles(const float x, const float y, const float z);
 
   /**
-   * Creates a RotationMatrix rotatied around the z, y and x components of the Vector3 (in this order!).
-   * Equivalent to fromRotationZ(rotation.z).rotateY(rotation.y).rotateX(rotation.x);
+   * Creates a RotationMatrix rotatied around the z, y and x components of the Vector3 (in this
+   * order!). Equivalent to fromRotationZ(rotation.z).rotateY(rotation.y).rotateX(rotation.x);
    */
   static RotationMatrix fromEulerAngles(const Vector3f& rotation);
 
-private:
+ private:
   // The following is a hack in order to keep the kicks from the Kickengine working...
   friend class KickViewWidget;
   friend class RotationMatrix_getPackedAngleAxisFaulty_Test;
@@ -224,8 +208,7 @@ private:
  * @param rotationMatrix The matrix to write.
  * @return The stream after writing.
  */
-inline Out& operator<<(Out& stream, const RotationMatrix& rotationMatrix)
-{
+inline Out& operator<<(Out& stream, const RotationMatrix& rotationMatrix) {
   STREAM_BASE_EXT(stream, rotationMatrix, Matrix3f);
   return stream;
 }
@@ -236,8 +219,7 @@ inline Out& operator<<(Out& stream, const RotationMatrix& rotationMatrix)
  * @param rotationMatrix The matrix to read.
  * @return The stream after reading.
  */
-inline In& operator>>(In& stream, RotationMatrix& rotationMatrix)
-{
+inline In& operator>>(In& stream, RotationMatrix& rotationMatrix) {
   STREAM_BASE_EXT(stream, rotationMatrix, Matrix3f);
   return stream;
 }

@@ -33,9 +33,8 @@
  *
  * The class implements threads as platform dependent std::thread.
  */
-class Thread
-{
-private:
+class Thread {
+ private:
   static thread_local Thread* instance;
   DECLARE_SYNC;
   std::thread* thread = nullptr;
@@ -44,7 +43,7 @@ private:
   int priority = 0;
   Semaphore terminated;
 
-public:
+ public:
   Thread() = default;
   Thread(int priority) : priority(priority) {}
 
@@ -58,7 +57,7 @@ public:
    * @param o The object the member function operates on.
    * @param f The member function.
    */
-  template<typename C>
+  template <typename C>
   void start(C* o, void (C::*f)());
 
   /**
@@ -80,7 +79,10 @@ public:
    * @param prio The scheduling priority. Priorities > 0 use the real
    *             time scheduler, -2..0 uses the normal scheduler.
    */
-  void setPriority(int prio) { priority = prio; changePriority(); }
+  void setPriority(int prio) {
+    priority = prio;
+    changePriority();
+  }
 
   /**
    * The function determines whether the thread should still be running.
@@ -103,10 +105,7 @@ public:
   /**
    * Causes the calling thread to relinquish the CPU.
    */
-  static void yield()
-  {
-    std::this_thread::yield();
-  }
+  static void yield() { std::this_thread::yield(); }
 
   static void sleep(unsigned ms) { std::this_thread::sleep_for(std::chrono::milliseconds(ms)); }
 
@@ -128,9 +127,9 @@ public:
    * @return The current Thread object or nullptr if the current thread was
    *         not started using the Thread class.
    */
-  static Thread* getCurrentThread() {return instance;}
+  static Thread* getCurrentThread() { return instance; }
 
-private:
+ private:
   /**
    * The function is called when the thread is started.
    * It calls the main function of the thread as a member function of an object.
@@ -144,23 +143,18 @@ private:
    * The function removes the additional debug information from a thread name.
    * @param The string to be edited.
    */
-  static void demangleThreadName(std::string& string)
-  {
+  static void demangleThreadName(std::string& string) {
     const size_t dotIndex = string.find_last_of('.');
-    if(dotIndex != std::string::npos)
-      string = string.substr(dotIndex + 1);
+    if (dotIndex != std::string::npos) string = string.substr(dotIndex + 1);
   }
 };
 
-template<typename C>
-void Thread::start(C* o, void (C::*f)())
-{
-  if(thread)
-    stop();
+template <typename C>
+void Thread::start(C* o, void (C::*f)()) {
+  if (thread) stop();
 
   running = true;
-  thread = new std::thread(&Thread::threadStart, this, [o, f, this]
-  {
+  thread = new std::thread(&Thread::threadStart, this, [o, f, this] {
     id = getCurrentId();
     instance = this;
     (o->*f)();

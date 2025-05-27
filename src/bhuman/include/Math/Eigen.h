@@ -17,8 +17,8 @@
  * @tparam T The element type of the row or column.
  * @tparam N The number of elements in the row or column.
  */
-template<typename T, int N> struct EigenMatrixRow
-{
+template <typename T, int N>
+struct EigenMatrixRow {
   T elems[N]; /**< The elements of the row or column. */
 };
 
@@ -27,8 +27,8 @@ template<typename T, int N> struct EigenMatrixRow
  * @tparam T The type of the elements.
  * @tparam N The number of elements of the row.
  */
-template<typename T, int N> void regEigenMatrixRow()
-{
+template <typename T, int N>
+void regEigenMatrixRow() {
   REG_CLASS(EigenMatrixRow<T, N>);
   REG(T[N], elems);
 }
@@ -40,9 +40,8 @@ template<typename T, int N> void regEigenMatrixRow()
  * @param stream The stream to write to.
  * @param row The row or column to write.
  */
-template<typename T, int N>
-Out& operator<<(Out& stream, const EigenMatrixRow<T, N>& row)
-{
+template <typename T, int N>
+Out& operator<<(Out& stream, const EigenMatrixRow<T, N>& row) {
   PUBLISH(regEigenMatrixRow<T, N>);
   STREAM_EXT(stream, row.elems);
   return stream;
@@ -55,9 +54,8 @@ Out& operator<<(Out& stream, const EigenMatrixRow<T, N>& row)
  * @param stream The stream to read from.
  * @param row The row or column to read.
  */
-template<typename T, int N>
-In& operator>>(In& stream, EigenMatrixRow<T, N>& row)
-{
+template <typename T, int N>
+In& operator>>(In& stream, EigenMatrixRow<T, N>& row) {
   PUBLISH(regEigenMatrixRow<T, N>);
   STREAM_EXT(stream, row.elems);
   return stream;
@@ -72,14 +70,13 @@ In& operator>>(In& stream, EigenMatrixRow<T, N>& row)
  * @tparam MAX_ROWS The maximum number of rows of the matrix. Must equal ROWS.
  * @tparam MAX_COLS The maximum number of columns of the matrix. Must equal COLS.
  */
-template<typename T, int ROWS, int COLS, int OPTIONS>
-void regMatrix()
-{
+template <typename T, int ROWS, int COLS, int OPTIONS>
+void regMatrix() {
   REG_CLASS(Eigen::Matrix<T, ROWS, COLS, OPTIONS, ROWS, COLS>);
-  if(OPTIONS & Eigen::RowMajor)
-    REG(EigenMatrixRow<T COMMA COLS> (*)[ROWS], rows);
+  if (OPTIONS & Eigen::RowMajor)
+    REG(EigenMatrixRow<T COMMA COLS>(*)[ROWS], rows);
   else
-    REG(EigenMatrixRow<T COMMA ROWS> (*)[COLS], cols);
+    REG(EigenMatrixRow<T COMMA ROWS>(*)[COLS], cols);
 }
 
 /**
@@ -93,23 +90,22 @@ void regMatrix()
  * @param stream The stream to write to.
  * @param matrix The matrix to write.
  */
-template<typename T, int ROWS, int COLS, int OPTIONS, int MAX_ROWS, int MAX_COLS>
-Out& operator<<(Out& stream, const Eigen::Matrix<T, ROWS, COLS, OPTIONS, MAX_ROWS, MAX_COLS>& matrix)
-{
+template <typename T, int ROWS, int COLS, int OPTIONS, int MAX_ROWS, int MAX_COLS>
+Out& operator<<(Out& stream,
+                const Eigen::Matrix<T, ROWS, COLS, OPTIONS, MAX_ROWS, MAX_COLS>& matrix) {
   static_assert(ROWS != Eigen::Dynamic && COLS != Eigen::Dynamic,
                 "Streaming dynamic Eigen matrix not supported yet");
   static_assert(ROWS == MAX_ROWS && COLS == MAX_COLS,
                 "Setting _MaxRows or _MaxCols is not supported yet");
 
   PUBLISH(regMatrix<T, ROWS, COLS, OPTIONS>);
-  if(OPTIONS & Eigen::RowMajor)
-  {
-    const EigenMatrixRow<T, COLS> (*rows)[ROWS] = reinterpret_cast<const EigenMatrixRow<T, COLS> (*)[ROWS]>(matrix.data());
+  if (OPTIONS & Eigen::RowMajor) {
+    const EigenMatrixRow<T, COLS>(*rows)[ROWS] =
+        reinterpret_cast<const EigenMatrixRow<T, COLS>(*)[ROWS]>(matrix.data());
     STREAM_EXT(stream, rows);
-  }
-  else
-  {
-    const EigenMatrixRow<T, ROWS> (*cols)[COLS] = reinterpret_cast<const EigenMatrixRow<T, ROWS> (*)[COLS]>(matrix.data());
+  } else {
+    const EigenMatrixRow<T, ROWS>(*cols)[COLS] =
+        reinterpret_cast<const EigenMatrixRow<T, ROWS>(*)[COLS]>(matrix.data());
     STREAM_EXT(stream, cols);
   }
 
@@ -127,23 +123,21 @@ Out& operator<<(Out& stream, const Eigen::Matrix<T, ROWS, COLS, OPTIONS, MAX_ROW
  * @param stream The stream to read from.
  * @param matrix The matrix to read.
  */
-template<typename T, int ROWS, int COLS, int OPTIONS, int MAX_ROWS, int MAX_COLS>
-In& operator>>(In& stream, Eigen::Matrix<T, ROWS, COLS, OPTIONS, MAX_ROWS, MAX_COLS>& matrix)
-{
+template <typename T, int ROWS, int COLS, int OPTIONS, int MAX_ROWS, int MAX_COLS>
+In& operator>>(In& stream, Eigen::Matrix<T, ROWS, COLS, OPTIONS, MAX_ROWS, MAX_COLS>& matrix) {
   static_assert(ROWS != Eigen::Dynamic && COLS != Eigen::Dynamic,
                 "Streaming dynamic Eigen matrix not supported yet");
   static_assert(ROWS == MAX_ROWS && COLS == MAX_COLS,
                 "Setting _MaxRows or _MaxCols is not supported yet");
 
   PUBLISH(regMatrix<T, ROWS, COLS, OPTIONS>);
-  if(OPTIONS & Eigen::RowMajor)
-  {
-    EigenMatrixRow<T, COLS> (*rows)[ROWS] = reinterpret_cast<EigenMatrixRow<T, COLS> (*)[ROWS]>(matrix.data());
+  if (OPTIONS & Eigen::RowMajor) {
+    EigenMatrixRow<T, COLS>(*rows)[ROWS] =
+        reinterpret_cast<EigenMatrixRow<T, COLS>(*)[ROWS]>(matrix.data());
     STREAM_EXT(stream, rows);
-  }
-  else
-  {
-    EigenMatrixRow<T, ROWS> (*cols)[COLS] = reinterpret_cast<EigenMatrixRow<T, ROWS> (*)[COLS]>(matrix.data());
+  } else {
+    EigenMatrixRow<T, ROWS>(*cols)[COLS] =
+        reinterpret_cast<EigenMatrixRow<T, ROWS>(*)[COLS]>(matrix.data());
     STREAM_EXT(stream, cols);
   }
 
@@ -157,10 +151,10 @@ In& operator>>(In& stream, Eigen::Matrix<T, ROWS, COLS, OPTIONS, MAX_ROWS, MAX_C
  * @tparam COLS The number of columns of the vector.
  * @tparam OPTIONS Mainly describes whether the matrix is row major or column major.
  */
-template<typename T, int ROWS, int COLS, int OPTIONS> void regMatrix1()
-{
+template <typename T, int ROWS, int COLS, int OPTIONS>
+void regMatrix1() {
   REG_CLASS(Eigen::Matrix<T, ROWS, COLS, OPTIONS, ROWS, COLS>);
-  REG(T (*)[ROWS > COLS ? ROWS : COLS], elems);
+  REG(T(*)[ROWS > COLS ? ROWS : COLS], elems);
 }
 
 /**
@@ -172,16 +166,13 @@ template<typename T, int ROWS, int COLS, int OPTIONS> void regMatrix1()
  * @param stream The stream to write to.
  * @param vector The vector to write.
  */
-template<typename T, int ELEMS, int OPTIONS, int MAX_ELEMS>
-Out& operator<<(Out& stream, const Eigen::Matrix<T, 1, ELEMS, OPTIONS, 1, MAX_ELEMS>& vector)
-{
-  static_assert(ELEMS != Eigen::Dynamic,
-                "Streaming dynamic Eigen matrix not supported yet");
-  static_assert(ELEMS == MAX_ELEMS,
-                "Setting _MaxCols is not supported yet");
+template <typename T, int ELEMS, int OPTIONS, int MAX_ELEMS>
+Out& operator<<(Out& stream, const Eigen::Matrix<T, 1, ELEMS, OPTIONS, 1, MAX_ELEMS>& vector) {
+  static_assert(ELEMS != Eigen::Dynamic, "Streaming dynamic Eigen matrix not supported yet");
+  static_assert(ELEMS == MAX_ELEMS, "Setting _MaxCols is not supported yet");
 
   PUBLISH(regMatrix1<T, 1, ELEMS, OPTIONS>);
-  const T (*elems)[ELEMS] = reinterpret_cast<const T (*)[ELEMS]>(vector.data());
+  const T(*elems)[ELEMS] = reinterpret_cast<const T(*)[ELEMS]>(vector.data());
   STREAM_EXT(stream, elems);
 
   return stream;
@@ -196,16 +187,13 @@ Out& operator<<(Out& stream, const Eigen::Matrix<T, 1, ELEMS, OPTIONS, 1, MAX_EL
  * @param stream The stream to read from.
  * @param vector The vector to read.
  */
-template<typename T, int ELEMS, int OPTIONS, int MAX_ELEMS>
-In& operator>>(In& stream, Eigen::Matrix<T, 1, ELEMS, OPTIONS, 1, MAX_ELEMS>& vector)
-{
-  static_assert(ELEMS != Eigen::Dynamic,
-                "Streaming dynamic Eigen matrix not supported yet");
-  static_assert(ELEMS == MAX_ELEMS,
-                "Setting _MaxCols is not supported yet");
+template <typename T, int ELEMS, int OPTIONS, int MAX_ELEMS>
+In& operator>>(In& stream, Eigen::Matrix<T, 1, ELEMS, OPTIONS, 1, MAX_ELEMS>& vector) {
+  static_assert(ELEMS != Eigen::Dynamic, "Streaming dynamic Eigen matrix not supported yet");
+  static_assert(ELEMS == MAX_ELEMS, "Setting _MaxCols is not supported yet");
 
   PUBLISH(regMatrix1<T, 1, ELEMS, OPTIONS>);
-  T (*elems)[ELEMS] = reinterpret_cast<T (*)[ELEMS]>(vector.data());
+  T(*elems)[ELEMS] = reinterpret_cast<T(*)[ELEMS]>(vector.data());
   STREAM_EXT(stream, elems);
 
   return stream;
@@ -220,16 +208,13 @@ In& operator>>(In& stream, Eigen::Matrix<T, 1, ELEMS, OPTIONS, 1, MAX_ELEMS>& ve
  * @param stream The stream to write to.
  * @param vector The vector to write.
  */
-template<typename T, int ELEMS, int OPTIONS, int MAX_ELEMS>
-Out& operator<<(Out& stream, const Eigen::Matrix<T, ELEMS, 1, OPTIONS, MAX_ELEMS, 1>& vector)
-{
-  static_assert(ELEMS != Eigen::Dynamic,
-                "Streaming dynamic Eigen matrix not supported yet");
-  static_assert(ELEMS == MAX_ELEMS,
-                "Setting _MaxRows is not supported yet");
+template <typename T, int ELEMS, int OPTIONS, int MAX_ELEMS>
+Out& operator<<(Out& stream, const Eigen::Matrix<T, ELEMS, 1, OPTIONS, MAX_ELEMS, 1>& vector) {
+  static_assert(ELEMS != Eigen::Dynamic, "Streaming dynamic Eigen matrix not supported yet");
+  static_assert(ELEMS == MAX_ELEMS, "Setting _MaxRows is not supported yet");
 
   PUBLISH(regMatrix1<T, ELEMS, 1, OPTIONS>);
-  const T (*elems)[ELEMS] = reinterpret_cast<const T (*)[ELEMS]>(vector.data());
+  const T(*elems)[ELEMS] = reinterpret_cast<const T(*)[ELEMS]>(vector.data());
   STREAM_EXT(stream, elems);
 
   return stream;
@@ -244,16 +229,13 @@ Out& operator<<(Out& stream, const Eigen::Matrix<T, ELEMS, 1, OPTIONS, MAX_ELEMS
  * @param stream The stream to read from.
  * @param vector The vector to read.
  */
-template<typename T, int ELEMS, int OPTIONS, int MAX_ELEMS>
-In& operator>>(In& stream, Eigen::Matrix<T, ELEMS, 1, OPTIONS, MAX_ELEMS, 1>& vector)
-{
-  static_assert(ELEMS != Eigen::Dynamic,
-                "Streaming dynamic Eigen matrix not supported yet");
-  static_assert(ELEMS == MAX_ELEMS,
-                "Setting _MaxRows is not supported yet");
+template <typename T, int ELEMS, int OPTIONS, int MAX_ELEMS>
+In& operator>>(In& stream, Eigen::Matrix<T, ELEMS, 1, OPTIONS, MAX_ELEMS, 1>& vector) {
+  static_assert(ELEMS != Eigen::Dynamic, "Streaming dynamic Eigen matrix not supported yet");
+  static_assert(ELEMS == MAX_ELEMS, "Setting _MaxRows is not supported yet");
 
   PUBLISH(regMatrix1<T, ELEMS, 1, OPTIONS>);
-  T (*elems)[ELEMS] = reinterpret_cast<T (*)[ELEMS]>(vector.data());
+  T(*elems)[ELEMS] = reinterpret_cast<T(*)[ELEMS]>(vector.data());
   STREAM_EXT(stream, elems);
 
   return stream;
@@ -266,8 +248,8 @@ In& operator>>(In& stream, Eigen::Matrix<T, ELEMS, 1, OPTIONS, MAX_ELEMS, 1>& ve
  * @tparam COLS The number of columns of the vector.
  * @tparam OPTIONS Mainly describes whether the matrix is row major or column major.
  */
-template<typename T, int ROWS, int COLS, int OPTIONS> void regMatrixXY()
-{
+template <typename T, int ROWS, int COLS, int OPTIONS>
+void regMatrixXY() {
   REG_CLASS(Eigen::Matrix<T, ROWS, COLS, OPTIONS, ROWS, COLS>);
   REG(T, x);
   REG(T, y);
@@ -280,9 +262,8 @@ template<typename T, int ROWS, int COLS, int OPTIONS> void regMatrixXY()
  * @param stream The stream to write to.
  * @param vector The vector to write.
  */
-template<typename T, int OPTIONS>
-Out& operator<<(Out& stream, const Eigen::Matrix<T, 1, 2, OPTIONS, 1, 2>& vector)
-{
+template <typename T, int OPTIONS>
+Out& operator<<(Out& stream, const Eigen::Matrix<T, 1, 2, OPTIONS, 1, 2>& vector) {
   PUBLISH(regMatrixXY<T, 1, 2, OPTIONS>);
   const T& x = vector.x();
   const T& y = vector.y();
@@ -300,9 +281,8 @@ Out& operator<<(Out& stream, const Eigen::Matrix<T, 1, 2, OPTIONS, 1, 2>& vector
  * @param stream The stream to read from.
  * @param vector The vector to read.
  */
-template<typename T, int OPTIONS>
-In& operator>>(In& stream, Eigen::Matrix<T, 1, 2, OPTIONS, 1, 2>& vector)
-{
+template <typename T, int OPTIONS>
+In& operator>>(In& stream, Eigen::Matrix<T, 1, 2, OPTIONS, 1, 2>& vector) {
   PUBLISH(regMatrixXY<T, 1, 2, OPTIONS>);
   T& x = vector.x();
   T& y = vector.y();
@@ -320,9 +300,8 @@ In& operator>>(In& stream, Eigen::Matrix<T, 1, 2, OPTIONS, 1, 2>& vector)
  * @param stream The stream to write to.
  * @param vector The vector to write.
  */
-template<typename T, int OPTIONS>
-Out& operator<<(Out& stream, const Eigen::Matrix<T, 2, 1, OPTIONS, 2, 1>& vector)
-{
+template <typename T, int OPTIONS>
+Out& operator<<(Out& stream, const Eigen::Matrix<T, 2, 1, OPTIONS, 2, 1>& vector) {
   PUBLISH(regMatrixXY<T, 2, 1, OPTIONS>);
   const T& x = vector.x();
   const T& y = vector.y();
@@ -340,9 +319,8 @@ Out& operator<<(Out& stream, const Eigen::Matrix<T, 2, 1, OPTIONS, 2, 1>& vector
  * @param stream The stream to read from.
  * @param vector The vector to read.
  */
-template<typename T, int OPTIONS>
-In& operator>>(In& stream, Eigen::Matrix<T, 2, 1, OPTIONS, 2, 1>& vector)
-{
+template <typename T, int OPTIONS>
+In& operator>>(In& stream, Eigen::Matrix<T, 2, 1, OPTIONS, 2, 1>& vector) {
   PUBLISH(regMatrixXY<T, 2, 1, OPTIONS>);
   T& x = vector.x();
   T& y = vector.y();
@@ -360,8 +338,8 @@ In& operator>>(In& stream, Eigen::Matrix<T, 2, 1, OPTIONS, 2, 1>& vector)
  * @tparam COLS The number of columns of the vector.
  * @tparam OPTIONS Mainly describes whether the matrix is row major or column major.
  */
-template<typename T, int ROWS, int COLS, int OPTIONS> void regMatrixXYZ()
-{
+template <typename T, int ROWS, int COLS, int OPTIONS>
+void regMatrixXYZ() {
   REG_CLASS(Eigen::Matrix<T, ROWS, COLS, OPTIONS, ROWS, COLS>);
   REG(T, x);
   REG(T, y);
@@ -375,9 +353,8 @@ template<typename T, int ROWS, int COLS, int OPTIONS> void regMatrixXYZ()
  * @param stream The stream to write to.
  * @param vector The vector to write.
  */
-template<typename T, int OPTIONS>
-Out& operator<<(Out& stream, const Eigen::Matrix<T, 1, 3, OPTIONS, 1, 3>& vector)
-{
+template <typename T, int OPTIONS>
+Out& operator<<(Out& stream, const Eigen::Matrix<T, 1, 3, OPTIONS, 1, 3>& vector) {
   PUBLISH(regMatrixXYZ<T, 1, 3, OPTIONS>);
   const T& x = vector.x();
   const T& y = vector.y();
@@ -397,9 +374,8 @@ Out& operator<<(Out& stream, const Eigen::Matrix<T, 1, 3, OPTIONS, 1, 3>& vector
  * @param stream The stream to read from.
  * @param vector The vector to read.
  */
-template<typename T, int OPTIONS>
-In& operator>>(In& stream, Eigen::Matrix<T, 1, 3, OPTIONS, 1, 3>& vector)
-{
+template <typename T, int OPTIONS>
+In& operator>>(In& stream, Eigen::Matrix<T, 1, 3, OPTIONS, 1, 3>& vector) {
   PUBLISH(regMatrixXYZ<T, 1, 3, OPTIONS>);
   T& x = vector.x();
   T& y = vector.y();
@@ -419,9 +395,8 @@ In& operator>>(In& stream, Eigen::Matrix<T, 1, 3, OPTIONS, 1, 3>& vector)
  * @param stream The stream to write to.
  * @param vector The vector to write.
  */
-template<typename T, int OPTIONS>
-Out& operator<<(Out& stream, const Eigen::Matrix<T, 3, 1, OPTIONS, 3, 1>& vector)
-{
+template <typename T, int OPTIONS>
+Out& operator<<(Out& stream, const Eigen::Matrix<T, 3, 1, OPTIONS, 3, 1>& vector) {
   PUBLISH(regMatrixXYZ<T, 3, 1, OPTIONS>);
   const T& x = vector.x();
   const T& y = vector.y();
@@ -441,9 +416,8 @@ Out& operator<<(Out& stream, const Eigen::Matrix<T, 3, 1, OPTIONS, 3, 1>& vector
  * @param stream The stream to read from.
  * @param vector The vector to read.
  */
-template<typename T, int OPTIONS>
-In& operator>>(In& stream, Eigen::Matrix<T, 3, 1, OPTIONS, 3, 1>& vector)
-{
+template <typename T, int OPTIONS>
+In& operator>>(In& stream, Eigen::Matrix<T, 3, 1, OPTIONS, 3, 1>& vector) {
   PUBLISH(regMatrixXYZ<T, 1, 3, OPTIONS>);
   T& x = vector.x();
   T& y = vector.y();
@@ -461,8 +435,8 @@ In& operator>>(In& stream, Eigen::Matrix<T, 3, 1, OPTIONS, 3, 1>& vector)
  * @tparam T The type of the elements.
  * @tparam OPTIONS Mainly describes whether the vector is row major or column major.
  */
-template<typename T, int OPTIONS> void regArrayXY()
-{
+template <typename T, int OPTIONS>
+void regArrayXY() {
   REG_CLASS(Eigen::Array<T, 2, 1, OPTIONS, 2, 1>);
   REG(T, x);
   REG(T, y);
@@ -475,9 +449,8 @@ template<typename T, int OPTIONS> void regArrayXY()
  * @param stream The stream to write to.
  * @param array The array to write.
  */
-template<typename T, int OPTIONS>
-Out& operator<<(Out& stream, const Eigen::Array<T, 2, 1, OPTIONS, 2, 1>& array)
-{
+template <typename T, int OPTIONS>
+Out& operator<<(Out& stream, const Eigen::Array<T, 2, 1, OPTIONS, 2, 1>& array) {
   PUBLISH(regArrayXY<T, OPTIONS>);
   const T& x = array.x();
   const T& y = array.y();
@@ -495,9 +468,8 @@ Out& operator<<(Out& stream, const Eigen::Array<T, 2, 1, OPTIONS, 2, 1>& array)
  * @param stream The stream to read from.
  * @param array The array to read.
  */
-template<typename T, int OPTIONS>
-In& operator>>(In& stream, Eigen::Array<T, 2, 1, OPTIONS, 2, 1>& array)
-{
+template <typename T, int OPTIONS>
+In& operator>>(In& stream, Eigen::Array<T, 2, 1, OPTIONS, 2, 1>& array) {
   PUBLISH(regArrayXY<T, OPTIONS>);
   T& x = array.x();
   T& y = array.y();
@@ -513,8 +485,8 @@ In& operator>>(In& stream, Eigen::Array<T, 2, 1, OPTIONS, 2, 1>& array)
  * @tparam T The type of the elements.
  * @tparam OPTIONS Mainly describes whether the vector is row major or column major.
  */
-template<typename T, int OPTIONS> void regQuaternion()
-{
+template <typename T, int OPTIONS>
+void regQuaternion() {
   REG_CLASS(Eigen::Quaternion<T, OPTIONS>);
   REG(T, x);
   REG(T, y);
@@ -529,9 +501,8 @@ template<typename T, int OPTIONS> void regQuaternion()
  * @param stream The stream to write to.
  * @param quaternion The quaternion to write.
  */
-template<typename T, int OPTIONS>
-In& operator>>(In& stream, Eigen::Quaternion<T, OPTIONS>& quaternion)
-{
+template <typename T, int OPTIONS>
+In& operator>>(In& stream, Eigen::Quaternion<T, OPTIONS>& quaternion) {
   PUBLISH(regQuaternion<T, OPTIONS>);
   T& x = quaternion.x();
   T& y = quaternion.y();
@@ -553,9 +524,8 @@ In& operator>>(In& stream, Eigen::Quaternion<T, OPTIONS>& quaternion)
  * @param stream The stream to read from.
  * @param quaternion The quaternion to read.
  */
-template<typename T, int OPTIONS>
-Out& operator<<(Out& stream, const Eigen::Quaternion<T, OPTIONS>& quaternion)
-{
+template <typename T, int OPTIONS>
+Out& operator<<(Out& stream, const Eigen::Quaternion<T, OPTIONS>& quaternion) {
   PUBLISH(regQuaternion<T, OPTIONS>);
   const T& x = quaternion.x();
   const T& y = quaternion.y();
@@ -574,8 +544,8 @@ Out& operator<<(Out& stream, const Eigen::Quaternion<T, OPTIONS>& quaternion)
  * Register an angle axis Eigen vector.
  * @tparam T The type of the elements.
  */
-template<typename T> void regAngleAxis()
-{
+template <typename T>
+void regAngleAxis() {
   REG_CLASS(Eigen::AngleAxis<T>);
   REG(T, angle);
   REG(Eigen::Matrix<T COMMA 3 COMMA 1>, axis);
@@ -587,9 +557,8 @@ template<typename T> void regAngleAxis()
  * @param stream The stream to write to.
  * @param angleAxis The angle axis vector to write.
  */
-template<typename T>
-In& operator>>(In& stream, Eigen::AngleAxis<T>& angleAxis)
-{
+template <typename T>
+In& operator>>(In& stream, Eigen::AngleAxis<T>& angleAxis) {
   PUBLISH(regAngleAxis<T>);
   T& angle = angleAxis.angle();
   Eigen::Matrix<T, 3, 1>& axis = angleAxis.axis();
@@ -606,9 +575,8 @@ In& operator>>(In& stream, Eigen::AngleAxis<T>& angleAxis)
  * @param stream The stream to read from.
  * @param angleAxis The angle axis vector to read.
  */
-template<typename T>
-Out& operator<<(Out& stream, const Eigen::AngleAxis<T>& angleAxis)
-{
+template <typename T>
+Out& operator<<(Out& stream, const Eigen::AngleAxis<T>& angleAxis) {
   PUBLISH(regAngleAxis<T>);
   const T& angle = angleAxis.angle();
   const Eigen::Matrix<T, 3, 1>& axis = angleAxis.axis();

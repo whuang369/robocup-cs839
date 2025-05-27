@@ -2,17 +2,16 @@
 
 using namespace std;
 
-
 int main(int argc, char *argv[]) {
-    rclcpp::init(argc, argv);
+  rclcpp::init(argc, argv);
 
-    auto node = make_shared<GameControllerNode>("game_controller_node");
+  auto node = make_shared<GameControllerNode>("game_controller_node");
 
-    node->init();
-    
-    rclcpp::spin(node);
+  node->init();
 
-    rclcpp::shutdown();
+  rclcpp::spin(node);
 
-    return 0;
+  rclcpp::shutdown();
+
+  return 0;
 }

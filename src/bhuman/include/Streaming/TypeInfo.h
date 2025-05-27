@@ -30,11 +30,9 @@
 #include <unordered_set>
 #include <vector>
 
-struct TypeInfo
-{
+struct TypeInfo {
   /** An attribute of a class. */
-  struct Attribute
-  {
+  struct Attribute {
     std::string type; /**< The type of the attribute. */
     std::string name; /**< The name of the attribute. */
 
@@ -51,9 +49,10 @@ struct TypeInfo
 
   static std::unique_ptr<TypeInfo> current; /**< The only instance of the current type info. */
 
-  std::unordered_set<std::string> primitives; /**< All primitive data types. */
+  std::unordered_set<std::string> primitives;                      /**< All primitive data types. */
   std::unordered_map<std::string, std::vector<std::string>> enums; /**< All enumeration types. */
-  std::unordered_map<std::string, std::vector<Attribute>> classes; /**< All classes and structures. */
+  std::unordered_map<std::string, std::vector<Attribute>>
+      classes; /**< All classes and structures. */
 
   /**
    * Default constructor.
@@ -68,7 +67,8 @@ struct TypeInfo
    * @param thisType The type name for this type information.
    * @param otherType The type name for the other type information.
    */
-  bool areTypesEqual(const TypeInfo& other, const std::string& thisType, const std::string& otherType) const;
+  bool areTypesEqual(const TypeInfo& other, const std::string& thisType,
+                     const std::string& otherType) const;
 
   /** Initialize the only instance of the current type info. */
   static void initCurrent();

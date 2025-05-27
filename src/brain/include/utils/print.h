@@ -40,46 +40,43 @@ using namespace std;
 #define RESET_CODE "\033[0m"
 
 // C printf style string formatter
-inline string format(const char *str, ...)
-{
-    char buf[1024];
-    va_list args;
-    va_start(args, str);
-    vsprintf(buf, str, args);
-    va_end(args);
-    return string(buf);
+inline string format(const char *str, ...) {
+  char buf[1024];
+  va_list args;
+  va_start(args, str);
+  vsprintf(buf, str, args);
+  va_end(args);
+  return string(buf);
 }
 
 // Print the string str enclosed in top and bottom borders, and return the input string itself
-inline string prettyPrint(const string &str, const string &title = "", const string &colorCode = "", int borderLength = 70, char borderChar = '=')
-{
-    int headerHalfLength = floor((borderLength - title.length() - 2) / 2);
-    if (headerHalfLength < 0)
-        headerHalfLength = 0;
-    string header = string(headerHalfLength, borderChar);
-    string footer = string(borderLength, borderChar);
-    cout << colorCode
-         << header << " " << title << " " << header << "\n\n"
-         << str << "\n\n"
-         << footer 
-         << RESET_CODE << "\n" << endl;
-    return str;
+inline string prettyPrint(const string &str, const string &title = "", const string &colorCode = "",
+                          int borderLength = 70, char borderChar = '=') {
+  int headerHalfLength = floor((borderLength - title.length() - 2) / 2);
+  if (headerHalfLength < 0) headerHalfLength = 0;
+  string header = string(headerHalfLength, borderChar);
+  string footer = string(borderLength, borderChar);
+  cout << colorCode << header << " " << title << " " << header << "\n\n"
+       << str << "\n\n"
+       << footer << RESET_CODE << "\n"
+       << endl;
+  return str;
 }
 
-// Print the string str enclosed in a prominent red block labeled "ERROR", and return the input string itself
-inline string prtErr(const string &str)
-{
-    return prettyPrint(str, "ERROR", RED_CODE);
+// Print the string str enclosed in a prominent red block labeled "ERROR", and return the input
+// string itself
+inline string prtErr(const string &str) {
+  return prettyPrint(str, "ERROR", RED_CODE);
 }
 
-// Print the string str enclosed in a prominent block labeled "DEBUG", and return the input string itself
-inline string prtDebug(const string &str)
-{
-    return prettyPrint(str, "DEBUG", CYAN_CODE);
+// Print the string str enclosed in a prominent block labeled "DEBUG", and return the input string
+// itself
+inline string prtDebug(const string &str) {
+  return prettyPrint(str, "DEBUG", CYAN_CODE);
 }
 
-// Print the string str enclosed in a prominent block labeled "DEBUG", and return the input string itself.
-inline string prtWarn(const string &str)
-{
-    return prettyPrint(str, "WARN", YELLOW_CODE);
+// Print the string str enclosed in a prominent block labeled "DEBUG", and return the input string
+// itself.
+inline string prtWarn(const string &str) {
+  return prettyPrint(str, "WARN", YELLOW_CODE);
 }

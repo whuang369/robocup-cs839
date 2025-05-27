@@ -17,9 +17,8 @@
 
 struct TypeInfo;
 
-class TypeRegistry
-{
-public:
+class TypeRegistry {
+ public:
   /**
    * Add the name of an enumeration to the registry.
    * Must only be called once for each enumeration type.
@@ -69,8 +68,8 @@ public:
    * @return The name of the constant or nullptr, if index is not within the value range
    *         of the enumeration type.
    */
-  template<typename E> static const char* getEnumName(E value)
-  {
+  template <typename E>
+  static const char* getEnumName(E value) {
     return getEnumName(typeid(E).name(), value);
   }
 

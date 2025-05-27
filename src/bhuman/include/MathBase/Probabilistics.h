@@ -27,8 +27,7 @@ const float sqrt2 = std::sqrt(2.f);
  * @param s The standard deviation
  * @return The probability density at x
  */
-inline float gaussianProbability(float x, float s)
-{
+inline float gaussianProbability(float x, float s) {
   return std::max(1.0f / (s * sqrt2pi) * std::exp(-0.5f * sqr(x / s)), 0.000001f);
 }
 
@@ -40,8 +39,7 @@ inline float gaussianProbability(float x, float s)
  * @param a  The lower bound of the interval
  * @param b  The upper bound of the interval
  */
-inline float probabilityOfInterval(float mu, float s, float a, float b)
-{
+inline float probabilityOfInterval(float mu, float s, float a, float b) {
   const float pa = std::erf((a - mu) / (sqrt2 * s));
   const float pb = std::erf((b - mu) / (sqrt2 * s));
   return (pb - pa) / 2;
@@ -55,12 +53,11 @@ inline float probabilityOfInterval(float mu, float s, float a, float b)
  * @param covariance2 The covariance matrix of the second normal distribution
  * @return Whether the equation could be solved
  */
-inline bool twoDimSquareEquation(Vector2f& mean, Matrix2f& covariance, const Vector2f& mean2, const Matrix2f& covariance2)
-{
-  //multidimensional square equation (german: "Multidimensionale quadratische Ausgleichsrechnung" aus dem Skript
-  //"Theorie der Sensorfusion")
-  if(covariance.determinant() == 0.f || covariance2.determinant() == 0.f)
-    return false;
+inline bool twoDimSquareEquation(Vector2f& mean, Matrix2f& covariance, const Vector2f& mean2,
+                                 const Matrix2f& covariance2) {
+  // multidimensional square equation (german: "Multidimensionale quadratische Ausgleichsrechnung"
+  // aus dem Skript "Theorie der Sensorfusion")
+  if (covariance.determinant() == 0.f || covariance2.determinant() == 0.f) return false;
 
   const Matrix2f information = covariance.inverse();
   const Matrix2f information2 = covariance2.inverse();

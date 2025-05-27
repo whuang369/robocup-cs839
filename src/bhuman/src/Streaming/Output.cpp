@@ -6,8 +6,7 @@
 #endif
 #include <cstdio>
 
-void Output::print(const char* message)
-{
+void Output::print(const char* message) {
   fprintf(stderr, "%s\n", message);
 #ifdef WINDOWS
   OutputDebugStringA(message);

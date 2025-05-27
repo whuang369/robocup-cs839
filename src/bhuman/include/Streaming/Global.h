@@ -17,21 +17,18 @@ class DrawingManager;
 class DrawingManager3D;
 class ReleaseOptions;
 class TimingManager;
-namespace asmjit
-{
-  inline namespace _abi_1_9
-  {
-    class JitRuntime;
-  }
+namespace asmjit {
+inline namespace _abi_1_9 {
+class JitRuntime;
 }
+}  // namespace asmjit
 
 /**
  * @class Global
  * A class that contains pointers to global data.
  */
-class Global
-{
-private:
+class Global {
+ private:
   static thread_local AnnotationManager* theAnnotationManager;
   static thread_local MessageQueue* theDebugOut;
   static thread_local Settings* theSettings;
@@ -42,7 +39,7 @@ private:
   static thread_local TimingManager* theTimingManager;
   static thread_local asmjit::JitRuntime* theAsmjitRuntime;
 
-public:
+ public:
   /**
    * The method returns a reference to the thread wide instance.
    * @return The instance of the annotation manager in this thread.
@@ -53,49 +50,49 @@ public:
    * The method returns a reference to the thread wide instance.
    * @return The instance of the outgoing debug message queue in this thread.
    */
-  static MessageQueue& getDebugOut() {return *theDebugOut;}
+  static MessageQueue& getDebugOut() { return *theDebugOut; }
 
   /**
    * The method returns whether the outgoing message queue was already instantiated.
    * @return Is it safe to use getDebugOut()?
    */
-  static bool debugOutExists() {return theDebugOut != nullptr;}
+  static bool debugOutExists() { return theDebugOut != nullptr; }
 
   /**
    * The method returns a reference to the thread wide instance.
    * @return The instance of the settings in this thread.
    */
-  static Settings& getSettings() {return *theSettings;}
+  static Settings& getSettings() { return *theSettings; }
 
   /**
    * The method returns whether the settings have already been instantiated.
    * @return Is it safe to use getSettings()?
    */
-  static bool settingsExist() {return theSettings != nullptr;}
+  static bool settingsExist() { return theSettings != nullptr; }
 
   /**
    * The method returns a reference to the thread wide instance.
    * @return The instance of the debug request table in this thread.
    */
-  static DebugRequestTable& getDebugRequestTable() {return *theDebugRequestTable;}
+  static DebugRequestTable& getDebugRequestTable() { return *theDebugRequestTable; }
 
   /**
    * The method returns a reference to the thread wide instance.
    * @return The instance of the debug data table in this thread.
    */
-  static DebugDataTable& getDebugDataTable() {return *theDebugDataTable;}
+  static DebugDataTable& getDebugDataTable() { return *theDebugDataTable; }
 
   /**
    * The method returns a reference to the thread wide instance.
    * @return The instance of the drawing manager in this thread.
    */
-  static DrawingManager& getDrawingManager() {return *theDrawingManager;}
+  static DrawingManager& getDrawingManager() { return *theDrawingManager; }
 
   /**
    * The method returns a reference to the thread wide instance.
    * @return The instance of the 3-D drawing manager in this thread.
    */
-  static DrawingManager3D& getDrawingManager3D() {return *theDrawingManager3D;}
+  static DrawingManager3D& getDrawingManager3D() { return *theDrawingManager3D; }
 
   /**
    * The method returns a reference to the thread wide instance.
@@ -109,7 +106,7 @@ public:
    */
   static asmjit::JitRuntime& getAsmjitRuntime() { return *theAsmjitRuntime; }
 
-  friend class ThreadFrame; // The class ThreadFrame can set these pointers.
-  friend class ConsoleRoboCupCtrl; // The class ConsoleRoboCupCtrl can set theSettings.
-  friend class RobotConsole; // The class RobotConsole can set theDebugOut.
+  friend class ThreadFrame;         // The class ThreadFrame can set these pointers.
+  friend class ConsoleRoboCupCtrl;  // The class ConsoleRoboCupCtrl can set theSettings.
+  friend class RobotConsole;        // The class RobotConsole can set theDebugOut.
 };

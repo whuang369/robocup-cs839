@@ -17,68 +17,60 @@
 static const unsigned unifiedTypeNames = 0x80000000;
 std::unique_ptr<TypeInfo> TypeInfo::current;
 
-TypeInfo::TypeInfo(bool fromTypeRegistry)
-{
-  if(fromTypeRegistry)
-    TypeRegistry::fill(*this);
+TypeInfo::TypeInfo(bool fromTypeRegistry) {
+  if (fromTypeRegistry) TypeRegistry::fill(*this);
 }
 
-bool TypeInfo::areTypesEqual(const TypeInfo& other, const std::string& thisType, const std::string& otherType) const
-{
+bool TypeInfo::areTypesEqual(const TypeInfo& other, const std::string& thisType,
+                             const std::string& otherType) const {
   bool thisIsStaticArray = !thisType.empty() && thisType.back() == ']';
   bool otherIsStaticArray = !otherType.empty() && otherType.back() == ']';
-  if(thisIsStaticArray != otherIsStaticArray)
+  if (thisIsStaticArray != otherIsStaticArray)
     return false;
-  else if(thisIsStaticArray)
-  {
+  else if (thisIsStaticArray) {
     size_t thisEnd = thisType.find_last_of('[');
     size_t otherEnd = otherType.find_last_of('[');
-    return thisType.substr(thisEnd) == otherType.substr(otherEnd)
-      && areTypesEqual(other, thisType.substr(0, thisEnd), otherType.substr(0, otherEnd));
-  }
-  else
-  {
+    return thisType.substr(thisEnd) == otherType.substr(otherEnd) &&
+           areTypesEqual(other, thisType.substr(0, thisEnd), otherType.substr(0, otherEnd));
+  } else {
     bool thisIsDynamicArray = !thisType.empty() && thisType.back() == '*';
     bool otherIsDynamicArray = !otherType.empty() && otherType.back() == '*';
-    if(thisIsDynamicArray != otherIsDynamicArray)
+    if (thisIsDynamicArray != otherIsDynamicArray)
       return false;
-    else if(thisIsDynamicArray)
-      return areTypesEqual(other, thisType.substr(0, thisType.size() - 1), otherType.substr(0, otherType.size() - 1));
-    else
-    {
+    else if (thisIsDynamicArray)
+      return areTypesEqual(other, thisType.substr(0, thisType.size() - 1),
+                           otherType.substr(0, otherType.size() - 1));
+    else {
       bool thisIsPrimitive = primitives.find(thisType) != primitives.end();
       bool otherIsPrimitive = other.primitives.find(otherType) != other.primitives.end();
-      if(thisIsPrimitive != otherIsPrimitive)
+      if (thisIsPrimitive != otherIsPrimitive)
         return false;
-      else if(thisIsPrimitive)
+      else if (thisIsPrimitive)
         return thisType == otherType;
-      else
-      {
+      else {
         bool thisIsEnum = enums.find(thisType) != enums.end();
         bool otherIsEnum = other.enums.find(otherType) != other.enums.end();
-        if(thisIsEnum != otherIsEnum)
+        if (thisIsEnum != otherIsEnum)
           return false;
-        else if(thisIsEnum)
-        {
+        else if (thisIsEnum) {
           const std::vector<std::string>& thisConstants = enums.find(thisType)->second;
           const std::vector<std::string>& otherConstants = other.enums.find(otherType)->second;
-          return thisConstants == otherConstants
-                 || (thisConstants.size() > otherConstants.size()
-                     && std::vector<std::string>(thisConstants.begin(), thisConstants.begin() + otherConstants.size()) == otherConstants);
-        }
-        else
-        {
+          return thisConstants == otherConstants ||
+                 (thisConstants.size() > otherConstants.size() &&
+                  std::vector<std::string>(thisConstants.begin(),
+                                           thisConstants.begin() + otherConstants.size()) ==
+                      otherConstants);
+        } else {
           auto thisClass = classes.find(thisType);
           auto otherClass = other.classes.find(otherType);
-          if(thisClass == classes.end() || otherClass == other.classes.end()
-             || thisClass->second.size() != otherClass->second.size())
+          if (thisClass == classes.end() || otherClass == other.classes.end() ||
+              thisClass->second.size() != otherClass->second.size())
             return false;
-          else
-          {
+          else {
             const std::vector<Attribute>& thisAttributes = thisClass->second;
             const std::vector<Attribute>& otherAttributes = otherClass->second;
-            for(size_t i = 0; i < thisAttributes.size(); ++i)
-              if(!areTypesEqual(other, thisAttributes[i].type, otherAttributes[i].type))
+            for (size_t i = 0; i < thisAttributes.size(); ++i)
+              if (!areTypesEqual(other, thisAttributes[i].type, otherAttributes[i].type))
                 return false;
             return true;
           }
@@ -88,33 +80,26 @@ bool TypeInfo::areTypesEqual(const TypeInfo& other, const std::string& thisType,
   }
 }
 
-Out& operator<<(Out& out, const TypeInfo& typeInfo)
-{
+Out& operator<<(Out& out, const TypeInfo& typeInfo) {
   out << (static_cast<unsigned>(typeInfo.primitives.size()) | unifiedTypeNames);
-  for(const std::string& primitive : typeInfo.primitives)
-    out << primitive;
+  for (const std::string& primitive : typeInfo.primitives) out << primitive;
 
   out << static_cast<unsigned>(typeInfo.classes.size());
-  for(const auto& [name, attributes] : typeInfo.classes)
-  {
+  for (const auto& [name, attributes] : typeInfo.classes) {
     out << name << static_cast<unsigned>(attributes.size());
-    for(const TypeInfo::Attribute& attribute : attributes)
-      out << attribute.name << attribute.type;
+    for (const TypeInfo::Attribute& attribute : attributes) out << attribute.name << attribute.type;
   }
 
   out << static_cast<unsigned>(typeInfo.enums.size());
-  for(const auto& [name, constants] : typeInfo.enums)
-  {
+  for (const auto& [name, constants] : typeInfo.enums) {
     out << name << static_cast<unsigned>(constants.size());
-    for(const std::string& constant : constants)
-      out << constant;
+    for (const std::string& constant : constants) out << constant;
   }
 
   return out;
 }
 
-static void demangle(std::string& type)
-{
+static void demangle(std::string& type) {
   static std::regex matchAnonymousNamespace("::__1\\b");
   static std::regex matchUnsignedLong("([0-9][0-9]*)ul\\b");
   static std::regex matchComma(", ");
@@ -129,8 +114,7 @@ static void demangle(std::string& type)
   type = std::regex_replace(type, matchAsterisk, "");
 }
 
-In& operator>>(In& in, TypeInfo& typeInfo)
-{
+In& operator>>(In& in, TypeInfo& typeInfo) {
   typeInfo.primitives.clear();
   typeInfo.classes.clear();
   typeInfo.enums.clear();
@@ -142,41 +126,32 @@ In& operator>>(In& in, TypeInfo& typeInfo)
   in >> size;
   bool needsTypenameUnification = (size & unifiedTypeNames) == 0;
   size &= ~unifiedTypeNames;
-  while(size-- > 0)
-  {
+  while (size-- > 0) {
     in >> type;
-    if(needsTypenameUnification)
-      demangle(type);
+    if (needsTypenameUnification) demangle(type);
     typeInfo.primitives.insert(type);
   }
 
   in >> size;
-  while(size-- > 0)
-  {
+  while (size-- > 0) {
     in >> type >> size2;
-    if(needsTypenameUnification)
-      demangle(type);
+    if (needsTypenameUnification) demangle(type);
     std::vector<TypeInfo::Attribute>& attributes = typeInfo.classes[type];
     attributes.reserve(size2);
-    while(size2-- > 0)
-    {
+    while (size2-- > 0) {
       in >> name >> type;
-      if(needsTypenameUnification)
-        demangle(type);
+      if (needsTypenameUnification) demangle(type);
       attributes.emplace_back(type, name);
     }
   }
 
   in >> size;
-  while(size-- > 0)
-  {
+  while (size-- > 0) {
     in >> type >> size2;
-    if(needsTypenameUnification)
-      demangle(type);
+    if (needsTypenameUnification) demangle(type);
     std::vector<std::string>& constants = typeInfo.enums[type];
     constants.reserve(size2);
-    while(size2-- > 0)
-    {
+    while (size2-- > 0) {
       in >> name;
       constants.emplace_back(name);
     }
@@ -185,10 +160,8 @@ In& operator>>(In& in, TypeInfo& typeInfo)
   return in;
 }
 
-void TypeInfo::initCurrent()
-{
+void TypeInfo::initCurrent() {
   static DECLARE_SYNC;
   SYNC;
-  if(!current)
-    current = std::make_unique<TypeInfo>(true);
+  if (!current) current = std::make_unique<TypeInfo>(true);
 }

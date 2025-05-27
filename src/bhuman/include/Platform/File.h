@@ -11,13 +11,13 @@
 /**
  * This class provides basic file input/output capabilities.
  */
-class File
-{
-private:
+class File {
+ private:
   void* stream = nullptr; /**< File handle. */
-  std::string fullName; /**< The full path name actually used or the file searched for if it was not found. */
+  std::string fullName; /**< The full path name actually used or the file searched for if it was not
+                           found. */
 
-public:
+ public:
   /**
    * @param name File name or path. If it is a relative path, it is assumed
    *             to be relative to the path for configuration files. Otherwise,
@@ -150,6 +150,6 @@ public:
   /** Clears the search path. */
   static void clearSearchPath();
 
-private:
+ private:
   static thread_local std::vector<std::string> searchPath;
 };

@@ -18,39 +18,46 @@
 #include <functional>
 #include <utility>
 
-namespace FunctionImpl
-{
-  template<typename S> class Function;
+namespace FunctionImpl {
+template <typename S>
+class Function;
 
-  template<typename R, typename... A> class Function<R(A...)> : public std::function<R(A...)>
-  {
-  private:
-    /**
-     * Returns the result of Zero() if a class has such a method, otherwise a default
-     * object of the class is returned.
-     * @param T The type of the class.
-     */
-    template<typename T> static auto zero(T*, T*) -> decltype(T::Zero(), T()) {return T::Zero();}
-    template<typename T> static T zero(T*, void*) {return T();}
+template <typename R, typename... A>
+class Function<R(A...)> : public std::function<R(A...)> {
+ private:
+  /**
+   * Returns the result of Zero() if a class has such a method, otherwise a default
+   * object of the class is returned.
+   * @param T The type of the class.
+   */
+  template <typename T>
+  static auto zero(T*, T*) -> decltype(T::Zero(), T()) {
+    return T::Zero();
+  }
+  template <typename T>
+  static T zero(T*, void*) {
+    return T();
+  }
 
-  public:
-    using std::function<R(A...)>::function;
+ public:
+  using std::function<R(A...)>::function;
 
-    R operator()(A... args) const
-    {
-      if(*this)
-        return std::function<R(A...)>::operator()(std::forward<A>(args)...);
-      else
-        return zero(static_cast<R*>(nullptr), static_cast<R*>(nullptr));
-    }
-  };
-}
+  R operator()(A... args) const {
+    if (*this)
+      return std::function<R(A...)>::operator()(std::forward<A>(args)...);
+    else
+      return zero(static_cast<R*>(nullptr), static_cast<R*>(nullptr));
+  }
+};
+}  // namespace FunctionImpl
 
 /**
  * Declare the type of a function. For instance: FUNCTION(void()) fn;
  * @param ... The type of the function.
  */
-#define FUNCTION(...) friend struct HasReadWrite; FunctionImpl::Function<__VA_ARGS__>
+#define FUNCTION(...)         \
+  friend struct HasReadWrite; \
+  FunctionImpl::Function<__VA_ARGS__>
 
 /**
  * If a class is derived from a class that has functions, but the derived

@@ -9,4 +9,4 @@ cv::Mat toCVMat(const sensor_msgs::msg::Image &source);
 
 // sensor_msgs::msg::Image::SharedPtr
 
-} // namespace booster_vision
+}  // namespace booster_vision

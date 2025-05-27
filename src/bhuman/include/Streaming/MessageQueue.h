@@ -40,20 +40,21 @@
 #include <functional>
 #include <utility>
 
-class MessageQueue : public Streamable
-{
+class MessageQueue : public Streamable {
   /**
    * The physical stream for writing to the message queue. It will revert all write
    * operations if the data does not fit into the queue. In that case, \c failed()
    * will return \c true .
    */
-  class OutQueue : public PhysicalOutStream
-  {
-    MessageQueue* queue = nullptr; /**< The message queue this stream is attached to. Is \c nullptr if writing is forbidden (e.g. because the queue is full). */
-    size_t originalSize; /**< The size of the queue before the first write operation. Is used to be able to revert write operations in case the queue is full. */
-    size_t maxCapacity; /**< The maximum capacity of the queue for the current message. It depends on the type of message that is written. */
+  class OutQueue : public PhysicalOutStream {
+    MessageQueue* queue = nullptr; /**< The message queue this stream is attached to. Is \c nullptr
+                                      if writing is forbidden (e.g. because the queue is full). */
+    size_t originalSize; /**< The size of the queue before the first write operation. Is used to be
+                            able to revert write operations in case the queue is full. */
+    size_t maxCapacity;  /**< The maximum capacity of the queue for the current message. It depends
+                            on the type of message that is written. */
 
-  protected:
+   protected:
     /**
      * Opens this stream for writing.
      * @param id The type of this message.
@@ -68,20 +69,22 @@ class MessageQueue : public Streamable
      */
     void writeToStream(const void* p, size_t size) override;
 
-  public:
+   public:
     /**
      * Did writing to the queue fail because there was not enough space?
      * @return Did it fail?
      */
-    bool failed() const {return queue == nullptr;}
+    bool failed() const { return queue == nullptr; }
   };
 
-  size_t used = 0; /**< The used capacity of the queue in bytes. */
-  size_t capacity; /**< The currently allocated capacity in bytes. */
-  size_t maxCapacity; /**< The maximum capacity of the queue in bytes. \c capacity cannot grow more than this. */
-  size_t protectedCapacity = 0; /**< A part of the maximum capacity that is reserved for certain message types (in bytes). */
+  size_t used = 0;    /**< The used capacity of the queue in bytes. */
+  size_t capacity;    /**< The currently allocated capacity in bytes. */
+  size_t maxCapacity; /**< The maximum capacity of the queue in bytes. \c capacity cannot grow more
+                         than this. */
+  size_t protectedCapacity = 0; /**< A part of the maximum capacity that is reserved for certain
+                                   message types (in bytes). */
   char* buffer = nullptr; /**< The memory block of size \c capacity containing the messages. */
-  bool ownBuffer = true; /**< Is the memory block maintained by this class? */
+  bool ownBuffer = true;  /**< Is the memory block maintained by this class? */
 
   /**
    * Determines the maximum capacity applicable for a specific message type.
@@ -108,7 +111,7 @@ class MessageQueue : public Streamable
    */
   void copyMessages(size_t size, const std::function<void(void*, size_t)>& copy);
 
-protected:
+ protected:
   /**
    * Reads a message queue from a stream and appends its messages to this one.
    * Some messages might be dropped if they do not fit.
@@ -122,13 +125,13 @@ protected:
    */
   void write(Out& stream) const override;
 
-public:
+ public:
   /** The header of a streamed queue. */
-  struct QueueHeader
-  {
-    size_t sizeLow : 32; /**< The lower 32 bits of the size of the queue. */
-    size_t messages : 28; /**< Unused. In previous implementations, this contained the number of messages in the queue. */
-    size_t sizeHigh : 4; /**< The bits 32..35 of the size of the queue. */
+  struct QueueHeader {
+    size_t sizeLow : 32;  /**< The lower 32 bits of the size of the queue. */
+    size_t messages : 28; /**< Unused. In previous implementations, this contained the number of
+                             messages in the queue. */
+    size_t sizeHigh : 4;  /**< The bits 32..35 of the size of the queue. */
   };
 
   /**
@@ -137,26 +140,22 @@ public:
    * the same type. Therefore this rather strange construct is used, in which
    * \c _ and \c id share the same address.
    */
-  struct MessageHeader
-  {
-    union
-    {
-      struct
-      {
-        unsigned _ : 8; /**< A placeholder for the message type. */
+  struct MessageHeader {
+    union {
+      struct {
+        unsigned _ : 8;     /**< A placeholder for the message type. */
         unsigned size : 24; /**< The size of the message in bytes (not including this header). */
       };
-      MessageID id;  /**< The message type. */
+      MessageID id; /**< The message type. */
     };
   };
 
   /** A message that can be read. */
-  class Message
-  {
-    const char* buffer; /**< The position of the message in the queue's buffer. */
+  class Message {
+    const char* buffer;        /**< The position of the message in the queue's buffer. */
     friend class MessageQueue; /**< \c operator<< need access to \c buffer . */
 
-  public:
+   public:
     /**
      * Constructor.
      * @param The position of the message in the queue's buffer.
@@ -167,43 +166,40 @@ public:
      * Returns the message id, i.e. a constant representing its type.
      * @return The id.
      */
-    MessageID id() const {return reinterpret_cast<const MessageHeader*>(buffer)->id;}
+    MessageID id() const { return reinterpret_cast<const MessageHeader*>(buffer)->id; }
 
     /**
      * Returns the message's size in bytes.
      * @return The size (without the \c MessageHeader ).
      */
-    size_t size() const {return reinterpret_cast<const MessageHeader*>(buffer)->size;}
+    size_t size() const { return reinterpret_cast<const MessageHeader*>(buffer)->size; }
 
     /**
      * Returns a stream that allows reading the message in binary format.
      * @return The binary stream.
      */
-    InBinaryMemory bin() const {return InBinaryMemory(buffer + sizeof(MessageHeader), size());}
+    InBinaryMemory bin() const { return InBinaryMemory(buffer + sizeof(MessageHeader), size()); }
 
     /**
      * Returns a stream that allows reading the message in textual format.
      * @return The textual stream.
      */
-    InTextMemory text() const {return InTextMemory(buffer + sizeof(MessageHeader), size());};
+    InTextMemory text() const { return InTextMemory(buffer + sizeof(MessageHeader), size()); };
   };
 
   /** Stream for adding a message in binary format. */
-  struct OutBinary : public OutStream<OutQueue, ::OutBinary>
-  {
-    OutBinary(MessageID id, MessageQueue& queue) {open(id, queue);}
+  struct OutBinary : public OutStream<OutQueue, ::OutBinary> {
+    OutBinary(MessageID id, MessageQueue& queue) { open(id, queue); }
   };
 
   /** Stream for adding a message in textual format. */
-  struct OutText : public OutStream<OutQueue, ::OutText>
-  {
-    OutText(MessageID id, MessageQueue& queue) {open(id, queue);}
+  struct OutText : public OutStream<OutQueue, ::OutText> {
+    OutText(MessageID id, MessageQueue& queue) { open(id, queue); }
   };
 
   /** Stream for adding a message in raw textual format. */
-  struct OutTextRaw : public OutStream<OutQueue, ::OutTextRaw>
-  {
-    OutTextRaw(MessageID id, MessageQueue& queue) {open(id, queue);}
+  struct OutTextRaw : public OutStream<OutQueue, ::OutTextRaw> {
+    OutTextRaw(MessageID id, MessageQueue& queue) { open(id, queue); }
   };
 
   /**
@@ -214,14 +210,13 @@ public:
    * access to the messages in the queue, only the ability to get a stream to
    * read from. Therefore, there also is no operator \c -> .
    */
-  class const_iterator
-  {
-  private:
-    const char* current; /**< The position of the message in the queue's buffer. */
+  class const_iterator {
+   private:
+    const char* current;       /**< The position of the message in the queue's buffer. */
     friend class MessageQueue; /**< \c operator<< need access to \c current . */
-    friend class LogPlayer; /**< \c playBack need access to \c current . */
+    friend class LogPlayer;    /**< \c playBack need access to \c current . */
 
-  public:
+   public:
     using iterator_category = std::forward_iterator_tag;
     using value_type = Message;
     using difference_type = size_t;
@@ -230,17 +225,38 @@ public:
 
     const_iterator(const char* current) : current(current) {}
     const_iterator(const const_iterator& other) : const_iterator(other.current) {}
-    const_iterator& operator=(const const_iterator& other) {return *new(this) const_iterator(other.current);}
-    Message operator*() const {return Message(current);}
-    bool operator==(const const_iterator& other) const {return current == other.current;}
-    bool operator!=(const const_iterator& other) const {return current != other.current;}
-    const_iterator& operator++() {current += sizeof(MessageHeader) + reinterpret_cast<const MessageHeader*>(current)->size; return *this;}
-    const_iterator operator++(int) {const_iterator result(*this); current += sizeof(MessageHeader) + reinterpret_cast<const MessageHeader*>(current)->size; return result;}
-    const_iterator& operator+=(std::ptrdiff_t offset) {current += offset; return *this;}
-    const_iterator& operator-=(std::ptrdiff_t offset) {current -= offset; return *this;}
-    const_iterator operator+(std::ptrdiff_t offset) const {const_iterator result(*this); return result += offset;}
-    const_iterator operator-(std::ptrdiff_t offset) const {const_iterator result(*this); return result -= offset;}
-    size_t operator-(const const_iterator& other) const {return current - other.current;}
+    const_iterator& operator=(const const_iterator& other) {
+      return *new (this) const_iterator(other.current);
+    }
+    Message operator*() const { return Message(current); }
+    bool operator==(const const_iterator& other) const { return current == other.current; }
+    bool operator!=(const const_iterator& other) const { return current != other.current; }
+    const_iterator& operator++() {
+      current += sizeof(MessageHeader) + reinterpret_cast<const MessageHeader*>(current)->size;
+      return *this;
+    }
+    const_iterator operator++(int) {
+      const_iterator result(*this);
+      current += sizeof(MessageHeader) + reinterpret_cast<const MessageHeader*>(current)->size;
+      return result;
+    }
+    const_iterator& operator+=(std::ptrdiff_t offset) {
+      current += offset;
+      return *this;
+    }
+    const_iterator& operator-=(std::ptrdiff_t offset) {
+      current -= offset;
+      return *this;
+    }
+    const_iterator operator+(std::ptrdiff_t offset) const {
+      const_iterator result(*this);
+      return result += offset;
+    }
+    const_iterator operator-(std::ptrdiff_t offset) const {
+      const_iterator result(*this);
+      return result -= offset;
+    }
+    size_t operator-(const const_iterator& other) const { return current - other.current; }
   };
 
   /**
@@ -279,8 +295,9 @@ public:
    * @param other The other message queue.
    * @return This queue.
    */
-  MessageQueue& operator<<(const MessageQueue& other)
-    {return *this << std::pair<const_iterator, const_iterator>(other.begin(), other.end());}
+  MessageQueue& operator<<(const MessageQueue& other) {
+    return *this << std::pair<const_iterator, const_iterator>(other.begin(), other.end());
+  }
 
   /**
    * Appends a single message to this queue. It might be dropped if it does not
@@ -288,8 +305,10 @@ public:
    * @param message The message.
    * @return This queue.
    */
-  MessageQueue& operator<<(const Message& message)
-    {return *this << std::pair<const_iterator, const_iterator>(message.buffer, message.buffer + sizeof(MessageHeader) + message.size());}
+  MessageQueue& operator<<(const Message& message) {
+    return *this << std::pair<const_iterator, const_iterator>(
+               message.buffer, message.buffer + sizeof(MessageHeader) + message.size());
+  }
 
   /** Empties the queue. */
   void clear();
@@ -298,7 +317,7 @@ public:
    * Returns the used size of the queue.
    * @return The size in bytes.
    */
-  size_t size() const {return used;}
+  size_t size() const { return used; }
 
   /**
    * Changes the size of the queue.
@@ -311,7 +330,7 @@ public:
    * Is the queue empty?
    * @return Is it?
    */
-  bool empty() {return used == 0;}
+  bool empty() { return used == 0; }
 
   /**
    * Defines the maximum capacity of the queue. On the robot, this capacity is
@@ -360,27 +379,27 @@ public:
    * Returns an iterator to the first message in the queue.
    * @return A constant iterator.
    */
-  const_iterator begin() const {return const_iterator(buffer);}
+  const_iterator begin() const { return const_iterator(buffer); }
 
   /**
    * Returns an iterator that points behind the last message in the queue.
    * @return A constant iterator.
    */
-  const_iterator end() const {return const_iterator(buffer + used);}
+  const_iterator end() const { return const_iterator(buffer + used); }
 
   /**
    * Returns a binary stream that allows to append a new message.
    * @param id The type of the new message.
    * @return A binary stream.
    */
-  OutBinary bin(MessageID id) {return OutBinary(id, *this);}
+  OutBinary bin(MessageID id) { return OutBinary(id, *this); }
 
   /**
    * Returns a textual stream that allows to append a new message.
    * @param id The type of the new message.
    * @return A textual stream.
    */
-  OutText text(MessageID id) {return OutText(id, *this);}
+  OutText text(MessageID id) { return OutText(id, *this); }
 
   /**
    * Returns a raw textual stream that allows to append a new message.
@@ -388,5 +407,5 @@ public:
    * @return A raw textual stream, i.e. a stream that does not add spaces
    *         between different entries.
    */
-  OutTextRaw textRaw(MessageID id) {return OutTextRaw(id, *this);}
+  OutTextRaw textRaw(MessageID id) { return OutTextRaw(id, *this); }
 };

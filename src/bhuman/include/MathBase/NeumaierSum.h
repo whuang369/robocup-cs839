@@ -15,15 +15,14 @@
  * Neumaier's method.
  * see https://en.wikipedia.org/wiki/Kahan_summation_algorithm#Further_enhancements
  */
-template<typename T = float>
-class NeumaierSum
-{
+template <typename T = float>
+class NeumaierSum {
   static_assert(std::is_floating_point<T>::value, "");
 
   T sum;
   T c;
 
-public:
+ public:
   NeumaierSum() : sum(0), c(0) {}
 
   /**
@@ -34,11 +33,10 @@ public:
   /**
    * Adds the given value to the sum.
    */
-  NeumaierSum& operator+=(const T x)
-  {
+  NeumaierSum& operator+=(const T x) {
     const T t = sum + x;
 
-    if(std::abs(sum) >= std::abs(x))
+    if (std::abs(sum) >= std::abs(x))
       c += (sum - t) + x;
     else
       c += (x - t) + sum;
@@ -51,8 +49,5 @@ public:
   /**
    * Returns the calculated sum.
    */
-  operator T() const
-  {
-    return sum + c;
-  }
+  operator T() const { return sum + c; }
 };

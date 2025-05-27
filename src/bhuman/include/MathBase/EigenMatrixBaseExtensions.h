@@ -1,36 +1,31 @@
-//Do NOT directly include this file, instead include "Math(Base)/Eigen.h"
+// Do NOT directly include this file, instead include "Math(Base)/Eigen.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
-inline PlainObject& normalize(RealScalar l)
-{
+inline PlainObject& normalize(RealScalar l) {
   const RealScalar vl = norm();
-  if(vl > 1e-9)
-  {
+  if (vl > 1e-9) {
     derived() *= (l / vl);
   }
   return derived();
 }
 
-inline PlainObject normalized(RealScalar l) const
-{
+inline PlainObject normalized(RealScalar l) const {
   return PlainObject(derived()).normalize(l);
 }
 
-inline PlainObject& mirror()
-{
-  //mirror is only defined for vectors with length 2
+inline PlainObject& mirror() {
+  // mirror is only defined for vectors with length 2
   EIGEN_STATIC_ASSERT_VECTOR_SPECIFIC_SIZE(Derived, 2);
   derived().x() = -derived().x();
   derived().y() = -derived().y();
   return derived();
 }
 
-inline PlainObject& rotateLeft()
-{
-  //rotateLeft() is only defined for vectors with length 2
+inline PlainObject& rotateLeft() {
+  // rotateLeft() is only defined for vectors with length 2
   EIGEN_STATIC_ASSERT_VECTOR_SPECIFIC_SIZE(Derived, 2);
   Scalar buffer = -derived().y();
   derived().y() = derived().x();
@@ -38,9 +33,8 @@ inline PlainObject& rotateLeft()
   return derived();
 }
 
-inline PlainObject& rotateRight()
-{
-  //rotateRight() is only defined for vectors with length 2
+inline PlainObject& rotateRight() {
+  // rotateRight() is only defined for vectors with length 2
   EIGEN_STATIC_ASSERT_VECTOR_SPECIFIC_SIZE(Derived, 2);
   Scalar buffer = -derived().x();
   derived().x() = derived().y();
@@ -48,26 +42,24 @@ inline PlainObject& rotateRight()
   return derived();
 }
 
-inline PlainObject& rotate(const float alpha)
-{
-  //angle() is only defined for vectors with length 2
+inline PlainObject& rotate(const float alpha) {
+  // angle() is only defined for vectors with length 2
   EIGEN_STATIC_ASSERT_VECTOR_SPECIFIC_SIZE(Derived, 2);
   const float buffer = static_cast<float>(derived().x());
   const float a = std::cos(alpha);
   const float b = std::sin(alpha);
-  derived().x() = static_cast<Scalar>(a * static_cast<float>(derived().x()) - b * static_cast<float>(derived().y()));
+  derived().x() = static_cast<Scalar>(a * static_cast<float>(derived().x()) -
+                                      b * static_cast<float>(derived().y()));
   derived().y() = static_cast<Scalar>(b * buffer + a * static_cast<float>(derived().y()));
   return derived();
 }
 
-inline PlainObject rotated(const float alpha) const
-{
+inline PlainObject rotated(const float alpha) const {
   return PlainObject(derived()).rotate(alpha);
 }
 
-inline RealScalar angle() const
-{
-  //angle() is only defined for vectors with length 2
+inline RealScalar angle() const {
+  // angle() is only defined for vectors with length 2
   EIGEN_STATIC_ASSERT_VECTOR_SPECIFIC_SIZE(Derived, 2);
   const RealScalar x = derived().x();
   const RealScalar y = derived().y();
@@ -79,21 +71,19 @@ inline RealScalar angle() const
  * @param other The other vector that creates the angle with this one
  * @return the angle in range of [0;pi]
  */
-RealScalar angleTo(const MatrixBase<Derived>& other) const
-{
+RealScalar angleTo(const MatrixBase<Derived>& other) const {
   EIGEN_STATIC_ASSERT_VECTOR_ONLY(Derived);
   const RealScalar normProd = derived().norm() * other.norm();
   ASSERT(normProd != 0.f);
   float normedDotProduct = derived().dot(other) / normProd;
-  if(normedDotProduct >= 1) // deals with floatingpoint imprecision
+  if (normedDotProduct >= 1)  // deals with floatingpoint imprecision
     return RealScalar(0.f);
-  if(normedDotProduct <= -1)
-    return RealScalar(M_PI);
+  if (normedDotProduct <= -1) return RealScalar(M_PI);
   return normProd == RealScalar(0.f) ? RealScalar(0.f) : std::acos(normedDotProduct);
 }
 
-static inline PlainObject polar(const RealScalar length, const float alpha)
-{
+static inline PlainObject polar(const RealScalar length, const float alpha) {
   EIGEN_STATIC_ASSERT_VECTOR_SPECIFIC_SIZE(Derived, 2);
-  return PlainObject(static_cast<RealScalar>(std::cos(alpha)) * length, static_cast<RealScalar>(std::sin(alpha)) * length);
+  return PlainObject(static_cast<RealScalar>(std::cos(alpha)) * length,
+                     static_cast<RealScalar>(std::sin(alpha)) * length);
 }

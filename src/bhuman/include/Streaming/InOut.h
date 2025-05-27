@@ -14,18 +14,17 @@
 
 class Angle;
 
-namespace EnumHelpers
-{
-  template<typename T, bool isEnum> struct EnumOrClass;
+namespace EnumHelpers {
+template <typename T, bool isEnum>
+struct EnumOrClass;
 }
 
 /**
  * The class Out is the abstract base class for all classes
  * that implement writing into streams.
  */
-class Out
-{
-protected:
+class Out {
+ protected:
   /**
    * Virtual redirection for operator<<(const bool& value).
    */
@@ -92,7 +91,7 @@ protected:
    */
   virtual void outEndL() = 0;
 
-public:
+ public:
   /** Virtual destructor for derived classes. */
   virtual ~Out() = default;
 
@@ -107,7 +106,7 @@ public:
    * The function returns whether this is a binary stream.
    * @return Does it output data in binary format?
    */
-  virtual bool isBinary() const {return false;}
+  virtual bool isBinary() const { return false; }
 
   virtual void select(const char* name, int type, const char* enumType = nullptr);
   virtual void deselect() {}
@@ -121,8 +120,8 @@ public:
    * @param t The object, array, or enum to stream.
    * @return The stream.
    */
-  template<typename T> Out& operator<<(const T& t)
-  {
+  template <typename T>
+  Out& operator<<(const T& t) {
     return EnumHelpers::EnumOrClass<T, std::is_enum<T>::value>::write(*this, t);
   }
 
@@ -151,7 +150,10 @@ inline void Out::select(const char*, int, const char*) {}
  * @param value The value that is written.
  * @return The stream.
  */
-inline Out& operator<<(Out& out, const bool value) {out.outBool(value); return out;}
+inline Out& operator<<(Out& out, const bool value) {
+  out.outBool(value);
+  return out;
+}
 
 /**
  * Operator that writes a char into a stream.
@@ -159,7 +161,10 @@ inline Out& operator<<(Out& out, const bool value) {out.outBool(value); return o
  * @param value The value that is written.
  * @return The stream.
  */
-inline Out& operator<<(Out& out, const char value) {out.outChar(value); return out;}
+inline Out& operator<<(Out& out, const char value) {
+  out.outChar(value);
+  return out;
+}
 
 /**
  * Operator that writes an signed char into a stream.
@@ -167,7 +172,10 @@ inline Out& operator<<(Out& out, const char value) {out.outChar(value); return o
  * @param value The value that is written.
  * @return The stream.
  */
-inline Out& operator<<(Out& out, const signed char value) {out.outSChar(value); return out;}
+inline Out& operator<<(Out& out, const signed char value) {
+  out.outSChar(value);
+  return out;
+}
 
 /**
  * Operator that writes an unsigned char into a stream.
@@ -175,7 +183,10 @@ inline Out& operator<<(Out& out, const signed char value) {out.outSChar(value); 
  * @param value The value that is written.
  * @return The stream.
  */
-inline Out& operator<<(Out& out, const unsigned char value) {out.outUChar(value); return out;}
+inline Out& operator<<(Out& out, const unsigned char value) {
+  out.outUChar(value);
+  return out;
+}
 
 /**
  * Operator that writes a short int into a stream.
@@ -183,7 +194,10 @@ inline Out& operator<<(Out& out, const unsigned char value) {out.outUChar(value)
  * @param value The value that is written.
  * @return The stream.
  */
-inline Out& operator<<(Out& out, const short value) {out.outShort(value); return out;}
+inline Out& operator<<(Out& out, const short value) {
+  out.outShort(value);
+  return out;
+}
 
 /**
  * Operator that writes an unsigned short int into a stream.
@@ -191,7 +205,10 @@ inline Out& operator<<(Out& out, const short value) {out.outShort(value); return
  * @param value The value that is written.
  * @return The stream.
  */
-inline Out& operator<<(Out& out, const unsigned short value) {out.outUShort(value); return out;}
+inline Out& operator<<(Out& out, const unsigned short value) {
+  out.outUShort(value);
+  return out;
+}
 
 /**
  * Operator that writes an int into a stream.
@@ -199,7 +216,10 @@ inline Out& operator<<(Out& out, const unsigned short value) {out.outUShort(valu
  * @param value The value that is written.
  * @return The stream.
  */
-inline Out& operator<<(Out& out, const int value) {out.outInt(value); return out;}
+inline Out& operator<<(Out& out, const int value) {
+  out.outInt(value);
+  return out;
+}
 
 /**
  * Operator that writes an unsigned int into a stream.
@@ -207,7 +227,11 @@ inline Out& operator<<(Out& out, const int value) {out.outInt(value); return out
  * @param value The value that is written.
  * @return The stream.
  */
-inline Out& operator<<(Out& out, const unsigned int value) {out.outUInt(value); ; return out;}
+inline Out& operator<<(Out& out, const unsigned int value) {
+  out.outUInt(value);
+  ;
+  return out;
+}
 
 /**
  * Operator that writes a float into a stream.
@@ -215,7 +239,10 @@ inline Out& operator<<(Out& out, const unsigned int value) {out.outUInt(value); 
  * @param value The value that is written.
  * @return The stream.
  */
-inline Out& operator<<(Out& out, const float value) {out.outFloat(value); return out;}
+inline Out& operator<<(Out& out, const float value) {
+  out.outFloat(value);
+  return out;
+}
 
 /**
  * Operator that writes a double into a stream.
@@ -223,7 +250,10 @@ inline Out& operator<<(Out& out, const float value) {out.outFloat(value); return
  * @param value The value that is written.
  * @return The stream.
  */
-inline Out& operator<<(Out& out, const double value) {out.outDouble(value); return out;}
+inline Out& operator<<(Out& out, const double value) {
+  out.outDouble(value);
+  return out;
+}
 
 /**
  * Operator that writes a string into a stream.
@@ -231,7 +261,10 @@ inline Out& operator<<(Out& out, const double value) {out.outDouble(value); retu
  * @param value The value that is written.
  * @return The stream.
  */
-inline Out& operator<<(Out& out, const char* value) {out.outString(value); return out;}
+inline Out& operator<<(Out& out, const char* value) {
+  out.outString(value);
+  return out;
+}
 
 /**
  * Operator that writes a string into a stream.
@@ -239,7 +272,10 @@ inline Out& operator<<(Out& out, const char* value) {out.outString(value); retur
  * @param value The value that is written.
  * @return The stream.
  */
-inline Out& operator<<(Out& out, const std::string& value) {out.outString(value.c_str()); return out;}
+inline Out& operator<<(Out& out, const std::string& value) {
+  out.outString(value.c_str());
+  return out;
+}
 
 /**
  * Operator that writes an Angle into a stream.
@@ -247,7 +283,10 @@ inline Out& operator<<(Out& out, const std::string& value) {out.outString(value.
  * @param value The value that is written.
  * @return The stream.
  */
-inline Out& operator<<(Out& out, const Angle& value) {out.outAngle(value); return out;}
+inline Out& operator<<(Out& out, const Angle& value) {
+  out.outAngle(value);
+  return out;
+}
 
 /**
  * Operator that calls the function pointed to by f.
@@ -255,7 +294,9 @@ inline Out& operator<<(Out& out, const Angle& value) {out.outAngle(value); retur
  * @param f A function that is normally endl.
  * @return The stream.
  */
-inline Out& operator<<(Out& out, Out& (*f)(Out&)) {return f(out);}
+inline Out& operator<<(Out& out, Out& (*f)(Out&)) {
+  return f(out);
+}
 
 /**
  * This function can be inserted into a stream to represent an end of line.
@@ -268,9 +309,8 @@ Out& endl(Out& out);
  * The class In is the abstract base class for all classes
  * that implement reading from streams.
  */
-class In
-{
-protected:
+class In {
+ protected:
   /**
    * Virtual redirection for operator>>(bool& value).
    */
@@ -337,7 +377,7 @@ protected:
    */
   virtual void inEndL() = 0;
 
-public:
+ public:
   /** Virtual destructor for derived classes. */
   virtual ~In() = default;
 
@@ -394,8 +434,8 @@ public:
    * @param t The object, array, or enum to stream.
    * @return The stream.
    */
-  template<typename T> In& operator>>(T& t)
-  {
+  template <typename T>
+  In& operator>>(T& t) {
     return EnumHelpers::EnumOrClass<T, std::is_enum<T>::value>::read(*this, t);
   }
 
@@ -423,7 +463,10 @@ inline void In::select(const char*, int, const char*) {}
  * @param value The value that is read.
  * @return The stream.
  */
-inline In& operator>>(In& in, bool& value) {in.inBool(value); return in;}
+inline In& operator>>(In& in, bool& value) {
+  in.inBool(value);
+  return in;
+}
 
 /**
  * Operator that reads a char from a stream.
@@ -431,7 +474,10 @@ inline In& operator>>(In& in, bool& value) {in.inBool(value); return in;}
  * @param value The value that is read.
  * @return The stream.
  */
-inline In& operator>>(In& in, char& value) {in.inChar(value); return in;}
+inline In& operator>>(In& in, char& value) {
+  in.inChar(value);
+  return in;
+}
 
 /**
  * Operator that reads a signed char from a stream.
@@ -439,7 +485,10 @@ inline In& operator>>(In& in, char& value) {in.inChar(value); return in;}
  * @param value The value that is read.
  * @return The stream.
  */
-inline In& operator>>(In& in, signed char& value) {in.inSChar(value); return in;}
+inline In& operator>>(In& in, signed char& value) {
+  in.inSChar(value);
+  return in;
+}
 
 /**
  * Operator that reads an unsigned char from a stream.
@@ -447,7 +496,10 @@ inline In& operator>>(In& in, signed char& value) {in.inSChar(value); return in;
  * @param value The value that is read.
  * @return The stream.
  */
-inline In& operator>>(In& in, unsigned char& value) {in.inUChar(value); return in;}
+inline In& operator>>(In& in, unsigned char& value) {
+  in.inUChar(value);
+  return in;
+}
 
 /**
  * Operator that reads a short int from a stream.
@@ -455,7 +507,10 @@ inline In& operator>>(In& in, unsigned char& value) {in.inUChar(value); return i
  * @param value The value that is read.
  * @return The stream.
  */
-inline In& operator>>(In& in, short& value) {in.inShort(value); return in;}
+inline In& operator>>(In& in, short& value) {
+  in.inShort(value);
+  return in;
+}
 
 /**
  * Operator that reads an unsigned short int from a stream.
@@ -463,7 +518,10 @@ inline In& operator>>(In& in, short& value) {in.inShort(value); return in;}
  * @param value The value that is read.
  * @return The stream.
  */
-inline In& operator>>(In& in, unsigned short& value) {in.inUShort(value); return in;}
+inline In& operator>>(In& in, unsigned short& value) {
+  in.inUShort(value);
+  return in;
+}
 
 /**
  * Operator that reads an int from a stream.
@@ -471,7 +529,10 @@ inline In& operator>>(In& in, unsigned short& value) {in.inUShort(value); return
  * @param value The value that is read.
  * @return The stream.
  */
-inline In& operator>>(In& in, int& value) {in.inInt(value); return in;}
+inline In& operator>>(In& in, int& value) {
+  in.inInt(value);
+  return in;
+}
 
 /**
  * Operator that reads an unsigned int from a stream.
@@ -479,7 +540,10 @@ inline In& operator>>(In& in, int& value) {in.inInt(value); return in;}
  * @param value The value that is read.
  * @return The stream.
  */
-inline In& operator>>(In& in, unsigned int& value) {in.inUInt(value); return in;}
+inline In& operator>>(In& in, unsigned int& value) {
+  in.inUInt(value);
+  return in;
+}
 
 /**
  * Operator that reads a float from a stream.
@@ -487,7 +551,10 @@ inline In& operator>>(In& in, unsigned int& value) {in.inUInt(value); return in;
  * @param value The value that is read.
  * @return The stream.
  */
-inline In& operator>>(In& in, float& value) {in.inFloat(value); return in;}
+inline In& operator>>(In& in, float& value) {
+  in.inFloat(value);
+  return in;
+}
 
 /**
  * Operator that reads a double from a stream.
@@ -495,7 +562,10 @@ inline In& operator>>(In& in, float& value) {in.inFloat(value); return in;}
  * @param value The value that is read.
  * @return The stream.
  */
-inline In& operator>>(In& in, double& value) {in.inDouble(value); return in;}
+inline In& operator>>(In& in, double& value) {
+  in.inDouble(value);
+  return in;
+}
 
 /**
  * Operator that reads a string from a stream.
@@ -503,7 +573,10 @@ inline In& operator>>(In& in, double& value) {in.inDouble(value); return in;}
  * @param value The value that is read.
  * @return The stream.
  */
-inline In& operator>>(In& in, std::string& value) {in.inString(value); return in;}
+inline In& operator>>(In& in, std::string& value) {
+  in.inString(value);
+  return in;
+}
 
 /**
  * Operator that reads an Angle from a stream.
@@ -511,7 +584,10 @@ inline In& operator>>(In& in, std::string& value) {in.inString(value); return in
  * @param value The value that is read.
  * @return The stream.
  */
-inline In& operator>>(In& in, Angle& value) {in.inAngle(value); return in;}
+inline In& operator>>(In& in, Angle& value) {
+  in.inAngle(value);
+  return in;
+}
 
 /**
  * Operator that reads the endl-symbol from a stream.
@@ -519,7 +595,9 @@ inline In& operator>>(In& in, Angle& value) {in.inAngle(value); return in;}
  * @param f A function that is normally endl.
  * @return The stream.
  */
-inline In& operator>>(In& in, In& (*f)(In&)) {return f(in);}
+inline In& operator>>(In& in, In& (*f)(In&)) {
+  return f(in);
+}
 
 /**
  * This function can be read from a stream to represent an end of line.
@@ -528,70 +606,70 @@ inline In& operator>>(In& in, In& (*f)(In&)) {return f(in);}
  */
 In& endl(In& in);
 
-namespace EnumHelpers
-{
-  /**
-   * Two classes that simply hide the template versions of the streaming
-   * operators by versions that will never be called. They aren't even
-   * implemented.
-   */
-  class Out2 : public ::Out {template<typename T> Out& operator<<(const int&);};
-  class In2 : public ::In {template<typename T> In& operator>>(int&);};
+namespace EnumHelpers {
+/**
+ * Two classes that simply hide the template versions of the streaming
+ * operators by versions that will never be called. They aren't even
+ * implemented.
+ */
+class Out2 : public ::Out {
+  template <typename T>
+  Out& operator<<(const int&);
+};
+class In2 : public ::In {
+  template <typename T>
+  In& operator>>(int&);
+};
 
-  /**
-   * @class EnumOrClass
-   * A template class to stream in a different way depending on whether
-   * it is instantiated for an enum or a class. This is the version for
-   * classes. Here the normal streaming operators are called. To avoid
-   * an endless recursion with the template streaming operators below,
-   * those operators are defined in the classes In und Out and they
-   * are hidden in the derivations In2 and Out2. Since hiding
-   * seems to be implemented differently in different compilers,
-   * all other streaming operators are defined outside of classes.
-   * @param T The type of the value to stream.
-   * @param isEnum Is T an enum type? For this version, this is always false.
-   */
-  template<typename T, bool isEnum> struct EnumOrClass
-  {
-    // An error here usually means that you try to stream data that is not streamable
-    static Out& write(Out& out, const T& t) {return static_cast<Out2&>(out) << t;}
-    static In& read(In& in, T& t) {return static_cast<In2&>(in) >> t;}
-  };
+/**
+ * @class EnumOrClass
+ * A template class to stream in a different way depending on whether
+ * it is instantiated for an enum or a class. This is the version for
+ * classes. Here the normal streaming operators are called. To avoid
+ * an endless recursion with the template streaming operators below,
+ * those operators are defined in the classes In und Out and they
+ * are hidden in the derivations In2 and Out2. Since hiding
+ * seems to be implemented differently in different compilers,
+ * all other streaming operators are defined outside of classes.
+ * @param T The type of the value to stream.
+ * @param isEnum Is T an enum type? For this version, this is always false.
+ */
+template <typename T, bool isEnum>
+struct EnumOrClass {
+  // An error here usually means that you try to stream data that is not streamable
+  static Out& write(Out& out, const T& t) { return static_cast<Out2&>(out) << t; }
+  static In& read(In& in, T& t) { return static_cast<In2&>(in) >> t; }
+};
 
-  /**
-   * @class EnumOrClass
-   * A template class to stream in a different way depending on whether
-   * it is instantiated for an enum or a class. This is the version for
-   * streaming enums (as integers).
-   * @param T The type of the value to stream.
-   */
-  template<typename T> struct EnumOrClass<T, true>
-  {
-    static Out& write(Out& out, const T& t)
-    {
-      return sizeof(t) == 1 ? out << static_cast<unsigned char>(t) : out << static_cast<int>(t);
+/**
+ * @class EnumOrClass
+ * A template class to stream in a different way depending on whether
+ * it is instantiated for an enum or a class. This is the version for
+ * streaming enums (as integers).
+ * @param T The type of the value to stream.
+ */
+template <typename T>
+struct EnumOrClass<T, true> {
+  static Out& write(Out& out, const T& t) {
+    return sizeof(t) == 1 ? out << static_cast<unsigned char>(t) : out << static_cast<int>(t);
+  }
+
+  static In& read(In& in, T& t) {
+    if (sizeof(t) == 1) {
+      unsigned char c =
+          static_cast<unsigned char>(t);  // keep old value in case streaming does nothing
+      in >> c;
+      t = static_cast<T>(c);
+    } else {
+      int i = static_cast<int>(t);  // keep old value in case streaming does nothing
+      in >> i;
+      t = static_cast<T>(i);
     }
+    return in;
+  }
+};
+}  // namespace EnumHelpers
 
-    static In& read(In& in, T& t)
-    {
-      if(sizeof(t) == 1)
-      {
-        unsigned char c = static_cast<unsigned char>(t); // keep old value in case streaming does nothing
-        in >> c;
-        t = static_cast<T>(c);
-      }
-      else
-      {
-        int i = static_cast<int>(t); // keep old value in case streaming does nothing
-        in >> i;
-        t = static_cast<T>(i);
-      }
-      return in;
-    }
-  };
-}
-
-namespace Streaming
-{
-  void trimName(const char*& name);
+namespace Streaming {
+void trimName(const char*& name);
 }

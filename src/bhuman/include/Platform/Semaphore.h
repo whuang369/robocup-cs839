@@ -9,15 +9,14 @@
 /**
  * Encapsulates an semaphore object.
  */
-class Semaphore
-{
-private:
+class Semaphore {
+ private:
   void* handle; /**< The sem_t handle of the semaphore. */
 #ifdef LINUX
   char handle2[sizeof(void*) * 4];
 #endif
 
-public:
+ public:
   /**
    * Constructs an new semaphore object.
    * @param value The initial value for the semaphore.

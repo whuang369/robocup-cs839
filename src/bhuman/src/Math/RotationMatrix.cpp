@@ -12,31 +12,26 @@
 #include "MathBase/BHMath.h"
 #include "MathBase/Rotation.h"
 
-AngleAxisf RotationMatrix::getAngleAxis() const
-{
+AngleAxisf RotationMatrix::getAngleAxis() const {
   return AngleAxisf(*this);
 }
 
-Vector3f RotationMatrix::getPackedAngleAxis() const
-{
+Vector3f RotationMatrix::getPackedAngleAxis() const {
   return Rotation::AngleAxis::pack(getAngleAxis());
 }
 
-Vector3f RotationMatrix::getPackedAngleAxisFaulty() const
-{
+Vector3f RotationMatrix::getPackedAngleAxisFaulty() const {
   // This function suffers from a wrong handling of +-180° +- 1° rotations.
   // Additionally normalizing the result vector by (2.f * std::sin(angle)) is imprecise.
   // Unfortunately, the KickEngine kicks are tuned with this function.
 
   float cosine = (trace() - 1.f) * 0.5f;
   ASSERT(std::isfinite(cosine));
-  if(cosine > 1.f || cosine < -1.f)
-    cosine = 1.f;
+  if (cosine > 1.f || cosine < -1.f) cosine = 1.f;
   const float angle = std::acos(cosine);
-  if(angle == 0.f)
+  if (angle == 0.f)
     return Vector3f::Zero();
-  else
-  {
+  else {
     const Matrix3f& mat = *this;
     Vector3f result(mat(2, 1) - mat(1, 2), mat(0, 2) - mat(2, 0), mat(1, 0) - mat(0, 1));
     result *= angle / (2.f * std::sin(angle));
@@ -44,8 +39,7 @@ Vector3f RotationMatrix::getPackedAngleAxisFaulty() const
   }
 }
 
-RotationMatrix& RotationMatrix::rotateX(const float angle)
-{
+RotationMatrix& RotationMatrix::rotateX(const float angle) {
   Matrix3f& mat = *this;
   const float c = std::cos(angle);
   const float s = std::sin(angle);
@@ -61,8 +55,7 @@ RotationMatrix& RotationMatrix::rotateX(const float angle)
   return *this;
 }
 
-RotationMatrix& RotationMatrix::rotateY(const float angle)
-{
+RotationMatrix& RotationMatrix::rotateY(const float angle) {
   Matrix3f& mat = *this;
   const float c = std::cos(angle);
   const float s = std::sin(angle);
@@ -78,8 +71,7 @@ RotationMatrix& RotationMatrix::rotateY(const float angle)
   return *this;
 }
 
-RotationMatrix& RotationMatrix::rotateZ(const float angle)
-{
+RotationMatrix& RotationMatrix::rotateZ(const float angle) {
   Matrix3f& mat = *this;
   const float c = std::cos(angle);
   const float s = std::sin(angle);
@@ -95,78 +87,60 @@ RotationMatrix& RotationMatrix::rotateZ(const float angle)
   return *this;
 }
 
-float RotationMatrix::getXAngle() const
-{
+float RotationMatrix::getXAngle() const {
   const Matrix3f& mat = *this;
   const float h = std::sqrt(mat(1, 2) * mat(1, 2) + mat(2, 2) * mat(2, 2));
-  if(Approx::isZero(h))
+  if (Approx::isZero(h))
     return 0.f;
   else
     return std::acos(mat(2, 2) / h) * -sgnNeg(mat(1, 2));
 }
 
-float RotationMatrix::getYAngle() const
-{
+float RotationMatrix::getYAngle() const {
   const Matrix3f& mat = *this;
   const float h = std::sqrt(mat(0, 0) * mat(0, 0) + mat(2, 0) * mat(2, 0));
-  if(Approx::isZero(h))
+  if (Approx::isZero(h))
     return 0.f;
   else
     return std::acos(mat(0, 0) / h) * -sgnNeg(mat(2, 0));
 }
 
-float RotationMatrix::getZAngle() const
-{
+float RotationMatrix::getZAngle() const {
   const Matrix3f& mat = *this;
   const float h = std::sqrt(mat(0, 0) * mat(0, 0) + mat(1, 0) * mat(1, 0));
-  if(Approx::isZero(h))
+  if (Approx::isZero(h))
     return 0.f;
   else
     return std::acos(mat(0, 0) / h) * sgnPos(mat(1, 0));
 }
 
-RotationMatrix RotationMatrix::aroundX(const float angle)
-{
+RotationMatrix RotationMatrix::aroundX(const float angle) {
   const float c = std::cos(angle);
   const float s = std::sin(angle);
-  return (RotationMatrix() <<
-          1.f, 0.f, 0.f,
-          0.f, c, -s,
-          0.f, s, c).finished();
+  return (RotationMatrix() << 1.f, 0.f, 0.f, 0.f, c, -s, 0.f, s, c).finished();
 }
 
-RotationMatrix RotationMatrix::aroundY(const float angle)
-{
+RotationMatrix RotationMatrix::aroundY(const float angle) {
   const float c = std::cos(angle);
   const float s = std::sin(angle);
-  return (RotationMatrix() <<
-          c, 0.f, s,
-          0.f, 1.f, 0.f,
-          -s, 0.f, c).finished();
+  return (RotationMatrix() << c, 0.f, s, 0.f, 1.f, 0.f, -s, 0.f, c).finished();
 }
 
-RotationMatrix RotationMatrix::aroundZ(const float angle)
-{
+RotationMatrix RotationMatrix::aroundZ(const float angle) {
   const float c = std::cos(angle);
   const float s = std::sin(angle);
-  return (RotationMatrix() <<
-          c, -s, 0.f,
-          s, c, 0.f,
-          0.f, 0.f, 1.f).finished();
+  return (RotationMatrix() << c, -s, 0.f, s, c, 0.f, 0.f, 0.f, 1.f).finished();
 }
 
-RotationMatrix RotationMatrix::fromEulerAngles(const float x, const float y, const float z)
-{
+RotationMatrix RotationMatrix::fromEulerAngles(const float x, const float y, const float z) {
   return Rotation::Euler::fromAngles(x, y, z);
 }
 
-RotationMatrix RotationMatrix::fromEulerAngles(const Vector3f& rotation)
-{
+RotationMatrix RotationMatrix::fromEulerAngles(const Vector3f& rotation) {
   return Rotation::Euler::fromAngles(rotation);
 }
 
-void RotationMatrix::reg()
-{
+void RotationMatrix::reg() {
   PUBLISH(reg);
   REG_CLASS_WITH_BASE(RotationMatrix, Matrix3f);
 }
