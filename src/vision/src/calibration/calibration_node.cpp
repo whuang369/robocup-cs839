@@ -122,15 +122,15 @@ void CalibrationNode::Init(const std::string cfg_path, bool is_offline,
   sub_opt_2.callback_group = callback_group_sub_2;
 
   it_ = std::make_shared<image_transport::ImageTransport>(shared_from_this());
-  color_sub_ = it_->subscribe("/camera/camera/color/image_raw", 1, &CalibrationNode::ColorCallback,
-                              this, nullptr, sub_opt_1);
+  color_sub_ = it_->subscribe("/camera/camera/rgb/image_rect_color", 1,
+                              &CalibrationNode::ColorCallback, this, nullptr, sub_opt_1);
   pose_sub_ = this->create_subscription<geometry_msgs::msg::Pose>(
       "/head_pose", 10, std::bind(&CalibrationNode::PoseCallback, this, std::placeholders::_1),
       sub_opt_2);
   is_offline_ = is_offline;
   if (!is_offline_) {
     camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
-        "/camera/camera/color/camera_info", 10,
+        "/camera/camera/rgb/camera_info", 10,
         std::bind(&CalibrationNode::CameraInfoCallback, this, std::placeholders::_1));
   }
 

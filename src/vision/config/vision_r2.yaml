@@ -1,0 +1,33 @@
+show_res: false
+camera:
+  type: "zed" # realsense or zed
+  intrin:
+    fx: 526.727234
+    fy: 526.727234
+    cx: 483.142609
+    cy: 293.299622
+    distortion_coeffs: [0., 0., 0., 0., 0., 0., 0., 0.] # /camera/camera/rgb
+    distortion_model: 0 # 0: none, 1: opencv format, 2: for rs d455 only
+  extrin:
+    - [-0.006346229,-0.007024993, 0.999955177,-0.002489057]
+    - [-0.999976814, 0.002519571,-0.006328666,-0.013019698]
+    - [-0.002475000,-0.999972224,-0.007040820,-0.010877512]
+    - [ 0.         , 0.         , 0.         , 1.        ]
+  pitch_compensation: 0.0 # in degree
+  yaw_compensation: 0.0
+  z_compensation: 0.0
+detection_model:
+  model_path: "./src/vision/model/best_orin.engine"
+  confidence_threshold: 0.2
+use_depth: true
+ball_pose_estimator:
+  use_depth: false
+  radius: 1.109
+  down_sample_leaf_size: 0.01
+  cluster_distance_threshold: 0.01
+  fitting_distance_threshold: 0.01
+human_like_pose_estimator:
+  use_depth: false
+  down_sample_leaf_size: 0.01
+  fitting_distance_threshold: 0.01
+  statistic_outlier_multiplier: 0.01
