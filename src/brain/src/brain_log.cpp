@@ -9,7 +9,7 @@ BrainLog::BrainLog(Brain *argBrain) : enabled(false), brain(argBrain), rerunLog(
     return;
   }
 
-  rerun::Error err = rerunLog.connect(brain->config->rerunLogServerAddr);
+  rerun::Error err = rerunLog.connect_grpc(brain->config->rerunLogServerAddr);
   if (err.is_err()) {
     prtErr("Connect rerunLog server failed: " + err.description);
     enabled = false;
