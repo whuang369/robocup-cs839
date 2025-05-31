@@ -84,15 +84,16 @@ void BrainTree::tick() {
   static int cnt = 0;
   cnt++;
   // print states
-  if (cnt % 30 == 0)
+  if (cnt % 30 == 0) {
     // prtDebug(format(
     //     "GameState: %s\tIsKickOffSide: %d\nScore: %d\t JustScored: %d",
     //     getEntry<string>("gc_game_state").c_str(),
     //     getEntry<bool>("gc_is_kickoff_side"),
     //     brain->data->lastScore,
     //     getEntry<bool>("we_just_scored")));
+  }
 
-    tree.tickOnce();
+  tree.tickOnce();
 }
 
 NodeStatus SetVelocity::tick() {
