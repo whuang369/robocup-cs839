@@ -24,7 +24,11 @@ void BrainConfig::handle() {
     fieldDimensions = FD_ADULTSIZE;
   } else if (fieldType == "kid_size") {
     fieldDimensions = FD_KIDSIZE;
-  } else {
+  } else if (fieldType == "gdc") {
+    fieldDimensions = FD_GDC;
+  }
+
+  else {
     throw invalid_argument("[Error] fieldType must be one of [adult_size, kid_size]. Got: " +
                            fieldType);
   }
