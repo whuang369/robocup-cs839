@@ -51,12 +51,15 @@ class StrikerDecide : public SyncActionNode {
 
   static PortsList providedPorts() {
     return {
-        InputPort<double>("chase_threshold", 1.0,
-                          "Perform the chasing action if the distance exceeds this threshold"),
+        InputPort<double>("kick_range_threshold", 1.5,
+                          "Perform the kick action if the distance less than this threshold"),
+        InputPort<double>("kick_angle_threshold", 0.2,
+                          "Perform the kick action if ball yaw is less than this threshold"),
         InputPort<string>("decision_in", "", "Used to read the last decision"),
         InputPort<string>("position", "offense",
                           "offense | defense, determines the direction to kick the ball"),
         OutputPort<string>("decision_out"),
+        OutputPort<double>("kick_dir_out"),
     };
   }
 
@@ -203,6 +206,33 @@ class Adjust : public SyncActionNode {
 
  private:
   Brain *brain;
+};
+
+class Approach : public SyncActionNode {
+ public:
+  Approach(const string &name, const NodeConfig &config, Brain *_brain)
+      : SyncActionNode(name, config), brain(_brain) {}
+
+  static PortsList providedPorts() {
+    return {
+        InputPort<double>("kick_dir", 0.0, "Direction to kick the ball (in radians)"),
+        InputPort<double>("vx_limit", 1.0, "Limit for vx during approach, [-limit, limit]"),
+        InputPort<double>("vy_limit", 0.5, "Limit for vy during approach, [-limit, limit]"),
+        InputPort<double>("vtheta_limit", 1.0, "Limit for vtheta during approach, [-limit, limit]"),
+        InputPort<double>("max_range", 1.0,
+                          "When the ball range exceeds this value, move slightly forward"),
+        InputPort<double>("min_range", 0.6,
+                          "When the ball range is smaller than this value, move slightly backward"),
+    };
+  }
+
+  NodeStatus tick() override;
+
+ private:
+  Brain *brain;
+
+  enum class ApproachPhase { Adjust, Approach, WrapAround };
+  ApproachPhase _phase = ApproachPhase::WrapAround;
 };
 
 class Kick : public StatefulActionNode {

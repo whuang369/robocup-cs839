@@ -6,6 +6,15 @@
 #include "utils/misc.h"
 #include "std_msgs/msg/string.hpp"
 
+using std::atan2;
+using std::clamp;
+using std::copysign;
+using std::cos;
+using std::fabs;
+using std::hypot;
+using std::sin;
+using std::string;
+
 /**
  * Here, a macro definition is used to reduce the amount of code in RegisterBuilder.
  * The effect after expanding REGISTER_BUILDER(Test) is as follows:
@@ -27,6 +36,7 @@ void BrainTree::init() {
   REGISTER_BUILDER(Chase)
   REGISTER_BUILDER(SimpleChase)
   REGISTER_BUILDER(Adjust)
+  REGISTER_BUILDER(Approach)
   REGISTER_BUILDER(Kick)
   REGISTER_BUILDER(StrikerDecide)
   REGISTER_BUILDER(CamTrackBall)
@@ -339,9 +349,128 @@ NodeStatus Adjust::tick() {
   return NodeStatus::SUCCESS;
 }
 
+NodeStatus Approach::tick() {
+  if (brain->tree->getEntry<bool>("ball_location_known") == false) {
+    brain->client->setVelocity(0, 0, 0);
+    return NodeStatus::SUCCESS;
+  }
+
+  // Read input parameters
+  double kickDir, vxLimit, vyLimit, vthetaLimit, maxRange, minRange;
+  getInput("kick_dir", kickDir);
+  getInput("vx_limit", vxLimit);
+  getInput("vy_limit", vyLimit);
+  getInput("vtheta_limit", vthetaLimit);
+  getInput("max_range", maxRange);
+  getInput("min_range", minRange);
+
+  // Variables for the state machine
+  double kickVecX = cos(kickDir);
+  double kickVecY = sin(kickDir);
+
+  Pose2D robotPose = brain->data->robotPoseToField;
+  Point ballPos = brain->data->ball.posToField;
+
+  double targetOffset = (maxRange + minRange) / 2.0;
+  Point2D targetPos = {ballPos.x - targetOffset * kickVecX, ballPos.y - targetOffset * kickVecY};
+  Point2D toTarget = {targetPos.x - robotPose.x, targetPos.y - robotPose.y};
+  double robotTargetAngle = atan2(toTarget.y, toTarget.x);
+  double ballRange = brain->data->ball.range;
+  double facingAngle = toPInPI(kickDir - brain->data->robotBallAngleToField);
+  double approachAngle = toPInPI(kickDir - robotTargetAngle);
+
+  // Determine the phase
+  constexpr double GOOD_FACING_ANGLE = 1.0;
+  constexpr double BAD_FACING_ANGLE = 1.3;
+  constexpr double GOOD_APPROACH_ANGLE = 1.5;
+  constexpr double BAD_APPROACH_ANGLE = 1.8;
+  bool enteredKickZone = (ballRange < maxRange) && (fabs(facingAngle) < GOOD_FACING_ANGLE);
+  bool exitedKickZone = (ballRange > maxRange + 0.2) || (fabs(facingAngle) > BAD_FACING_ANGLE);
+  bool goodApproach = (fabs(approachAngle) < GOOD_APPROACH_ANGLE);
+  bool badApproach = (fabs(approachAngle) > BAD_APPROACH_ANGLE);
+
+  ApproachPhase newPhase = _phase;
+  if (_phase == ApproachPhase::Adjust && exitedKickZone) {
+    newPhase = goodApproach ? ApproachPhase::Approach : ApproachPhase::WrapAround;
+  } else if (enteredKickZone) {
+    newPhase = ApproachPhase::Adjust;
+  } else if (_phase == ApproachPhase::Approach && badApproach) {
+    newPhase = ApproachPhase::WrapAround;
+  } else if (_phase == ApproachPhase::WrapAround && goodApproach) {
+    newPhase = ApproachPhase::Approach;
+  }
+
+  // Update the phase if it has changed
+  if (newPhase != _phase) {
+    string msg = "Phase changed: " + std::to_string(static_cast<int>(_phase)) + " -> " +
+                 std::to_string(static_cast<int>(newPhase));
+    brain->log->log("approach", rerun::TextLog(msg));
+    _phase = newPhase;
+  }
+
+  // Set the velocity based on the state
+  double vx = 0, vy = 0, vtheta = 0;
+  constexpr double TURNING_GAIN = 0.8;
+  constexpr double ADJUST_SPEED_FACTOR = 0.4;
+  constexpr double GUIDE_DISTANCE = 1.0;
+  constexpr double BLEND_RANGE = 2.0;
+  constexpr double OPPOSITE_FACING_ANGLE = 2.5;
+
+  if (_phase == ApproachPhase::Adjust) {
+    double dir = (fabs(facingAngle) < 0.02) ? 0.0 : (facingAngle > 0 ? -1.0 : 1.0);
+    double ballYaw = brain->data->ball.yawToRobot;
+    vx = -ADJUST_SPEED_FACTOR * dir * sin(ballYaw);
+    if (ballRange > maxRange) vx += 0.1;
+    if (ballRange < minRange) vx -= 0.1;
+    vy = ADJUST_SPEED_FACTOR * dir * cos(ballYaw);
+    vtheta = (ballYaw - dir * ADJUST_SPEED_FACTOR) / TURNING_GAIN;
+  } else {
+    Point2D guidePos;
+    double alpha = 1.0;
+
+    if (_phase == ApproachPhase::Approach) {
+      // Project onto kick direction
+      double proj = toTarget.x * kickVecX + toTarget.y * kickVecY;
+      guidePos.x = targetPos.x - clamp(proj, 0.0, GUIDE_DISTANCE) * kickVecX;
+      guidePos.y = targetPos.y - clamp(proj, 0.0, GUIDE_DISTANCE) * kickVecY;
+
+      double lateralDist = hypot(toTarget.x - proj * kickVecX, toTarget.y - proj * kickVecY);
+      alpha = clamp(lateralDist / BLEND_RANGE, 0.0, 1.0);
+    } else if (_phase == ApproachPhase::WrapAround) {
+      // Project onto line perpendicular to kick direction
+      double proj = toTarget.x * kickVecY - toTarget.y * kickVecX;
+      guidePos.x = targetPos.x - copysign(GUIDE_DISTANCE, proj) * kickVecY;
+      guidePos.y = targetPos.y + copysign(GUIDE_DISTANCE, proj) * kickVecX;
+
+      double lateralDist = hypot(toTarget.x - proj * kickVecY, toTarget.y + proj * kickVecX);
+      alpha = clamp(lateralDist / BLEND_RANGE, 0.0, 1.0);
+      if (fabs(proj) < GUIDE_DISTANCE && fabs(facingAngle) > OPPOSITE_FACING_ANGLE) alpha = 1.0;
+    }
+
+    // Get the carrot position by interpolating between the guide position and the target position
+    Point2D carrotPos = {alpha * guidePos.x + (1.0 - alpha) * targetPos.x,
+                         alpha * guidePos.y + (1.0 - alpha) * targetPos.y};
+    Point2D toCarrot = {carrotPos.x - robotPose.x, carrotPos.y - robotPose.y};
+    double carrotAngle = atan2(toCarrot.y, toCarrot.x);
+    double headingAngle = toPInPI(carrotAngle - robotPose.theta);
+    vx = hypot(toCarrot.x, toCarrot.y) * cos(headingAngle);
+    vy = 0.0;
+    vtheta = headingAngle / TURNING_GAIN;
+  }
+
+  // Cap the velocities
+  vx = std::clamp(vx, -vxLimit, vxLimit);
+  vy = std::clamp(vy, -vyLimit, vyLimit);
+  vtheta = std::clamp(vtheta, -vthetaLimit, vthetaLimit);
+
+  brain->client->setVelocity(vx, vy, vtheta, false, false, false);
+  return NodeStatus::SUCCESS;
+}
+
 NodeStatus StrikerDecide::tick() {
-  double chaseRangeThreshold;
-  getInput("chase_threshold", chaseRangeThreshold);
+  double kickRangeThreshold, kickAngleThreshold;
+  getInput("kick_range_threshold", kickRangeThreshold);
+  getInput("kick_angle_threshold", kickAngleThreshold);
   string lastDecision, position;
   getInput("decision_in", lastDecision);
   getInput("position", position);
@@ -352,35 +481,39 @@ NodeStatus StrikerDecide::tick() {
                   brain->data->ball.posToField.x + brain->config->fieldDimensions.length / 2)
           : atan2(-brain->data->ball.posToField.y,
                   brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
+
+  Pose2D robotPose = brain->data->robotPoseToField;
   double dir_rb_f = brain->data->robotBallAngleToField;
+  double ballRange = brain->data->ball.range;
+  double ballYaw = brain->data->ball.yawToRobot;
   auto goalPostAngles = brain->getGoalPostAngles(0.3);
   double theta_l = goalPostAngles[0];
   double theta_r = goalPostAngles[1];
   bool angleIsGood = (theta_l > dir_rb_f && theta_r < dir_rb_f);
-  double ballRange = brain->data->ball.range;
-  double ballYaw = brain->data->ball.yawToRobot;
+  bool rangeIsGood = (ballRange < kickRangeThreshold);
+  bool headingIsGood = (fabs(ballYaw) < kickAngleThreshold);
 
   string newDecision;
   auto color = 0xFFFFFFFF;  // for log
   if (!brain->tree->getEntry<bool>("ball_location_known")) {
     newDecision = "find";
     color = 0x0000FFFF;
-  } else if (ballRange > chaseRangeThreshold * (lastDecision == "chase" ? 0.9 : 1.0)) {
-    newDecision = "chase";
-    color = 0x00FF00FF;
-  } else if (angleIsGood) {
+  } else if (angleIsGood && rangeIsGood && headingIsGood) {
     newDecision = "kick";
     color = 0xFF0000FF;
   } else {
-    newDecision = "adjust";
+    newDecision = "approach";
     color = 0x00FFFFFF;
   }
 
   setOutput("decision_out", newDecision);
+  setOutput("kick_dir_out", kickDir);
   brain->log->logToScreen(
-      "tree/Decide",
-      format("Decision: %s ballrange: %.2f ballyaw: %.2f kickDir: %.2f rbDir: %.2f angleIsGood: %d",
-             newDecision.c_str(), ballRange, ballYaw, kickDir, dir_rb_f, angleIsGood),
+      "tree/StrickerDecide",
+      format("Decision: %s | kickDir: %.2f | rbDir: %.2f | ballRange: %.2f | ballYaw: %.2f | "
+             "goodAngle: %d | goodRange: %d | goodHeading: %d",
+             newDecision.c_str(), kickDir, dir_rb_f, ballRange, ballYaw, angleIsGood, rangeIsGood,
+             headingIsGood),
       color);
   return NodeStatus::SUCCESS;
 }
