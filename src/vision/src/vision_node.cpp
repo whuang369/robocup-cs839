@@ -13,7 +13,7 @@
 #include "booster_vision/pose_estimator/pose_estimator.h"
 #include "booster_vision/base/misc_utils.hpp"
 #include "booster_vision/base/pointcloud_process.h"
-#include "booster_vision/img_bridge.h"
+#include "booster_vision/base/img_bridge.hpp"
 
 #include <pcl/sample_consensus/model_types.h>
 #include <pcl/sample_consensus/method_types.h>
@@ -21,25 +21,27 @@
 
 #include <Eigen/Dense>  // Requires Eigen library
 
+using std::string;
+
 namespace booster_vision {
 
-void VisionNode::Init(const std::string &cfg_template_path, const std::string &cfg_path) {
-  if (!std::filesystem::exists(cfg_template_path)) {
-    std::cerr << "Error: Configuration template file '" << cfg_path << "' does not exist."
-              << std::endl;
+void VisionNode::Init(const std::string &cfg_path, const std::string &cfg_local_path) {
+  if (!std::filesystem::exists(cfg_path)) {
+    std::cerr << "Error: Configuration file '" << cfg_path << "' does not exist." << std::endl;
     return;
   }
 
-  YAML::Node node = YAML::LoadFile(cfg_template_path);
-  if (!std::filesystem::exists(cfg_path)) {
-    std::cout << "Warning: Configuration file empty!" << std::endl;
+  YAML::Node node = YAML::LoadFile(cfg_path);
+
+  if (std::filesystem::exists(cfg_local_path)) {
+    YAML::Node local_node = YAML::LoadFile(cfg_local_path);
+    MergeYAML(node, local_node);
+    std::cout << "Merged local override config: " << cfg_local_path << std::endl;
   } else {
-    YAML::Node cfg_node = YAML::LoadFile(cfg_path);
-    // merge input cfg to template cfg
-    MergeYAML(node, cfg_node);
+    std::cout << "No local override config found. Skipping: " << cfg_local_path << std::endl;
   }
 
-  std::cout << "loaded file: " << std::endl << node << std::endl;
+  std::cout << "loaded cfg file: " << std::endl << node << std::endl;
 
   show_res_ = as_or<bool>(node["show_res"], false);
 
@@ -85,8 +87,12 @@ void VisionNode::Init(const std::string &cfg_template_path, const std::string &c
   }
 
   // init ros related
-  std::string color_topic = "/camera/camera/color/image_raw";
-  std::string depth_topic = "/camera/camera/aligned_depth_to_color/image_raw";
+  string color_topic = "/camera/camera/rgb/image_rect_color";
+  string depth_topic = "/camera/camera/depth/depth_registered";
+  if (node["topics"]) {
+    color_topic = as_or<string>(node["topics"]["color"], color_topic);
+    depth_topic = as_or<string>(node["topics"]["depth"], depth_topic);
+  }
 
   it_ = std::make_shared<image_transport::ImageTransport>(shared_from_this());
   color_sub_ = it_->subscribe(color_topic, 1,
@@ -108,11 +114,11 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
     return;
   }
 
-  cv::Mat img;
+  cv::Mat imgBGR;
   try {
-    img = toCVMat(*msg);
-  } catch (std::exception &e) {
-    std::cerr << "converting msg to cv::Mat failed: " << e.what() << std::endl;
+    imgBGR = toBGRMat(*msg);
+  } catch (const std::exception &e) {
+    std::cerr << "converting msg to BGR cv::Mat failed: " << e.what() << std::endl;
     return;
   }
 
@@ -121,7 +127,7 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
   double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
 
   // get synced data
-  SyncedDataBlock synced_data = data_syncer_->getSyncedDataBlock(ColorDataBlock(img, timestamp));
+  SyncedDataBlock synced_data = data_syncer_->getSyncedDataBlock(ColorDataBlock(imgBGR, timestamp));
   cv::Mat color = synced_data.color_data.data;
   cv::Mat depth = synced_data.depth_data.data;
   Pose p_head2base = synced_data.pose_data.data;

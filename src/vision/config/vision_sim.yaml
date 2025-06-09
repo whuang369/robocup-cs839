@@ -1,4 +1,7 @@
 show_res: false
+topics:
+  color: "/camera/camera/color/image_raw"
+  depth: "/camera/camera/aligned_depth_to_color/image_raw"
 camera:
   type: "realsense" # realsense or zed
   intrin:

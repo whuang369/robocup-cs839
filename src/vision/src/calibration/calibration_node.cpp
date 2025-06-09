@@ -26,7 +26,7 @@
 #include "booster_vision/base/pose.h"
 #include "booster_vision/base/data_syncer.hpp"
 #include "booster_vision/base/misc_utils.hpp"
-#include "booster_vision/img_bridge.h"
+#include "booster_vision/base/img_bridge.hpp"
 #include "booster_vision/calibration/optimizor.hpp"
 #include "booster_vision/calibration/calibration.h"
 #include "booster_vision/calibration/board_detector.h"

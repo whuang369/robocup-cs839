@@ -7,7 +7,6 @@ set(BOOSTER_ROBOTICS_SDK_DEPENDENCIES booster_robotics_sdk.a fastrtps fastcdr)
 
 
 add_executable(vision_node main.cpp 
-                           img_bridge.cpp
                            vision_node.cpp)
 ament_target_dependencies(vision_node
   rclcpp

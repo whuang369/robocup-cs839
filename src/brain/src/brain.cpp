@@ -72,7 +72,7 @@ void Brain::init() {
   lowStateSubscription = create_subscription<booster_interface::msg::LowState>(
       "/low_state", 1, bind(&Brain::lowStateCallback, this, _1));
   imageSubscription = create_subscription<sensor_msgs::msg::Image>(
-      "/camera/camera/color/image_raw", 1, bind(&Brain::imageCallback, this, _1));
+      "/camera/camera/rgb/image_rect_color", 1, bind(&Brain::imageCallback, this, _1));
   headPoseSubscription = create_subscription<geometry_msgs::msg::Pose>(
       "/head_pose", 1, bind(&Brain::headPoseCallback, this, _1));
   ballToRobotPub = create_publisher<geometry_msgs::msg::Point>("/brain/ball_to_robot", 10);
@@ -485,19 +485,30 @@ void Brain::imageCallback(const sensor_msgs::msg::Image &msg) {
   if (!config->rerunLogEnable) return;
 
   static int counter = 0;
-  counter++;
-  if (counter % config->rerunLogImgInterval == 0) {
-    cv::Mat imageBGR(msg.height, msg.width, CV_8UC3, const_cast<uint8_t *>(msg.data.data()));
-    cv::Mat imageRGB;
-    cv::cvtColor(imageBGR, imageRGB, cv::COLOR_BGR2RGB);
+  if (++counter % config->rerunLogImgInterval != 0) return;
+
+  try {
+    cv::Mat imageBGR;
+
+    if (msg.encoding == "rgb8") {
+      cv::Mat imageRGB(msg.height, msg.width, CV_8UC3, const_cast<uchar *>(msg.data.data()));
+      cv::cvtColor(imageRGB, imageBGR, cv::COLOR_RGB2BGR);
+    } else if (msg.encoding == "bgra8") {
+      cv::Mat imageBGRA(msg.height, msg.width, CV_8UC4, const_cast<uchar *>(msg.data.data()));
+      cv::cvtColor(imageBGRA, imageBGR, cv::COLOR_BGRA2BGR);
+    } else {
+      prtErr("Unsupported image encoding: " + msg.encoding);
+      return;
+    }
 
     std::vector<uint8_t> compressed_image;
-    std::vector<int> compression_params = {cv::IMWRITE_JPEG_QUALITY, 10};
-    cv::imencode(".jpg", imageRGB, compressed_image, compression_params);
+    cv::imencode(".jpg", imageBGR, compressed_image, {cv::IMWRITE_JPEG_QUALITY, 10});
 
     double time = msg.header.stamp.sec + static_cast<double>(msg.header.stamp.nanosec) * 1e-9;
     log->setTimeSeconds(time);
     log->log("image/img", rerun::EncodedImage::from_bytes(compressed_image));
+  } catch (const std::exception &e) {
+    prtErr("Failed to log image: " + std::string(e.what()));
   }
 }
 

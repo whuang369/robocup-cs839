@@ -19,8 +19,7 @@ target_link_libraries(booster_vision_calibration PUBLIC ${OpenCV_LIBRARIES}
                                                         Ceres::ceres
                                                         )
 
-add_executable(calibration_node calibration_node.cpp
-                                ../img_bridge.cpp)
+add_executable(calibration_node calibration_node.cpp)
 
 target_link_libraries(calibration_node booster_vision_base
                                        booster_vision_pose_estimator
