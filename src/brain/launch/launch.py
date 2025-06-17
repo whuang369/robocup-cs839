@@ -37,9 +37,9 @@ def handle_configuration(context, *args, **kwargs):
     role = context.perform_substitution(LaunchConfiguration("role"))
     if not role == "":
         config["game.player_role"] = role
-    server_addr = context.perform_substitution(LaunchConfiguration("server_addr"))
-    if not server_addr == "":
-        config["rerunLog.server_addr"] = server_addr
+    rerun = context.perform_substitution(LaunchConfiguration("rerun"))
+    if not rerun == "":
+        config["rerunLog.server_addr"] = f"rerun+http://{rerun}:9876/proxy"
 
     return [
         Node(
@@ -81,7 +81,7 @@ def generate_launch_description():
                 description="If you need to override the game.player_role in the config.yaml, you can specify the parameter role:=striker when launching",
             ),
             DeclareLaunchArgument(
-                "server_addr", default_value="", description="Override the rerunLog server address"
+                "rerun", default_value="", description="Override the rerunLog server address"
             ),
             OpaqueFunction(function=handle_configuration),
         ]
