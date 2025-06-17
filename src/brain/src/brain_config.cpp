@@ -31,6 +31,12 @@ void BrainConfig::handle() {
                            fieldType);
   }
 
+  // camera
+  if (camPixX <= 0 || camPixY <= 0) {
+    throw invalid_argument("[Error] camera resolution must be positive. Got: " +
+                           to_string(camPixX) + "x" + to_string(camPixY));
+  }
+
   // joystick
   if (joystick == "logitech") {
     JoyMsg::type = JoyMsg::LOGITECH;
@@ -55,6 +61,10 @@ void BrainConfig::print(ostream &os) {
   os << "vxFactor = " << vxFactor << endl;
   os << "yawOffset = " << yawOffset << endl;
   os << "joystick = " << joystick << endl;
+  os << "----------------------------------------" << endl;
+  os << "cameraTopic = " << cameraTopic << endl;
+  os << "camPixX = " << camPixX << endl;
+  os << "camPixY = " << camPixY << endl;
   os << "----------------------------------------" << endl;
   os << "rerunLogEnable = " << rerunLogEnable << endl;
   os << "rerunLogServerAddr = " << rerunLogServerAddr << endl;

@@ -6,8 +6,6 @@
 #include "types.h"
 #include "utils/math.h"
 
-using namespace std;
-
 /**
  * Stores configuration values required by the Brain. These values should be confirmed during
  * initialization and remain read-only during the robot's decision-making process. Values that need
@@ -26,35 +24,32 @@ class BrainConfig {
   // added here to store them. These values will be overwritten in BrainNode, so even if a
   // configuration is not explicitly defined in config.yaml, the default values here will not take
   // effect. The actual default values should be configured in the BrainNode's declare_parameter.
-  int teamId;             // Corresponds to game.team_id
-  int playerId;           // Corresponds to game.player_id
-  string fieldType;       // Corresponds to game.field_type  "adult_size"(14*9) | "kid_size" (9*6)
-  string playerRole;      // Corresponds to game.player_role   "striker" | "goal_keeper"
-  string playerStartPos;  // Corresponds to game.player_start_post  "left" | "right"
+  int teamId;                  // game.team_id
+  int playerId;                // game.player_id
+  std::string fieldType;       // game.field_type  "adult_size"(14*9) | "kid_size" (9*6)
+  std::string playerRole;      // game.player_role   "striker" | "goal_keeper"
+  std::string playerStartPos;  // game.player_start_post  "left" | "right"
 
-  double robotHeight;      // Corresponds to robot.robot_height
-  double robotOdomFactor;  // Corresponds to robot.odom_factor odom
-  double vxFactor;   // Corresponds to robot.vx_factor fix the issue where the actual vx is larger
-                     // than the command
-  double yawOffset;  // Corresponds to robot.yaw_offset fix the issue of leftward bias during
-                     // distance measurement
-  string joystick;   // Corresponds to robot.joystick "logicall" | "beitong"
+  double robotHeight;      // robot.robot_height
+  double robotOdomFactor;  // robot.odom_factor odom
+  double vxFactor;   // robot.vx_factor fix the issue where the actual vx is larger than the command
+  double yawOffset;  // robot.yaw_offset fix the issue of leftward bias during distance measurement
+  std::string joystick;  // robot.joystick "logicall" | "beitong"
 
-  bool rerunLogEnable;        // Corresponds to rerunLog.enable  Whether to enable rerunLog
-  string rerunLogServerAddr;  // Corresponds to rerunLog.server_addr  rerunLog address
-  int rerunLogImgInterval;    // Corresponds to rerunLog.img_interval the interval to record the
-                              // images
+  std::string cameraTopic;  // camera.topic the topic of the rgb image
+  double camPixX;           // camera.width
+  double camPixY;           // camera.height
 
-  string treeFilePath;  //  It is no longer placed in config.yaml; the path to the behavior-tree
-                        //  file is now specified in launch.py.
+  bool rerunLogEnable;             // rerunLog.enable  Whether to enable rerunLog
+  std::string rerunLogServerAddr;  // rerunLog.server_addr  rerunLog address
+  int rerunLogImgInterval;         // rerunLog.img_interval the interval to log the images
+
+  std::string treeFilePath;  //  It is no longer placed in config.yaml; the path to the
+                             //  behavior-tree file is now specified in launch.py.
   // ----------  end config from config.yaml ---------------------------------------------
 
   // game parameters
   FieldDimensions fieldDimensions;
-
-  // Camera resolution
-  double camPixX = 1280;
-  double camPixY = 720;
 
   // Camera angle
   double camAngleX = deg2rad(90);

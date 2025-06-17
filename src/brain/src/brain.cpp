@@ -6,7 +6,9 @@
 #include "utils/math.h"
 #include "joy_msg.h"
 
-using namespace std;
+using std::bind;
+using std::string;
+using std::vector;
 using std::placeholders::_1;
 
 Brain::Brain() : rclcpp::Node("brain_node") {
@@ -24,6 +26,10 @@ Brain::Brain() : rclcpp::Node("brain_node") {
   declare_parameter<double>("robot.vx_factor", 0.95);
   declare_parameter<double>("robot.yaw_offset", 0.1);
   declare_parameter<string>("robot.joystick", "");
+
+  declare_parameter<string>("camera.topic", "");
+  declare_parameter<int>("camera.width", 960);
+  declare_parameter<int>("camera.height", 540);
 
   declare_parameter<bool>("rerunLog.enable", false);
   declare_parameter<string>("rerunLog.server_addr", "");
@@ -72,7 +78,7 @@ void Brain::init() {
   lowStateSubscription = create_subscription<booster_interface::msg::LowState>(
       "/low_state", 1, bind(&Brain::lowStateCallback, this, _1));
   imageSubscription = create_subscription<sensor_msgs::msg::Image>(
-      "/camera/camera/rgb/image_rect_color", 1, bind(&Brain::imageCallback, this, _1));
+      config->cameraTopic, 1, bind(&Brain::imageCallback, this, _1));
   headPoseSubscription = create_subscription<geometry_msgs::msg::Pose>(
       "/head_pose", 1, bind(&Brain::headPoseCallback, this, _1));
   ballToRobotPub = create_publisher<geometry_msgs::msg::Point>("/brain/ball_to_robot", 10);
@@ -94,6 +100,13 @@ void Brain::loadConfig() {
   get_parameter("robot.yaw_offset", config->yawOffset);
   get_parameter("robot.joystick", config->joystick);
 
+  get_parameter("camera.topic", config->cameraTopic);
+  int camWidth, camHeight;
+  get_parameter("camera.width", camWidth);
+  get_parameter("camera.height", camHeight);
+  config->camPixX = static_cast<double>(camWidth);
+  config->camPixY = static_cast<double>(camHeight);
+
   get_parameter("rerunLog.enable", config->rerunLogEnable);
   get_parameter("rerunLog.server_addr", config->rerunLogServerAddr);
   get_parameter("rerunLog.img_interval", config->rerunLogImgInterval);
@@ -104,7 +117,7 @@ void Brain::loadConfig() {
   config->handle();
 
   // debug after handle the parameters
-  ostringstream oss;
+  std::ostringstream oss;
   config->print(oss);
   prtDebug(oss.str());
 }
@@ -141,19 +154,19 @@ void Brain::updateMemory() {
 void Brain::updateBallMemory() {
   // update Pose to field from Pose to robot (based on odom)
   double xfr, yfr, thetafr;  // fr = field to robot
-  yfr = sin(data->robotPoseToField.theta) * data->robotPoseToField.x -
-        cos(data->robotPoseToField.theta) * data->robotPoseToField.y;
-  xfr = -cos(data->robotPoseToField.theta) * data->robotPoseToField.x -
-        sin(data->robotPoseToField.theta) * data->robotPoseToField.y;
+  yfr = std::sin(data->robotPoseToField.theta) * data->robotPoseToField.x -
+        std::cos(data->robotPoseToField.theta) * data->robotPoseToField.y;
+  xfr = -std::cos(data->robotPoseToField.theta) * data->robotPoseToField.x -
+        std::sin(data->robotPoseToField.theta) * data->robotPoseToField.y;
   thetafr = -data->robotPoseToField.theta;
   transCoord(data->ball.posToField.x, data->ball.posToField.y, 0, xfr, yfr, thetafr,
              data->ball.posToRobot.x, data->ball.posToRobot.y, data->ball.posToRobot.z);
 
-  data->ball.range = sqrt(data->ball.posToRobot.x * data->ball.posToRobot.x +
-                          data->ball.posToRobot.y * data->ball.posToRobot.y);
+  data->ball.range = std::sqrt(data->ball.posToRobot.x * data->ball.posToRobot.x +
+                               data->ball.posToRobot.y * data->ball.posToRobot.y);
   tree->setEntry<double>("ball_range", data->ball.range);
-  data->ball.yawToRobot = atan2(data->ball.posToRobot.y, data->ball.posToRobot.x);
-  data->ball.pitchToRobot = asin(config->robotHeight / data->ball.range);
+  data->ball.yawToRobot = std::atan2(data->ball.posToRobot.y, data->ball.posToRobot.x);
+  data->ball.pitchToRobot = std::asin(config->robotHeight / data->ball.range);
 
   // mark ball as lost if long time no see
   if (get_clock()->now().seconds() - data->ball.timePoint.seconds() > config->memoryLength) {
@@ -216,9 +229,9 @@ vector<double> Brain::getGoalPostAngles(const double margin) {
   */
 
   const double theta_l =
-      atan2(leftY - margin - data->ball.posToField.y, leftX - data->ball.posToField.x);
+      std::atan2(leftY - margin - data->ball.posToField.y, leftX - data->ball.posToField.x);
   const double theta_r =
-      atan2(rightY + margin - data->ball.posToField.y, rightX - data->ball.posToField.x);
+      std::atan2(rightY + margin - data->ball.posToField.y, rightX - data->ball.posToField.x);
 
   vector<double> vec = {theta_l, theta_r};
   return vec;
@@ -226,10 +239,10 @@ vector<double> Brain::getGoalPostAngles(const double margin) {
 
 void Brain::calibrateOdom(double x, double y, double theta) {
   double x_or, y_or, theta_or;  // or = odom to robot
-  x_or = -cos(data->robotPoseToOdom.theta) * data->robotPoseToOdom.x -
-         sin(data->robotPoseToOdom.theta) * data->robotPoseToOdom.y;
-  y_or = sin(data->robotPoseToOdom.theta) * data->robotPoseToOdom.x -
-         cos(data->robotPoseToOdom.theta) * data->robotPoseToOdom.y;
+  x_or = -std::cos(data->robotPoseToOdom.theta) * data->robotPoseToOdom.x -
+         std::sin(data->robotPoseToOdom.theta) * data->robotPoseToOdom.y;
+  y_or = std::sin(data->robotPoseToOdom.theta) * data->robotPoseToOdom.x -
+         std::cos(data->robotPoseToOdom.theta) * data->robotPoseToOdom.y;
   theta_or = -data->robotPoseToOdom.theta;
 
   transCoord(x_or, y_or, theta_or, x, y, theta, data->odomToField.x, data->odomToField.y,
@@ -385,7 +398,7 @@ void Brain::detectionsCallback(const vision_interface::msg::Detections &msg) {
   rclcpp::Time timePoint(detection_time_stamp.sec, detection_time_stamp.nanosec);
   auto now = get_clock()->now();
 
-  map<std::string, rerun::Color> detectColorMap = {
+  std::map<string, rerun::Color> detectColorMap = {
       {"LCross", rerun::Color(0xFFFF00FF)},   {"TCross", rerun::Color(0x00FF00FF)},
       {"XCross", rerun::Color(0x0000FFFF)},   {"Person", rerun::Color(0xFF00FFFF)},
       {"Goalpost", rerun::Color(0x00FFFFFF)}, {"Opponent", rerun::Color(0xFF0000FF)},
@@ -437,8 +450,8 @@ void Brain::detectionsCallback(const vision_interface::msg::Detections &msg) {
 void Brain::odometerCallback(const booster_interface::msg::Odometer &msg) {
   double new_odom_x = msg.x * config->robotOdomFactor;
   double new_odom_y = msg.y * config->robotOdomFactor;
-  if (abs(new_odom_x - data->robotPoseToOdom.x) > 0.01 ||
-      abs(new_odom_y - data->robotPoseToOdom.y) > 0.01)
+  if (std::abs(new_odom_x - data->robotPoseToOdom.x) > 0.01 ||
+      std::abs(new_odom_y - data->robotPoseToOdom.y) > 0.01)
     data->walking = true;
   else
     data->walking = false;
@@ -501,14 +514,14 @@ void Brain::imageCallback(const sensor_msgs::msg::Image &msg) {
       return;
     }
 
-    std::vector<uint8_t> compressed_image;
+    vector<uint8_t> compressed_image;
     cv::imencode(".jpg", imageBGR, compressed_image, {cv::IMWRITE_JPEG_QUALITY, 10});
 
     double time = msg.header.stamp.sec + static_cast<double>(msg.header.stamp.nanosec) * 1e-9;
     log->setTimeSeconds(time);
     log->log("image/img", rerun::EncodedImage::from_bytes(compressed_image));
   } catch (const std::exception &e) {
-    prtErr("Failed to log image: " + std::string(e.what()));
+    prtErr("Failed to log image: " + string(e.what()));
   }
 }
 
@@ -522,13 +535,14 @@ void Brain::headPoseCallback(const geometry_msgs::msg::Pose &msg) {
 
     auto orientation = msg.orientation;
 
-    auto roll =
-        rad2deg(atan2(2 * (orientation.w * orientation.x + orientation.y * orientation.z),
-                      1 - 2 * (orientation.x * orientation.x + orientation.y * orientation.y)));
-    auto pitch = rad2deg(asin(2 * (orientation.w * orientation.y - orientation.z * orientation.x)));
-    auto yaw =
-        rad2deg(atan2(2 * (orientation.w * orientation.z + orientation.x * orientation.y),
-                      1 - 2 * (orientation.y * orientation.y + orientation.z * orientation.z)));
+    auto roll = rad2deg(
+        std::atan2(2 * (orientation.w * orientation.x + orientation.y * orientation.z),
+                   1 - 2 * (orientation.x * orientation.x + orientation.y * orientation.y)));
+    auto pitch =
+        rad2deg(std::asin(2 * (orientation.w * orientation.y - orientation.z * orientation.x)));
+    auto yaw = rad2deg(
+        std::atan2(2 * (orientation.w * orientation.z + orientation.x * orientation.y),
+                   1 - 2 * (orientation.y * orientation.y + orientation.z * orientation.z)));
 
     log->setTimeNow();
 
@@ -550,7 +564,7 @@ void Brain::recoveryStateCallback(const booster_interface::msg::RawBytesMsg &msg
   // uint8_t is_recovery_available; // 1 for available, 0 for not available
   // 使用 RobotRecoveryState 结构，将msg里面的msg转换为RobotRecoveryState
   try {
-    const std::vector<unsigned char> &buffer = msg.msg;
+    const vector<unsigned char> &buffer = msg.msg;
     RobotRecoveryStateData recoveryState;
     memcpy(&recoveryState, buffer.data(), buffer.size());
 
@@ -599,8 +613,8 @@ vector<GameObject> Brain::getGameObjects(const vision_interface::msg::Detections
     }
 
     gObj.range = norm(gObj.posToRobot.x, gObj.posToRobot.y);
-    gObj.yawToRobot = atan2(gObj.posToRobot.y, gObj.posToRobot.x);
-    gObj.pitchToRobot = atan2(config->robotHeight, gObj.range);
+    gObj.yawToRobot = std::atan2(gObj.posToRobot.y, gObj.posToRobot.x);
+    gObj.pitchToRobot = std::atan2(config->robotHeight, gObj.range);
 
     transCoord(gObj.posToRobot.x, gObj.posToRobot.y, 0, data->robotPoseToField.x,
                data->robotPoseToField.y, data->robotPoseToField.theta, gObj.posToField.x,
@@ -672,8 +686,8 @@ void Brain::detectProcessBalls(const vector<GameObject> &ballObjs) {
     data->ball.confidence = 0;
   }
 
-  data->robotBallAngleToField = atan2(data->ball.posToField.y - data->robotPoseToField.y,
-                                      data->ball.posToField.x - data->robotPoseToField.x);
+  data->robotBallAngleToField = std::atan2(data->ball.posToField.y - data->robotPoseToField.y,
+                                           data->ball.posToField.x - data->robotPoseToField.x);
 }
 
 void Brain::detectProcessMarkings(const vector<GameObject> &markingObjs) {
