@@ -5,7 +5,7 @@
 void BrainConfig::handle() {
   // playerStartPos[left, right]
   if (playerStartPos != "left" && playerStartPos != "right") {
-    throw invalid_argument("palyer_start_pos must be one of [left, right]. Got: " + playerStartPos);
+    throw invalid_argument("player_start_pos must be one of [left, right]. Got: " + playerStartPos);
   }
 
   // playerRole [striker, goal_keeper]
@@ -26,10 +26,8 @@ void BrainConfig::handle() {
     fieldDimensions = FD_KIDSIZE;
   } else if (fieldType == "gdc") {
     fieldDimensions = FD_GDC;
-  }
-
-  else {
-    throw invalid_argument("[Error] fieldType must be one of [adult_size, kid_size]. Got: " +
+  } else {
+    throw invalid_argument("[Error] fieldType must be one of [adult_size, kid_size, gdc]. Got: " +
                            fieldType);
   }
 
