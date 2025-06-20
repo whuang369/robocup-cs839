@@ -572,7 +572,8 @@ NodeStatus CheckAndStandUp::tick() {
   }
 
   // 机器人站着且是robocup步态，可以重置跌到爬起的状态
-  if (brain->data->recoveryState == RobotRecoveryState::IS_READY &&
+  if (brain->data->recoveryPerformed &&
+      brain->data->recoveryState == RobotRecoveryState::IS_READY &&
       brain->data->currentRobotModeIndex == 8) {  // in robocup gait
     brain->data->recoveryPerformed = false;
     brain->data->enterDampingPerformed = false;
@@ -603,6 +604,8 @@ NodeStatus RotateForRelocate::onRunning() {
       brain->data->lastSuccessfulLocalizeTime.nanoseconds()) {
     brain->tree->setEntry<bool>("should_recalibrate_after_fall_recovery", false);
     brain->log->log("recovery", rerun::TextLog("Relocated successfully"));
+    brain->client->moveHead(0.0, 0.0);
+    brain->client->setVelocity(0, 0, 0);
     return NodeStatus::SUCCESS;
   }
 
@@ -803,6 +806,7 @@ NodeStatus SelfLocate::tick() {
   // brain->tree->setEntry<bool>("odom_calibrated", true);
   if (brain->self_locator->isGood()) {
     brain->tree->setEntry<bool>("odom_calibrated", true);
+    brain->data->lastSuccessfulLocalizeTime = brain->get_clock()->now();
   } else {
     brain->tree->setEntry<bool>("odom_calibrated", false);
   }
