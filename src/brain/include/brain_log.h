@@ -3,44 +3,39 @@
 #include <string>
 #include <rerun.hpp>
 
-class Brain; // Forward declaration
+class Brain;  // Forward declaration
 
 using namespace std;
 
 /**
  * Operations related to rerun logs are handled in this library.
- * If there are repetitive logs that need to be printed, the functions can be encapsulated within this class.
+ * If there are repetitive logs that need to be printed, the functions can be encapsulated within
+ * this class.
  */
-class BrainLog
-{
-public:
-    BrainLog(Brain *argBrain);
-    
-    void prepare();
+class BrainLog {
+ public:
+  BrainLog(Brain *argBrain);
 
-    void logStatics();
+  void prepare();
 
-    void setTimeNow();
+  void logStatics();
 
-    void setTimeSeconds(double seconds);
+  void setTimeNow();
 
-    // Expose the same interface as rerun::RecordingStream
-    template <typename... Ts>
-    inline void log(string_view entity_path, const Ts &...archetypes_or_collections) const
-    {
-        if (enabled)
-            rerunLog.log(entity_path, archetypes_or_collections...);
-    }
+  void setTimeSeconds(double seconds);
 
-    void logToScreen(string logPath, string text, u_int32_t color, double padding = 0.0);
+  // Expose the same interface as rerun::RecordingStream
+  template <typename... Ts>
+  inline void log(string_view entity_path, const Ts &...archetypes_or_collections) const {
+    if (enabled) rerunLog.log(entity_path, archetypes_or_collections...);
+  }
 
-    inline bool isEnabled()
-    {
-        return enabled;
-    }
+  void logToScreen(string logPath, string text, u_int32_t color, double padding = 0.0);
 
-private:
-    bool enabled;
-    Brain *brain;
-    rerun::RecordingStream rerunLog;
+  inline bool isEnabled() { return enabled; }
+
+ private:
+  bool enabled;
+  Brain *brain;
+  rerun::RecordingStream rerunLog;
 };

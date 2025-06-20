@@ -1,0 +1,54 @@
+<root BTCPP_format="4" >
+    <include path="./subtrees/subtree_cam_find_and_track_ball.xml" />
+    <BehaviorTree ID="MainTree">
+        <Sequence name="root">
+            <ReactiveSequence _while="control_state==2" name="pickup">
+                <CamScanField  _while="!odom_calibrated"/>
+                <SubTree ID="CamFindAndTrackBall" _autoremap="true" _while="odom_calibrated" />
+                <SelfLocate />
+            </ReactiveSequence>
+            <ReactiveSequence _while="control_state==3" name="control_state-3">
+                <ReactiveSequence _while="gc_game_state=='INITIAL'" name="init">
+                    <CamScanField _while="!odom_calibrated"/>
+                    <SubTree ID="CamFindAndTrackBall" _autoremap="true" _while="odom_calibrated" />
+                    <SelfLocate />
+                </ReactiveSequence>
+
+                <ReactiveSequence _while="gc_game_state=='READY'" name="ready">
+                    <CamScanField />
+                    <MoveToPoseOnField x="-2.0" _while="player_role == 'striker'" vtheta_limit="2.0"  vx_limit="0.4" />
+                    <MoveToPoseOnField x="-5.5" _while="player_role == 'goal_keeper'" vtheta_limit="2.0"  vx_limit="0.4" />
+                    <SelfLocate />
+                </ReactiveSequence>
+
+                <ReactiveSequence _while="gc_game_state=='SET'" name="set">
+                    <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
+                    <SetVelocity />
+                </ReactiveSequence>
+
+                <ReactiveSequence _while="gc_game_state=='PLAY'" name="play">
+                    <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
+                    <SelfLocate />
+                    <Sequence>
+                        <StrikerDecide decision_out="{decision}" decision_in="{decision}"
+                                       kick_dir_out="{kick_dir}"
+                                       kick_range_threshold="1.0" kick_angle_threshold="0.2" />
+                        <RobotFindBall _while="decision == 'find'" vyaw_limit="1.0" />
+                        <Approach _while="decision == 'approach'"
+                                  kick_dir="{kick_dir}" min_range="0.6" max_range="1.0"
+                                  vx_limit="1.0" vy_limit="0.5" vtheta_limit="1.0" />
+                        <Sequence  _while="decision == 'kick'">
+                            <SetVelocity />
+                            <Sleep msec="1000" />
+                            <Kick vx_limit="1.2" vy_limit="0.4" min_msec_kick="1000"/>
+                        </Sequence>
+                    </Sequence>
+                </ReactiveSequence>
+
+                <ReactiveSequence _while="gc_game_state=='END'" name="end">
+                    <SetVelocity />
+                </ReactiveSequence>
+            </ReactiveSequence>
+        </Sequence>
+    </BehaviorTree>
+</root>

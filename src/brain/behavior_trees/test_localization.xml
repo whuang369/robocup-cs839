@@ -1,0 +1,9 @@
+<root BTCPP_format="4" >
+    <BehaviorTree ID="MainTree">
+        <Sequence name="root">
+            <ReactiveSequence>
+                <SelfLocate />
+            </ReactiveSequence>
+        </Sequence>
+    </BehaviorTree>
+</root>

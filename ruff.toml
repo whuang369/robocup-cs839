@@ -1,0 +1,10 @@
+line-length = 100
+
+[lint]
+select = ["E", "F", "W", "I"]  # basic errors, flakes, warnings, isort
+ignore = []
+
+[format]
+line-ending = "lf"
+quote-style = "double"
+docstring-code-format = true
