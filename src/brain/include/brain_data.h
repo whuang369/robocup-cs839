@@ -2,10 +2,9 @@
 
 #include <string>
 #include <mutex>
+#include <unordered_map>
 
 #include "locator.h"
-
-using namespace std;
 
 /**
  * The BrainData class records the data needed by the Brain during decision-making.
@@ -24,7 +23,10 @@ class BrainData {
   // Robot position & velocity commands
   Pose2D
       robotPoseToOdom;  // The robot's Pose in the Odom coordinate system, updated via odomCallback
-  Pose2D odomToField;   // The origin of the Odom coordinate system in the Field coordinate system,
+
+  //   Pose3D visualOdom; // camera's Pose in the camera odom coordinate system (visualOdomCallback)
+
+  Pose2D odomToField;  // The origin of the Odom coordinate system in the Field coordinate system,
                        // can be calibrated using known positions, e.g., by calibration at the start
                        // of the game
   Pose2D robotPoseToField;  // The robot's current position and orientation in the field coordinate
@@ -56,11 +58,12 @@ class BrainData {
   bool needManualRelocate = false;
 
   // Other objects on the field
-  vector<GameObject> opponents =
+  std::vector<GameObject> opponents =
       {};  // Records information about opponent players, including position, bounding box, etc.
-  vector<GameObject> goalposts =
+  std::vector<GameObject> goalposts =
       {};  // Records information about goalposts, including position, bounding box, etc.
-  vector<GameObject> markings = {};  // Records information about field markings and intersections
+  std::vector<GameObject> markings =
+      {};  // Records information about field markings and intersections
 
   // Motion planning
   double dribbleTargetAngle;     // The direction for dribbling
@@ -68,7 +71,7 @@ class BrainData {
   double moveTargetAngle;        // Target direction for movement
 
   // A collection of utility functions
-  vector<FieldMarker> getMarkers();
+  std::vector<FieldMarker> getMarkers();
   // Convert a Pose from the robot coordinate system to the field coordinate system.
   Pose2D robot2field(const Pose2D &poseToRobot);
   // Convert a Pose from the field coordinate system to the robot coordinate system.

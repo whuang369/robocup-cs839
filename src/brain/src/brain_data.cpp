@@ -1,25 +1,30 @@
 #include "brain_data.h"
 #include "utils/math.h"
 
+using std::string;
+using std::unordered_map;
+using std::vector;
+
 vector<FieldMarker> BrainData::getMarkers() {
+  static const unordered_map<string, char> labelToMarker = {
+      {"LCross", 'L'},
+      {"TCross", 'T'},
+      {"XCross", 'X'},
+      {"PenaltyPoint", 'P'},
+  };
+
   vector<FieldMarker> res;
-  for (size_t i = 0; i < markings.size(); i++) {
-    auto label = markings[i].label;
-    auto x = markings[i].posToRobot.x;
-    auto y = markings[i].posToRobot.y;
-    auto confidence = markings[i].confidence;
+  res.reserve(markings.size());
 
+  for (const auto &mark : markings) {
     char markerType = ' ';
-    if (label == "LCross")
-      markerType = 'L';
-    else if (label == "TCross")
-      markerType = 'T';
-    else if (label == "XCross")
-      markerType = 'X';
-    else if (label == "PenaltyPoint")
-      markerType = 'P';
+    auto it = labelToMarker.find(mark.label);
+    if (it != labelToMarker.end()) {
+      markerType = it->second;
+    }
 
-    res.push_back(FieldMarker{markerType, x, y, confidence});
+    res.emplace_back(
+        FieldMarker{markerType, mark.posToRobot.x, mark.posToRobot.y, mark.confidence});
   }
   return res;
 }

@@ -23,6 +23,61 @@
 
 using std::string;
 
+namespace {
+bool detectPixelShiftCorruption(const cv::Mat &image) {
+  if (image.empty()) return false;
+
+  // Convert to grayscale if needed
+  cv::Mat gray;
+  if (image.channels() == 3) {
+    cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+  } else {
+    gray = image.clone();
+  }
+
+  // Parameters (can be made configurable)
+  const int expected_shift = 515;
+  const int window = 5;
+  const double gradient_thresh = 60000.0;
+  const double jump_thresh = 6.0;
+
+  // Compute horizontal gradient (vertical edge strength)
+  cv::Mat grad, col_strength;
+  cv::Sobel(gray, grad, CV_32F, 1, 0, 3);
+  cv::reduce(cv::abs(grad), col_strength, 0, cv::REDUCE_SUM, CV_32F);
+
+  // Search for strong peak around expected shift
+  int start = std::max(0, expected_shift - window);
+  int end = std::min(gray.cols - 2, expected_shift + window);
+
+  // Find the column with maximum strength in the window
+  int seam_col = start;
+  double max_strength = 0.0;
+  for (int col = start; col < end; col++) {
+    double strength = col_strength.at<float>(0, col);
+    if (strength > max_strength) {
+      max_strength = strength;
+      seam_col = col;
+    }
+  }
+
+  // Compare adjacent columns at seam
+  cv::Mat col_left, col_right, diff;
+  gray.col(seam_col).convertTo(col_left, CV_32F);
+  gray.col(seam_col + 1).convertTo(col_right, CV_32F);
+  cv::absdiff(col_left, col_right, diff);
+  double mean_jump = cv::mean(diff)[0];
+
+  bool corrupted = (max_strength > gradient_thresh && mean_jump > jump_thresh);
+  if (corrupted) {
+    std::cout << "[Seam Detected] Column: " << seam_col << ", Edge Strength: " << std::fixed
+              << std::setprecision(2) << max_strength << ", Intensity Jump: " << std::fixed
+              << std::setprecision(2) << mean_jump << std::endl;
+  }
+  return corrupted;
+}
+}  // anonymous namespace
+
 namespace booster_vision {
 
 void VisionNode::Init(const std::string &cfg_path, const std::string &cfg_local_path) {
@@ -100,15 +155,14 @@ void VisionNode::Init(const std::string &cfg_path, const std::string &cfg_local_
   depth_sub_ = it_->subscribe(depth_topic, 1,
                               std::bind(&VisionNode::DepthCallback, this, std::placeholders::_1));
 
-  detection_pub_ = this->create_publisher<vision_interface::msg::Detections>(
-      "/booster_vision/detection", rclcpp::QoS(1));
-
   pose_sub_ = this->create_subscription<geometry_msgs::msg::Pose>(
       "/head_pose", 10, std::bind(&VisionNode::PoseCallBack, this, std::placeholders::_1));
+
+  detection_pub_ = this->create_publisher<vision_interface::msg::Detections>(
+      "/booster_vision/detection", rclcpp::QoS(1));
 }
 
 void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &msg) {
-  std::cout << "new color received" << std::endl;
   if (!msg) {
     std::cerr << "empty image message." << std::endl;
     return;
@@ -122,9 +176,18 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
     return;
   }
 
+  double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
   vision_interface::msg::Detections detection_msg;
   detection_msg.header = msg->header;
-  double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
+
+  bool is_corrupted = detectPixelShiftCorruption(imgBGR);
+  detection_msg.corrupted_frame = is_corrupted;
+
+  if (is_corrupted) {
+    std::cerr << "Pixel shift corruption detected, dropping frame." << std::endl;
+    detection_pub_->publish(detection_msg);
+    return;
+  }
 
   // get synced data
   SyncedDataBlock synced_data = data_syncer_->getSyncedDataBlock(ColorDataBlock(imgBGR, timestamp));
@@ -132,13 +195,13 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
   cv::Mat depth = synced_data.depth_data.data;
   Pose p_head2base = synced_data.pose_data.data;
   Pose p_eye2base = p_head2base * p_headprime2head_ * p_eye2head_;
-  std::cout << "p_head2base: \n" << p_head2base.toCVMat() << std::endl;
-  std::cout << "p_eye2base: \n" << p_eye2base.toCVMat() << std::endl;
+  // std::cout << "p_head2base: \n" << p_head2base.toCVMat() << std::endl;
+  // std::cout << "p_eye2base: \n" << p_eye2base.toCVMat() << std::endl;
   std::vector<float> eye2base_angles = p_eye2base.getEulerAnglesVec();
   std::vector<float> eye2base_t = p_eye2base.getTranslationVec();
-  std::cout << "p_eye2base roll: " << eye2base_angles[0] * 180.0 / M_PI << std::endl;
-  std::cout << "p_eye2base pitch: " << eye2base_angles[1] * 180.0 / M_PI << std::endl;
-  std::cout << "p_eye2base yaw: " << eye2base_angles[2] * 180.0 / M_PI << std::endl;
+  // std::cout << "p_eye2base roll: " << eye2base_angles[0] * 180.0 / M_PI << std::endl;
+  // std::cout << "p_eye2base pitch: " << eye2base_angles[1] * 180.0 / M_PI << std::endl;
+  // std::cout << "p_eye2base yaw: " << eye2base_angles[2] * 180.0 / M_PI << std::endl;
 
   bool estimateCameraRollPitch = false;
   Pose p_eye2base_from_depth;
@@ -228,8 +291,6 @@ std::endl;
   // publish msg
   detection_pub_->publish(detection_msg);
 
-  std::cout << detection_msg.detected_objects.size() << std::endl;
-
   // show vision results
   if (show_res_) {
     cv::Mat img_out = YoloV8Detector::DrawDetection(color, detections);
@@ -239,30 +300,29 @@ std::endl;
 }
 
 void VisionNode::DepthCallback(const sensor_msgs::msg::Image::ConstSharedPtr &msg) {
-  std::cout << "new depth received" << std::endl;
-  cv::Mat img;
-  try {
-    img = cv::Mat(msg->height, msg->width, CV_16UC1, const_cast<unsigned char *>(msg->data.data()));
-  } catch (std::exception &e) {
-    std::cerr << "cv_bridge exception " << e.what() << std::endl;
+  if (!msg) {
+    std::cerr << "empty depth message." << std::endl;
     return;
   }
 
-  if (img.empty()) {
+  cv::Mat depth;
+  if (msg->encoding == "16UC1") {
+    cv::Mat depthRaw(msg->height, msg->width, CV_16UC1, const_cast<uchar *>(msg->data.data()));
+    depthRaw.convertTo(depth, CV_32FC1, 0.001);  // mm to meters
+  } else if (msg->encoding == "32FC1") {
+    depth = cv::Mat(msg->height, msg->width, CV_32FC1, const_cast<uchar *>(msg->data.data()));
+  } else {
+    std::cerr << "Unsupported depth image encoding: " << msg->encoding << std::endl;
+    return;
+  }
+
+  if (depth.empty()) {
     std::cerr << "empty image recevied." << std::endl;
     return;
   }
 
-  if (img.depth() != CV_16U) {
-    std::cerr << "image is not 16-bit depth." << std::endl;
-    return;
-  }
-
-  cv::Mat depth_image_float;
-  img.convertTo(depth_image_float, CV_32F, 0.0008);
-
   double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
-  data_syncer_->AddDepth(DepthDataBlock(depth_image_float, timestamp));
+  data_syncer_->AddDepth(DepthDataBlock(depth, timestamp));
 }
 
 void VisionNode::PoseCallBack(const geometry_msgs::msg::Pose::SharedPtr msg) {

@@ -111,6 +111,8 @@ void Brain::loadConfig() {
   config->camPixX = static_cast<double>(imgWidth);
   config->camPixY = static_cast<double>(imgHeight);
 
+  get_parameter("depth.topic", config->depthTopic);
+
   get_parameter("visual_odom.topic", config->visualOdomTopic);
 
   get_parameter("rerunLog.enable", config->rerunLogEnable);
@@ -375,22 +377,41 @@ void Brain::gameControlCallback(const game_controller_interface::msg::GameContro
 }
 
 void Brain::detectionsCallback(const vision_interface::msg::Detections &msg) {
+  double time = msg.header.stamp.sec + static_cast<double>(msg.header.stamp.nanosec) * 1e-9;
+
+  if (msg.corrupted_frame) {
+    // create a fake bounding box
+    rerun::Boxes2D corrupted_box =
+        rerun::Boxes2D::from_mins_and_sizes({{0.f, 0.f}}, {{config->camPixX, config->camPixY}})
+            .with_colors({rerun::Color(0xFF000080)})
+            .with_labels({rerun::Text("CORRUPTED FRAME")});
+
+    log->setTimeSeconds(time);
+    log->log("image/detection_boxes", corrupted_box);
+    return;
+  }
+
   auto gameObjects = getGameObjects(msg);
 
   vector<GameObject> balls, goalPosts, persons, robots, obstacles, markings;
-  for (int i = 0; i < gameObjects.size(); i++) {
-    const auto &obj = gameObjects[i];
-    if (obj.label == "Ball") balls.push_back(obj);
-    if (obj.label == "Goalpost") goalPosts.push_back(obj);
-    if (obj.label == "Person") {
-      persons.push_back(obj);
+  for (const auto &obj : gameObjects) {
+    const auto &label = obj.label;
 
-      if (tree->getEntry<bool>("treat_person_as_robot")) robots.push_back(obj);
-    }
-    if (obj.label == "Opponent") robots.push_back(obj);
-    if (obj.label == "LCross" || obj.label == "TCross" || obj.label == "XCross" ||
-        obj.label == "PenaltyPoint")
+    if (label == "Ball") {
+      balls.push_back(obj);
+    } else if (label == "Goalpost") {
+      goalPosts.push_back(obj);
+    } else if (label == "Person") {
+      persons.push_back(obj);
+      if (tree->getEntry<bool>("treat_person_as_robot")) {
+        robots.push_back(obj);
+      }
+    } else if (label == "Opponent") {
+      robots.push_back(obj);
+    } else if (label == "LCross" || label == "TCross" || label == "XCross" ||
+               label == "PenaltyPoint") {
       markings.push_back(obj);
+    }
   }
 
   detectProcessBalls(balls);
@@ -400,14 +421,11 @@ void Brain::detectionsCallback(const vision_interface::msg::Detections &msg) {
   if (!log->isEnabled()) return;
 
   // log detection boxes to rerun
-  auto detection_time_stamp = msg.header.stamp;
-  rclcpp::Time timePoint(detection_time_stamp.sec, detection_time_stamp.nanosec);
-  auto now = get_clock()->now();
-
-  std::map<string, rerun::Color> detectColorMap = {
-      {"LCross", rerun::Color(0xFFFF00FF)},   {"TCross", rerun::Color(0x00FF00FF)},
-      {"XCross", rerun::Color(0x0000FFFF)},   {"Person", rerun::Color(0xFF00FFFF)},
-      {"Goalpost", rerun::Color(0x00FFFFFF)}, {"Opponent", rerun::Color(0xFF0000FF)},
+  static std::map<string, rerun::Color> detectColorMap = {
+      {"LCross", rerun::Color(0xFFFF00FF)},     {"TCross", rerun::Color(0x00FF00FF)},
+      {"XCross", rerun::Color(0x0000FFFF)},     {"Person", rerun::Color(0xFF00FFFF)},
+      {"Goalpost", rerun::Color(0x00FFFFFF)},   {"Opponent", rerun::Color(0xFF0000FF)},
+      {"Corruption", rerun::Color(0x000000FF)},
   };
 
   // for logging boundingBoxes
@@ -439,7 +457,6 @@ void Brain::detectionsCallback(const vision_interface::msg::Detections &msg) {
     }
   }
 
-  double time = msg.header.stamp.sec + static_cast<double>(msg.header.stamp.nanosec) * 1e-9;
   log->setTimeSeconds(time);
   log->log(
       "image/detection_boxes",
@@ -593,8 +610,8 @@ void Brain::recoveryStateCallback(const booster_interface::msg::RawBytesMsg &msg
     this->data->currentRobotModeIndex = static_cast<int>(recoveryState.current_planner_index);
 
     // cout << "recoveryState: " << static_cast<int>(recoveryState.state) << endl;
-    // cout << "recovery is available: " << static_cast<int>(recoveryState.is_recovery_available) <<
-    // endl; cout << "current planner idx: " <<
+    // cout << "recovery is available: " << static_cast<int>(recoveryState.is_recovery_available)
+    // << endl; cout << "current planner idx: " <<
     // static_cast<int>(recoveryState.current_planner_index) << endl;
   } catch (const std::exception &e) {
     std::cerr << e.what() << '\n';
@@ -651,8 +668,8 @@ void Brain::detectProcessBalls(const vector<GameObject> &ballObjs) {
              // 0.2).
   const double pitchLimit =
       deg2rad(0);  // When the pitch of the ball relative to the front of the robot (downward is
-                   // positive) is lower than this value, it is considered not a ball. (Because the
-                   // ball won't be in the sky.)
+                   // positive) is lower than this value, it is considered not a ball. (Because
+                   // the ball won't be in the sky.)
   const int timeCountThreshold =
       5;  // Only when the ball is detected in consecutive several frames is it considered a ball.
           // This is only used in the ball-finding strategy.
@@ -661,15 +678,16 @@ void Brain::detectProcessBalls(const vector<GameObject> &ballObjs) {
           // considered that the target is truly identified. (Currently only used for ball
           // detection.)
   const unsigned int diffConfidThreshold =
-      4;  // The threshold for the difference times between the tracked ball and the high-confidence
-          // ball. After reaching this threshold, the high-confidence ball will be adopted.
+      4;  // The threshold for the difference times between the tracked ball and the
+          // high-confidence ball. After reaching this threshold, the high-confidence ball will be
+          // adopted.
 
   double bestConfidence = 0;
   double minPixDistance = 1.e4;
-  int indexRealBall = -1;  // Which ball is considered to be the real one. -1 indicates that no ball
-                           // has been detected.
-  int indexTraceBall = -1;  // Track the ball according to the pixel distance. -1 indicates that no
-                            // target has been tracked.
+  int indexRealBall = -1;   // Which ball is considered to be the real one. -1 indicates that no
+                            // ball has been detected.
+  int indexTraceBall = -1;  // Track the ball according to the pixel distance. -1 indicates that
+                            // no target has been tracked.
 
   // Find the most likely real ball.
   for (int i = 0; i < ballObjs.size(); i++) {
