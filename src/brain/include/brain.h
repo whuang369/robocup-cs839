@@ -8,6 +8,7 @@
 #include <sensor_msgs/msg/joy.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <geometry_msgs/msg/pose.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <vision_interface/msg/detections.hpp>
 #include <game_controller_interface/msg/game_control_data.hpp>
 #include <booster/robot/b1/b1_api_const.hpp>
@@ -98,6 +99,7 @@ class Brain : public rclcpp::Node {
   void detectionsCallback(const vision_interface::msg::Detections &msg);
   void imageCallback(const sensor_msgs::msg::Image &msg);
   void odometerCallback(const booster_interface::msg::Odometer &msg);
+  void visualOdomCallback(const geometry_msgs::msg::PoseStamped &msg);
   void lowStateCallback(const booster_interface::msg::LowState &msg);
   void headPoseCallback(const geometry_msgs::msg::Pose &msg);
   vector<GameObject> getGameObjects(const vision_interface::msg::Detections &msg);
@@ -111,6 +113,7 @@ class Brain : public rclcpp::Node {
       gameControlSubscription;
   rclcpp::Subscription<vision_interface::msg::Detections>::SharedPtr detectionsSubscription;
   rclcpp::Subscription<booster_interface::msg::Odometer>::SharedPtr odometerSubscription;
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr visualOdomSubscription;
   rclcpp::Subscription<booster_interface::msg::LowState>::SharedPtr lowStateSubscription;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr imageSubscription;
   rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr headPoseSubscription;

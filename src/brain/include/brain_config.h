@@ -36,9 +36,11 @@ class BrainConfig {
   double yawOffset;  // robot.yaw_offset fix the issue of leftward bias during distance measurement
   std::string joystick;  // robot.joystick "logicall" | "beitong"
 
-  std::string cameraTopic;  // camera.topic the topic of the rgb image
-  double camPixX;           // camera.width
-  double camPixY;           // camera.height
+  std::string imageTopic;  // image.topic the topic of the rgb image
+  double camPixX;          // image.width
+  double camPixY;          // image.height
+
+  std::string visualOdomTopic;  // visual_odom.topic the topic of the visual odometry
 
   bool rerunLogEnable;             // rerunLog.enable  Whether to enable rerunLog
   std::string rerunLogServerAddr;  // rerunLog.server_addr  rerunLog address

@@ -11,13 +11,16 @@ brain_node:
       robot_height: 1.0
       odom_factor: 1.0
       vx_factor: 0.90
-      yaw_offset: 0.0
+      yaw_offset: 0.1
       joystick: "logitech" # logitech | beitong
 
-    camera:
+    image:
       topic: "/camera/camera/rgb/image_rect_color"
       width: 960
       height: 540
+
+    visual_odom:
+      topic: "/camera/camera/pose"
 
     enable_com: true
 

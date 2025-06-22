@@ -27,9 +27,11 @@ Brain::Brain() : rclcpp::Node("brain_node") {
   declare_parameter<double>("robot.yaw_offset", 0.1);
   declare_parameter<string>("robot.joystick", "");
 
-  declare_parameter<string>("camera.topic", "");
-  declare_parameter<int>("camera.width", 960);
-  declare_parameter<int>("camera.height", 540);
+  declare_parameter<string>("image.topic", "");
+  declare_parameter<int>("image.width", 960);
+  declare_parameter<int>("image.height", 540);
+
+  declare_parameter<string>("visual_odom.topic", "");
 
   declare_parameter<bool>("rerunLog.enable", false);
   declare_parameter<string>("rerunLog.server_addr", "");
@@ -78,7 +80,9 @@ void Brain::init() {
   lowStateSubscription = create_subscription<booster_interface::msg::LowState>(
       "/low_state", 1, bind(&Brain::lowStateCallback, this, _1));
   imageSubscription = create_subscription<sensor_msgs::msg::Image>(
-      config->cameraTopic, 1, bind(&Brain::imageCallback, this, _1));
+      config->imageTopic, 1, bind(&Brain::imageCallback, this, _1));
+  visualOdomSubscription = create_subscription<geometry_msgs::msg::PoseStamped>(
+      config->visualOdomTopic, 1, bind(&Brain::visualOdomCallback, this, _1));
   headPoseSubscription = create_subscription<geometry_msgs::msg::Pose>(
       "/head_pose", 1, bind(&Brain::headPoseCallback, this, _1));
   ballToRobotPub = create_publisher<geometry_msgs::msg::Point>("/brain/ball_to_robot", 10);
@@ -100,12 +104,14 @@ void Brain::loadConfig() {
   get_parameter("robot.yaw_offset", config->yawOffset);
   get_parameter("robot.joystick", config->joystick);
 
-  get_parameter("camera.topic", config->cameraTopic);
-  int camWidth, camHeight;
-  get_parameter("camera.width", camWidth);
-  get_parameter("camera.height", camHeight);
-  config->camPixX = static_cast<double>(camWidth);
-  config->camPixY = static_cast<double>(camHeight);
+  get_parameter("image.topic", config->imageTopic);
+  int imgWidth, imgHeight;
+  get_parameter("image.width", imgWidth);
+  get_parameter("image.height", imgHeight);
+  config->camPixX = static_cast<double>(imgWidth);
+  config->camPixY = static_cast<double>(imgHeight);
+
+  get_parameter("visual_odom.topic", config->visualOdomTopic);
 
   get_parameter("rerunLog.enable", config->rerunLogEnable);
   get_parameter("rerunLog.server_addr", config->rerunLogServerAddr);
@@ -471,6 +477,17 @@ void Brain::odometerCallback(const booster_interface::msg::Odometer &msg) {
                              -data->robotPoseToField.y - 0.1 * sin(data->robotPoseToField.theta)}})
                .with_radii({0.2, 0.1})
                .with_colors({0xFF6666FF, 0xFF0000FF}));
+}
+
+void Brain::visualOdomCallback(const geometry_msgs::msg::PoseStamped &msg) {
+  log->setTimeNow();
+  log->log("camera/odom",
+           rerun::Transform3D(
+               rerun::components::Translation3D(msg.pose.position.x, msg.pose.position.y,
+                                                msg.pose.position.z),
+               rerun::Quaternion::from_wxyz(msg.pose.orientation.w, msg.pose.orientation.x,
+                                            msg.pose.orientation.y, msg.pose.orientation.z))
+               .with_axis_length(0.1));
 }
 
 void Brain::lowStateCallback(const booster_interface::msg::LowState &msg) {

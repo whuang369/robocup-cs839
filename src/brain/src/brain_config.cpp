@@ -62,9 +62,11 @@ void BrainConfig::print(ostream &os) {
   os << "yawOffset = " << yawOffset << endl;
   os << "joystick = " << joystick << endl;
   os << "----------------------------------------" << endl;
-  os << "cameraTopic = " << cameraTopic << endl;
+  os << "imageTopic = " << imageTopic << endl;
   os << "camPixX = " << camPixX << endl;
   os << "camPixY = " << camPixY << endl;
+  os << "----------------------------------------" << endl;
+  os << "visualOdomTopic = " << visualOdomTopic << endl;
   os << "----------------------------------------" << endl;
   os << "rerunLogEnable = " << rerunLogEnable << endl;
   os << "rerunLogServerAddr = " << rerunLogServerAddr << endl;

@@ -14,10 +14,13 @@ brain_node:
       yaw_offset: 0.0
       joystick: "logitech" # logitech | beitong
 
-    camera:
+    image:
       topic: "/camera/camera/color/image_raw"
       width: 1280
       height: 720
+    
+    visual_odom:
+      topic: "/camera/camera/pose"
 
     enable_com: true
 
