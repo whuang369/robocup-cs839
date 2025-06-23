@@ -8,7 +8,7 @@
 
 #include <yaml-cpp/yaml.h>
 
-#include "booster_vision/model//data_types.h"
+#include "booster_vision/model/data_types.h"
 
 namespace booster_vision {
 

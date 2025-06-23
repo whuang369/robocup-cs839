@@ -26,11 +26,11 @@ class BrainLog {
 
   // Expose the same interface as rerun::RecordingStream
   template <typename... Ts>
-  inline void log(string_view entity_path, const Ts &...archetypes_or_collections) const {
+  inline void log(std::string_view entity_path, const Ts &...archetypes_or_collections) const {
     if (enabled) rerunLog.log(entity_path, archetypes_or_collections...);
   }
 
-  void logToScreen(string logPath, string text, u_int32_t color, double padding = 0.0);
+  void logToScreen(std::string logPath, std::string text, uint32_t color, double padding = 0.0);
 
   inline bool isEnabled() { return enabled; }
 

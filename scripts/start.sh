@@ -10,11 +10,11 @@ BRAIN_ARGS=()
 GAME_ARGS=()
 for arg in "$@"; do
   case "$arg" in
-    robot:=*)
+    robot:=*|rerun:=*)
       VISION_ARGS+=("$arg")
       BRAIN_ARGS+=("$arg")
       ;;
-    tree:=*|pos:=*|role:=*|rerun:=*)
+    tree:=*|pos:=*|role:=*)
       BRAIN_ARGS+=("$arg")
       ;;
     port:=*)

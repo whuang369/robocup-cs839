@@ -5,9 +5,11 @@ add_subdirectory(calibration)
 
 set(BOOSTER_ROBOTICS_SDK_DEPENDENCIES booster_robotics_sdk.a fastrtps fastcdr)
 
+find_package(rerun_sdk REQUIRED)
 
 add_executable(vision_node main.cpp 
-                           vision_node.cpp)
+                           vision_node.cpp
+                           vision_log.cpp)
 ament_target_dependencies(vision_node
   rclcpp
   std_msgs
@@ -25,6 +27,7 @@ target_link_libraries(vision_node ${BOOSTER_ROBOTICS_SDK_DEPENDENCIES}
                                      yolov8_model
                                      ${typesupport_target}
                                     #  booster_inferface_dds
+                                     rerun_sdk
                                      )
 
 

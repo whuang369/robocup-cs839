@@ -1,4 +1,3 @@
-show_res: false
 topics:
   color: "/camera/camera/rgb/image_rect_color"
   depth: "/camera/camera/depth/depth_registered"
@@ -34,3 +33,4 @@ human_like_pose_estimator:
   down_sample_leaf_size: 0.01
   fitting_distance_threshold: 0.01
   statistic_outlier_multiplier: 0.01
+rerun_log: true

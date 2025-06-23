@@ -14,8 +14,15 @@ void RobotClient::init() {
 }
 
 int RobotClient::moveHead(double pitch, double yaw) {
+  brain->log->setTimeNow();
+  brain->log->log("RobotClient/moveHead_in",
+                  rerun::TextLog(format("pitch: %.2f  yaw: %.2f", pitch, yaw)));
+
   yaw = cap(yaw, brain->config->headYawLimitLeft, brain->config->headYawLimitRight);
   pitch = max(pitch, brain->config->headPitchLimitUp);
+
+  brain->log->log("RobotClient/moveHead_out",
+                  rerun::TextLog(format("pitch: %.2f  yaw: %.2f", pitch, yaw)));
 
   booster_msgs::msg::RpcReqMsg msg = booster_msgs::CreateRotateHeadMsg(pitch, yaw);
   publisher->publish(msg);
@@ -43,6 +50,7 @@ int RobotClient::enterDamping() {
   return 0;
 }
 
+// TODO: log what function called this function
 int RobotClient::setVelocity(double x, double y, double theta, bool applyMinX, bool applyMinY,
                              bool applyMinTheta) {
   brain->log->setTimeNow();

@@ -1,6 +1,9 @@
 #include <iostream>
 #include <string>
 
+#include <rerun.hpp>
+#include <opencv2/opencv.hpp>
+
 #include "brain.h"
 #include "utils/print.h"
 #include "utils/math.h"
@@ -50,22 +53,19 @@ void Brain::init() {
   config = std::make_shared<BrainConfig>();
   loadConfig();
 
+  log = std::make_shared<BrainLog>(this);
+  log->prepare();
+
   data = std::make_shared<BrainData>();
-  locator = std::make_shared<Locator>();
   self_locator = std::make_shared<SelfLocator>(this, config->fieldDimensions);
 
-  log = std::make_shared<BrainLog>(this);
   tree = std::make_shared<BrainTree>(this);
   client = std::make_shared<RobotClient>(this);
   communication = std::make_shared<BrainCommunication>(this);
 
-  locator->init(config->fieldDimensions, 4, 0.5);
-
   tree->init();
 
   client->init();
-
-  log->prepare();
 
   communication->initUDPBroadcast();
 
@@ -81,8 +81,6 @@ void Brain::init() {
       "/odometer_state", 1, bind(&Brain::odometerCallback, this, _1));
   lowStateSubscription = create_subscription<booster_interface::msg::LowState>(
       "/low_state", 1, bind(&Brain::lowStateCallback, this, _1));
-  imageSubscription = create_subscription<sensor_msgs::msg::Image>(
-      config->imageTopic, 1, bind(&Brain::imageCallback, this, _1));
   visualOdomSubscription = create_subscription<geometry_msgs::msg::PoseStamped>(
       config->visualOdomTopic, 1, bind(&Brain::visualOdomCallback, this, _1));
   headPoseSubscription = create_subscription<geometry_msgs::msg::Pose>(
@@ -175,7 +173,7 @@ void Brain::updateBallMemory() {
   data->ball.pitchToRobot = std::asin(config->robotHeight / data->ball.range);
 
   // mark ball as lost if long time no see
-  if (msecsSince(data->ball.timePoint) > config->memoryLength) {
+  if (get_clock()->now().seconds() - data->ball.timePoint.seconds() > config->memoryLength) {
     tree->setEntry<bool>("ball_location_known", false);
     data->ballDetected = false;
   }
@@ -408,16 +406,20 @@ void Brain::detectionsCallback(const vision_interface::msg::Detections &msg) {
   if (!log->isEnabled()) return;
 
   // log detection boxes to rerun
-  static std::map<string, rerun::Color> detectColorMap = {
-      {"LCross", rerun::Color(0xFFFF00FF)},     {"TCross", rerun::Color(0x00FF00FF)},
-      {"XCross", rerun::Color(0x0000FFFF)},     {"Person", rerun::Color(0xFF00FFFF)},
-      {"Goalpost", rerun::Color(0x00FFFFFF)},   {"Opponent", rerun::Color(0xFF0000FF)},
-      {"Corruption", rerun::Color(0x000000FF)},
+  static std::map<std::string, rerun::Color> detectColorMap = {
+      {"Ball", rerun::Color(0xFFFFFFFF)},          // White
+      {"LCross", rerun::Color(0xFFFF00FF)},        // Yellow
+      {"TCross", rerun::Color(0x00FF00FF)},        // Bright Green
+      {"XCross", rerun::Color(0x00FFFFFF)},        // Cyan / Aqua
+      {"Person", rerun::Color(0xFF69B4FF)},        // Hot Pink
+      {"Goalpost", rerun::Color(0xFFA500FF)},      // Orange
+      {"Opponent", rerun::Color(0xFF4500FF)},      // Orange-Red
+      {"Corruption", rerun::Color(0xDC143CFF)},    // Crimson (bright red)
+      {"PenaltyPoint", rerun::Color(0x7C00FFFF)},  // Vivid Purple/Violet
+      {"Default", rerun::Color(0xFFFFFFFF)},       // White (default/fallback)
   };
 
   // for logging boundingBoxes
-  vector<rerun::Vec2D> mins;
-  vector<rerun::Vec2D> sizes;
   vector<rerun::Text> labels;
   vector<rerun::Color> colors;
 
@@ -432,9 +434,6 @@ void Brain::detectionsCallback(const vision_interface::msg::Detections &msg) {
                                         obj.posToRobot.x, obj.posToRobot.y, obj.confidence)));
     points.push_back(rerun::Vec2D{obj.posToField.x, -obj.posToField.y});
     points_r.push_back(rerun::Vec2D{obj.posToRobot.x, -obj.posToRobot.y});
-    mins.push_back(rerun::Vec2D{obj.boundingBox.xmin, obj.boundingBox.ymin});
-    sizes.push_back(rerun::Vec2D{obj.boundingBox.xmax - obj.boundingBox.xmin,
-                                 obj.boundingBox.ymax - obj.boundingBox.ymin});
 
     auto it = detectColorMap.find(label);
     if (it != detectColorMap.end()) {
@@ -445,9 +444,6 @@ void Brain::detectionsCallback(const vision_interface::msg::Detections &msg) {
   }
 
   log->setTimeSeconds(time);
-  log->log(
-      "image/detection_boxes",
-      rerun::Boxes2D::from_mins_and_sizes(mins, sizes).with_labels(labels).with_colors(colors));
 
   log->log("field/detection_points", rerun::Points2D(points).with_colors(colors)
            // .with_labels(labels)
@@ -513,37 +509,6 @@ void Brain::lowStateCallback(const booster_interface::msg::LowState &msg) {
   log->log("low_state_callback/imu/gyro/x", rerun::Scalar(msg.imu_state.gyro[0]));
   log->log("low_state_callback/imu/gyro/y", rerun::Scalar(msg.imu_state.gyro[1]));
   log->log("low_state_callback/imu/gyro/z", rerun::Scalar(msg.imu_state.gyro[2]));
-}
-
-void Brain::imageCallback(const sensor_msgs::msg::Image &msg) {
-  if (!config->rerunLogEnable) return;
-
-  static int counter = 0;
-  if (++counter % config->rerunLogImgInterval != 0) return;
-
-  try {
-    cv::Mat imageBGR;
-
-    if (msg.encoding == "rgb8") {
-      cv::Mat imageRGB(msg.height, msg.width, CV_8UC3, const_cast<uchar *>(msg.data.data()));
-      cv::cvtColor(imageRGB, imageBGR, cv::COLOR_RGB2BGR);
-    } else if (msg.encoding == "bgra8") {
-      cv::Mat imageBGRA(msg.height, msg.width, CV_8UC4, const_cast<uchar *>(msg.data.data()));
-      cv::cvtColor(imageBGRA, imageBGR, cv::COLOR_BGRA2BGR);
-    } else {
-      prtErr("Unsupported image encoding: " + msg.encoding);
-      return;
-    }
-
-    vector<uint8_t> compressed_image;
-    cv::imencode(".jpg", imageBGR, compressed_image, {cv::IMWRITE_JPEG_QUALITY, 10});
-
-    double time = msg.header.stamp.sec + static_cast<double>(msg.header.stamp.nanosec) * 1e-9;
-    log->setTimeSeconds(time);
-    log->log("image/img", rerun::EncodedImage::from_bytes(compressed_image));
-  } catch (const std::exception &e) {
-    prtErr("Failed to log image: " + string(e.what()));
-  }
 }
 
 void Brain::headPoseCallback(const geometry_msgs::msg::Pose &msg) {
@@ -714,7 +679,7 @@ void Brain::detectProcessBalls(const vector<GameObject> &ballObjs) {
 }
 
 void Brain::detectProcessMarkings(const vector<GameObject> &markingObjs) {
-  constexpr double confidenceValve = 20;
+  constexpr double confidenceValve = 60;
   constexpr double minX = -0.5, maxX = 10.0;
 
   data->markings.clear();

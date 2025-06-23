@@ -2,8 +2,6 @@
 
 #include <string>
 #include <rclcpp/rclcpp.hpp>
-#include <rerun.hpp>
-#include <opencv2/opencv.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <sensor_msgs/msg/joy.hpp>
 #include <sensor_msgs/msg/image.hpp>
@@ -24,7 +22,6 @@
 #include "brain_data.h"
 #include "brain_log.h"
 #include "brain_tree.h"
-#include "locator.h"
 #include "robot_client.h"
 #include "brain_communication.h"
 
@@ -46,8 +43,6 @@ class Brain : public rclcpp::Node {
   std::shared_ptr<BrainData> data;
   // The RobotClient object, which contains all the operations on the robot.
   std::shared_ptr<RobotClient> client;
-  // The locator object.
-  std::shared_ptr<Locator> locator;
   // The self locator object.
   std::shared_ptr<SelfLocator> self_locator;
   // The BrainTree object, which contains the operations related to the BehaviorTree.
@@ -97,7 +92,6 @@ class Brain : public rclcpp::Node {
   void joystickCallback(const sensor_msgs::msg::Joy &msg);
   void gameControlCallback(const game_controller_interface::msg::GameControlData &msg);
   void detectionsCallback(const vision_interface::msg::Detections &msg);
-  void imageCallback(const sensor_msgs::msg::Image &msg);
   void odometerCallback(const booster_interface::msg::Odometer &msg);
   void visualOdomCallback(const geometry_msgs::msg::PoseStamped &msg);
   void lowStateCallback(const booster_interface::msg::LowState &msg);
@@ -115,7 +109,6 @@ class Brain : public rclcpp::Node {
   rclcpp::Subscription<booster_interface::msg::Odometer>::SharedPtr odometerSubscription;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr visualOdomSubscription;
   rclcpp::Subscription<booster_interface::msg::LowState>::SharedPtr lowStateSubscription;
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr imageSubscription;
   rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr headPoseSubscription;
   rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr ballToRobotPub;
   rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr goalToRobotPub;

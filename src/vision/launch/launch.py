@@ -20,6 +20,11 @@ def handle_configuration(context, *args, **kwargs):
     # (Optional) Local configuration file for debugging
     config_local_file = os.path.join(config_path, "vision_local.yaml")
 
+    # override parameters from launch arguments
+    rerun = context.perform_substitution(LaunchConfiguration("rerun"))
+    if not rerun == "":
+        config["rerunLog.server_addr"] = f"rerun+http://{rerun}:9877/proxy"
+
     return [
         Node(
             package="vision",
@@ -44,6 +49,11 @@ def generate_launch_description():
                 "sim",
                 default_value="false",
                 description="Run in simulation mode (selects vision_sim.yaml if true)",
+            ),
+            DeclareLaunchArgument(
+                "rerun",
+                default_value="rerun+http://127.0.0.1:9877/proxy",
+                description="Override the rerunLog server address",
             ),
             OpaqueFunction(function=handle_configuration),
         ]

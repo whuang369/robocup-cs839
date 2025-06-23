@@ -2,8 +2,10 @@
 
 #include <functional>
 #include <filesystem>
+#include <sstream>
 
 #include <yaml-cpp/yaml.h>
+#include <opencv2/opencv.hpp>
 
 #include "vision_interface/msg/detected_object.hpp"
 #include "vision_interface/msg/detections.hpp"
@@ -22,6 +24,7 @@
 #include <Eigen/Dense>  // Requires Eigen library
 
 using std::string;
+using std::vector;
 
 namespace {
 bool detectPixelShiftCorruption(const cv::Mat &image) {
@@ -81,6 +84,7 @@ bool detectPixelShiftCorruption(const cv::Mat &image) {
 namespace booster_vision {
 
 void VisionNode::Init(const std::string &cfg_path, const std::string &cfg_local_path) {
+  // load config file
   if (!std::filesystem::exists(cfg_path)) {
     std::cerr << "Error: Configuration file '" << cfg_path << "' does not exist." << std::endl;
     return;
@@ -95,10 +99,12 @@ void VisionNode::Init(const std::string &cfg_path, const std::string &cfg_local_
   } else {
     std::cout << "No local override config found. Skipping: " << cfg_local_path << std::endl;
   }
-
   std::cout << "loaded cfg file: " << std::endl << node << std::endl;
 
-  show_res_ = as_or<bool>(node["show_res"], false);
+  this->declare_parameter<string>("rerunLog.server_addr", "");
+  string rerun_server_addr;
+  this->get_parameter("rerunLog.server_addr", rerun_server_addr);
+  log = std::make_shared<VisionLog>(this, node["rerun_log"].as<bool>(), rerun_server_addr);
 
   // read camera param
   if (!node["camera"]) {
@@ -186,6 +192,12 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
   if (is_corrupted) {
     std::cerr << "Pixel shift corruption detected, dropping frame." << std::endl;
     detection_pub_->publish(detection_msg);
+
+    // TODO: remove this
+    vector<uint8_t> compressed_image;
+    cv::imencode(".jpg", imgBGR, compressed_image, {cv::IMWRITE_JPEG_QUALITY, 10});
+    log->setTimeSeconds(timestamp);
+    log->log("image/corrupted", rerun::EncodedImage::from_bytes(compressed_image));
     return;
   }
 
@@ -278,6 +290,7 @@ std::endl;
                                  static_cast<float>(rpy[1] / CV_PI * 180),
                                  static_cast<float>(rpy[2] / CV_PI * 180)};
     detection_obj.received_pos = xyzrpy;
+    // NOTE: currently, received_pos is not used in brain
 
     detection_obj.confidence = detection.confidence * 100;
     detection_obj.xmin = detection.bbox.x;
@@ -291,12 +304,48 @@ std::endl;
   // publish msg
   detection_pub_->publish(detection_msg);
 
-  // show vision results
-  if (show_res_) {
-    cv::Mat img_out = YoloV8Detector::DrawDetection(color, detections);
-    cv::imshow("Detection", img_out);
-    cv::waitKey(1);
+  // rerun logging
+  vector<uint8_t> compressed_image;
+  cv::imencode(".jpg", color, compressed_image, {cv::IMWRITE_JPEG_QUALITY, 10});
+
+  log->setTimeSeconds(timestamp);
+  log->log("image/color", rerun::EncodedImage::from_bytes(compressed_image));
+
+  static std::map<std::string, rerun::Color> detectColorMap = {
+      {"Ball", rerun::Color(0xFFFFFFFF)},          // White
+      {"LCross", rerun::Color(0xFFFF00FF)},        // Yellow
+      {"TCross", rerun::Color(0x00FF00FF)},        // Bright Green
+      {"XCross", rerun::Color(0x00FFFFFF)},        // Cyan / Aqua
+      {"Person", rerun::Color(0xFF69B4FF)},        // Hot Pink
+      {"Goalpost", rerun::Color(0xFFA500FF)},      // Orange
+      {"Opponent", rerun::Color(0xFF4500FF)},      // Orange-Red
+      {"Corruption", rerun::Color(0xDC143CFF)},    // Crimson (bright red)
+      {"PenaltyPoint", rerun::Color(0x7C00FFFF)},  // Vivid Purple/Violet
+  };
+
+  vector<rerun::Vec2D> mins, sizes;
+  vector<rerun::Text> labels;
+  vector<rerun::Color> colors;
+  mins.reserve(detections.size());
+  sizes.reserve(detections.size());
+  labels.reserve(detections.size());
+  colors.reserve(detections.size());
+
+  for (const auto &detection : detections) {
+    std::ostringstream oss;
+    // clang-format off
+    oss << detection.class_name << " "
+        << "c:" << std::fixed << std::setprecision(2) << detection.confidence;
+    // TODO: add position info
+    // clang-format on
+    labels.emplace_back(rerun::Text(oss.str()));
+    mins.emplace_back(rerun::Vec2D(detection.bbox.x, detection.bbox.y));
+    sizes.emplace_back(rerun::Vec2D(detection.bbox.width, detection.bbox.height));
+    colors.emplace_back(detectColorMap[detection.class_name]);
   }
+  log->log(
+      "image/detection_boxes",
+      rerun::Boxes2D::from_mins_and_sizes(mins, sizes).with_labels(labels).with_colors(colors));
 }
 
 void VisionNode::DepthCallback(const sensor_msgs::msg::Image::ConstSharedPtr &msg) {

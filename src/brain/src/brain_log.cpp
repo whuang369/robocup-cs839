@@ -3,7 +3,7 @@
 #include "utils/math.h"
 #include "utils/print.h"
 
-BrainLog::BrainLog(Brain *argBrain) : enabled(false), brain(argBrain), rerunLog("robocup") {
+BrainLog::BrainLog(Brain *argBrain) : enabled(false), brain(argBrain), rerunLog("robocup_brain") {
   if (!brain->config->rerunLogEnable) {
     enabled = false;
     return;

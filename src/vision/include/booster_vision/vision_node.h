@@ -9,12 +9,12 @@
 #include <image_transport/image_transport.hpp>
 #include <geometry_msgs/msg/pose.hpp>
 
-#include <yaml-cpp/yaml.h>
-
 #include "vision_interface/msg/detections.hpp"
 
 #include "booster_vision/base/intrin.h"
 #include "booster_vision/base/pose.h"
+
+#include "booster_vision/vision_log.h"
 
 namespace booster_vision {
 
@@ -27,6 +27,8 @@ class VisionNode : public rclcpp::Node {
   VisionNode(const std::string &node_name) : rclcpp::Node(node_name) {}
   ~VisionNode() = default;
 
+  std::shared_ptr<VisionLog> log;
+
   void Init(const std::string &cfg_template_path, const std::string &cfg_path);
   void ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &msg);
   void SegmentationCallback(const sensor_msgs::msg::Image::ConstSharedPtr &msg);
@@ -37,7 +39,6 @@ class VisionNode : public rclcpp::Node {
 
  private:
   bool use_depth_ = false;
-  bool show_res_ = false;
 
   Intrinsics intr_;
   Pose p_eye2head_;

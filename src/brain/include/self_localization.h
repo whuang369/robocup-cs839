@@ -96,6 +96,9 @@ class SelfLocator {
   void sensorUpdate(const std::vector<GameObject>& detectedGoalPosts,
                     const std::vector<GameObject>& detectedMarkings);
 
+  void logLandmarks();
+  void logSamples();
+
   /** Destructor */
   ~SelfLocator();
 

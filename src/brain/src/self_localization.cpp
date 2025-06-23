@@ -100,42 +100,31 @@ SelfLocator::SelfLocator(Brain* brain, const FieldDimensions& fd) : brain(brain)
               Vector2f(fd.length / 2, fd.penaltyAreaWidth / 2),
               Vector2f(fd.length / 2, -fd.penaltyAreaWidth / 2),
               Vector2f(-fd.length / 2, fd.penaltyAreaWidth / 2),
-              Vector2f(-fd.length / 2, -fd.penaltyAreaWidth / 2)};
-  float penaltyDist = fd.length / 2 - fd.penaltyAreaLength / 2;
-  lMarkers = {Vector2f(penaltyDist, fd.penaltyAreaWidth / 2),
-              Vector2f(penaltyDist, -fd.penaltyAreaWidth / 2),
-              Vector2f(-penaltyDist, fd.penaltyAreaWidth / 2),
-              Vector2f(-penaltyDist, -fd.penaltyAreaWidth / 2)};
+              Vector2f(-fd.length / 2, -fd.penaltyAreaWidth / 2),
+              Vector2f(fd.length / 2, -fd.goalAreaWidth / 2),
+              Vector2f(fd.length / 2, fd.goalAreaWidth / 2),
+              Vector2f(-fd.length / 2, -fd.goalAreaWidth / 2),
+              Vector2f(-fd.length / 2, fd.goalAreaWidth / 2)};
+
+  float centerToPenalty = fd.length / 2 - fd.penaltyAreaLength;
+  float centerToGoalArea = fd.length / 2 - fd.goalAreaLength;
+  lMarkers = {Vector2f(fd.length / 2, fd.width / 2),
+              Vector2f(fd.length / 2, -fd.width / 2),
+              Vector2f(-fd.length / 2, fd.width / 2),
+              Vector2f(-fd.length / 2, -fd.width / 2),
+              Vector2f(centerToPenalty, fd.penaltyAreaWidth / 2),
+              Vector2f(centerToPenalty, -fd.penaltyAreaWidth / 2),
+              Vector2f(-centerToPenalty, fd.penaltyAreaWidth / 2),
+              Vector2f(-centerToPenalty, -fd.penaltyAreaWidth / 2),
+              Vector2f(centerToGoalArea, fd.goalAreaWidth / 2),
+              Vector2f(centerToGoalArea, -fd.goalAreaWidth / 2),
+              Vector2f(-centerToGoalArea, fd.goalAreaWidth / 2),
+              Vector2f(-centerToGoalArea, -fd.goalAreaWidth / 2)};
   penaltyMarkers = {Vector2f(fd.length / 2 - fd.penaltyDist, 0.0),
                     Vector2f(-fd.length / 2 + fd.penaltyDist, 0.0)};
   odomInitialized = false;
 
-  // rerun logging
-  std::vector<rerun::Vec2D> xPoints;
-  for (const auto& marker : xMarkers) {
-    xPoints.emplace_back(rerun::Vec2D{marker.x(), marker.y()});
-  }
-  std::vector<rerun::Vec2D> lPoints;
-  for (const auto& marker : lMarkers) {
-    lPoints.emplace_back(rerun::Vec2D{marker.x(), marker.y()});
-  }
-  std::vector<rerun::Vec2D> tPoints;
-  for (const auto& marker : tMarkers) {
-    tPoints.emplace_back(rerun::Vec2D{marker.x(), marker.y()});
-  }
-  std::vector<rerun::Vec2D> penaltyPoints;
-  for (const auto& marker : penaltyMarkers) {
-    penaltyPoints.emplace_back(rerun::Vec2D{marker.x(), marker.y()});
-  }
-
-  brain->log->log("localization/landmarks/x_markers",
-                  rerun::Points2D(xPoints).with_colors(0xFF0000FF).with_radii(0.05));
-  brain->log->log("localization/landmarks/l_markers",
-                  rerun::Points2D(lPoints).with_colors(0xFF00FF00).with_radii(0.05));
-  brain->log->log("localization/landmarks/t_markers",
-                  rerun::Points2D(tPoints).with_colors(0xFFFF00FF).with_radii(0.05));
-  brain->log->log("localization/landmarks/penalty_markers",
-                  rerun::Points2D(penaltyPoints).with_colors(0xFF00FFFF).with_radii(0.05));
+  logLandmarks();
 }
 
 Pose2f SelfLocator::getPose() {
@@ -432,5 +421,48 @@ UKFRobotPoseHypothesis& SelfLocator::getMostValidSample() {
     return *lastBestSample;
   } else {
     return *bestSample;
+  }
+}
+
+void SelfLocator::logLandmarks() {
+  // rerun logging
+  std::vector<rerun::Vec2D> xPoints;
+  for (const auto& marker : xMarkers) {
+    xPoints.emplace_back(rerun::Vec2D{marker.x(), marker.y()});
+  }
+  std::vector<rerun::Vec2D> lPoints;
+  for (const auto& marker : lMarkers) {
+    lPoints.emplace_back(rerun::Vec2D{marker.x(), marker.y()});
+  }
+  std::vector<rerun::Vec2D> tPoints;
+  for (const auto& marker : tMarkers) {
+    tPoints.emplace_back(rerun::Vec2D{marker.x(), marker.y()});
+  }
+  std::vector<rerun::Vec2D> penaltyPoints;
+  for (const auto& marker : penaltyMarkers) {
+    penaltyPoints.emplace_back(rerun::Vec2D{marker.x(), marker.y()});
+  }
+
+  brain->log->log("field/landmarks/x_markers",
+                  rerun::Points2D(xPoints).with_colors(0x00FFFFFF).with_radii(0.1));
+  brain->log->log("field/landmarks/l_markers",
+                  rerun::Points2D(lPoints).with_colors(0xFFFF00FF).with_radii(0.1));
+  brain->log->log("field/landmarks/t_markers",
+                  rerun::Points2D(tPoints).with_colors(0x00FF00FF).with_radii(0.1));
+  brain->log->log("field/landmarks/penalty_markers",
+                  rerun::Points2D(penaltyPoints).with_colors(0x7C00FFFF).with_radii(0.1));
+}
+
+void SelfLocator::logSamples() {
+  for (int i = 0; i < numberOfSamples; ++i) {
+    const Pose2f pose = samples->at(i).getPose();
+    float x = pose.translation.x();
+    float y = pose.translation.y();
+    float theta = pose.rotation;
+    string id = std::to_string(samples->at(i).id);
+    brain->log->log("field/pose_samples/" + id,
+                    rerun::Points2D({{x, -y}, {x + 0.05 * cos(theta), -y - 0.05 * sin(theta)}})
+                        .with_radii({0.1, 0.05})
+                        .with_colors({0xFFAA00FF, 0xFFFF00FF}));
   }
 }
