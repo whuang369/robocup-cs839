@@ -17,11 +17,8 @@ vector<FieldMarker> BrainData::getMarkers() {
   res.reserve(markings.size());
 
   for (const auto &mark : markings) {
-    char markerType = ' ';
     auto it = labelToMarker.find(mark.label);
-    if (it != labelToMarker.end()) {
-      markerType = it->second;
-    }
+    char markerType = (it != labelToMarker.end()) ? it->second : ' ';
 
     res.emplace_back(
         FieldMarker{markerType, mark.posToRobot.x, mark.posToRobot.y, mark.confidence});

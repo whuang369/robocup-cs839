@@ -15,6 +15,8 @@
 #include "SampleSet.h"
 #include "types.h"
 
+class Brain;
+
 struct RegisteredLandmark {
   Vector2f percept =
       Vector2f::Zero(); /**< The position of the perceived landmark (relative to the robot) */
@@ -78,14 +80,43 @@ class UKFRobotPoseHypothesis : public UKFPose2D {
 };
 
 class SelfLocator {
+ public:
+  SelfLocator(Brain* brain, const FieldDimensions& fd);
+
+  Pose2f getPose();
+
+  bool isGood();
+
+  // TODO: resampling
+
+  /** Integrate odometry offset into hypotheses */
+  void motionUpdate(const Pose2D& robotToOdom);
+
+  /** Perform UKF measurement step for all samples */
+  void sensorUpdate(const std::vector<GameObject>& detectedGoalPosts,
+                    const std::vector<GameObject>& detectedMarkings);
+
+  /** Destructor */
+  ~SelfLocator();
+
+ protected:
+  double solveAssignment(const MatrixXd& costMatrix, std::vector<int>& assignment,
+                         const double threshold);
+
+  void registerLandmarks(const Pose2f& samplePose, const std::vector<GameObject>& detectedObjs,
+                         const std::vector<Vector2f>& groundTruthObjs,
+                         std::vector<RegisteredLandmark>& landmarks);
+
  private:
   SampleSet<UKFRobotPoseHypothesis>* samples; /**< Container for all samples. */
-  int nextSampleNumber;                       /**< Unique sample identifiers */
   int idOfLastBestSample; /**< Identifier of the best sample of the last frame */
+
+  // landmarks
   std::vector<Vector2f> goalPosts;
   std::vector<Vector2f> xMarkers;
+  std::vector<Vector2f> lMarkers;
+  std::vector<Vector2f> tMarkers;
   std::vector<Vector2f> penaltyMarkers;
-  int totalNumberOfAvailableLandmarks;
 
   Pose2f lastOdometryData;
   bool odomInitialized;
@@ -112,31 +143,5 @@ class SelfLocator {
    */
   UKFRobotPoseHypothesis& getMostValidSample();
 
- protected:
-  double solveAssignment(const MatrixXd& costMatrix, std::vector<int>& assignment,
-                         const double threshold);
-
-  void registerLandmarks(const Pose2f& samplePose, const std::vector<GameObject>& detectedObjs,
-                         const std::vector<Vector2f>& groundTruthObjs,
-                         std::vector<RegisteredLandmark>& landmarks);
-
- public:
-  /** Default constructor */
-  SelfLocator(const FieldDimensions& fd);
-
-  Pose2f getPose();
-
-  bool isGood();
-
-  // TODO: resampling
-
-  /** Integrate odometry offset into hypotheses */
-  void motionUpdate(const Pose2D& robotToOdom);
-
-  /** Perform UKF measurement step for all samples */
-  void sensorUpdate(const std::vector<GameObject>& detectedGoalPosts,
-                    const std::vector<GameObject>& detectedMarkings);
-
-  /** Destructor */
-  ~SelfLocator();
+  Brain* brain;
 };

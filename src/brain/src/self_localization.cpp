@@ -15,6 +15,9 @@
 #include "Math/Eigen.h"
 #include "utils/print.h"
 #include "utils/math.h"
+#include "brain.h"
+
+#include <rerun.hpp>
 
 const int SelfLocator::numberOfSamples = 12;
 const float SelfLocator::sigmaAngle = 0.0005;
@@ -73,15 +76,18 @@ void UKFRobotPoseHypothesis::updateByLandmark(const RegisteredLandmark& landmark
   landmarkSensorUpdate(landmark.model, landmark.percept, landmark.covPercept);
 }
 
-SelfLocator::SelfLocator(const FieldDimensions& fd) : nextSampleNumber(0) {
+SelfLocator::SelfLocator(Brain* brain, const FieldDimensions& fd) : brain(brain) {
+  int nextSampleId = 0;
+
   // Create sample set with samples at the typical walk-in positions
   samples = new SampleSet<UKFRobotPoseHypothesis>(numberOfSamples);
-  for (int i = 0; i < samples->size(); ++i)
+  for (int i = 0; i < samples->size(); ++i) {
     samples->at(i).init(
         {-M_PI / 2, static_cast<float>(((-fd.length / 2) + (-fd.circleRadius)) / 2),
          static_cast<float>(fd.width / 2 + 0.5)},
         {M_PI / 6, static_cast<float>(abs((-fd.length / 2) - (-fd.circleRadius)) / 2), 0.5},
-        nextSampleNumber++, 0.5f);
+        nextSampleId++, 0.5f);
+  }
   goalPosts = {
       Vector2f(fd.length / 2, fd.goalWidth / 2),    // left post of left goal
       Vector2f(fd.length / 2, -fd.goalWidth / 2),   // right post of left goal
@@ -103,20 +109,21 @@ Pose2f SelfLocator::getPose() {
 bool SelfLocator::isGood() {
   UKFRobotPoseHypothesis& bestSample = getMostValidSample();
   Matrix3f cov = bestSample.getCov();
-  const float translationalStandardDeviation = std::sqrt(std::max(cov(0, 0), cov(1, 1)));
-  const float rotationalStandardDeviation = std::sqrt(cov(2, 2));
+  const float transStd = std::sqrt(std::max(cov(0, 0), cov(1, 1)));
+  const float rotStd = std::sqrt(cov(2, 2));
   // prtDebug("Validity " + to_string(bestSample.validity) + " translational sd " +
   // to_string(translationalStandardDeviation)
   //          + " rotational sd " + to_string(rotationalStandardDeviation));
   // if(bestSample.validity >= minValidityForSuperbLocalizationQuality &&
   //    translationalStandardDeviation < maxTranslationDeviationForSuperbLocalizationQuality &&
   //    rotationalStandardDeviation < maxRotationalDeviationForSuperbLocalizationQuality) {
-  prtDebug("Validity " + to_string(bestSample.validity));
-  if (bestSample.validity >= minValidityForSuperbLocalizationQuality) {
-    return true;
-  } else {
-    return false;
-  }
+
+  brain->log->log("localization/validity",
+                  rerun::TextLog(format("validity: %.2f  trans std: %.2f  rot std: %.2f",
+                                        bestSample.validity, transStd, rotStd)));
+
+  bool isGood = (bestSample.validity >= minValidityForSuperbLocalizationQuality);
+  return isGood;
 };
 
 SelfLocator::~SelfLocator() {
@@ -172,58 +179,55 @@ void SelfLocator::motionUpdate(const Pose2D& robotToOdom) {
 
 void SelfLocator::sensorUpdate(const std::vector<GameObject>& detectedGoalPosts,
                                const std::vector<GameObject>& detectedMarkings) {
-  std::vector<GameObject> detectedXMarkers;
-  std::copy_if(detectedMarkings.begin(), detectedMarkings.end(),
-               std::back_inserter(detectedXMarkers),
-               [](const GameObject& obj) { return obj.label == "XCross"; });
-  std::vector<GameObject> detectedPenaltyPoints;
-  std::copy_if(detectedMarkings.begin(), detectedMarkings.end(),
-               std::back_inserter(detectedPenaltyPoints),
-               [](const GameObject& obj) { return obj.label == "PenaltyPoint"; });
+  auto filterByLabel = [](const std::vector<GameObject>& v, const std::string& label) {
+    std::vector<GameObject> out;
+    std::copy_if(v.begin(), v.end(), std::back_inserter(out),
+                 [&](const GameObject& obj) { return obj.label == label; });
+    return out;
+  };
 
-  totalNumberOfAvailableLandmarks =
-      detectedXMarkers.size() + detectedPenaltyPoints.size() + detectedGoalPosts.size();
+  const auto detectedXMarkers = filterByLabel(detectedMarkings, "XCross");
+  const auto detectedLMarkers = filterByLabel(detectedMarkings, "LCross");
+  const auto detectedTMarkers = filterByLabel(detectedMarkings, "TCross");
+  const auto detectedPenaltyPoints = filterByLabel(detectedMarkings, "PenaltyPoint");
 
-  if (totalNumberOfAvailableLandmarks == 0) {
-    return;
+  // array of paired vectors
+  const std::vector<GameObject>* detectedArrays[] = {
+      &detectedGoalPosts, &detectedXMarkers,      &detectedLMarkers,
+      &detectedTMarkers,  &detectedPenaltyPoints,
+  };
+  const std::vector<Vector2f>* groundTruthArrays[] = {
+      &goalPosts, &xMarkers, &lMarkers, &tMarkers, &penaltyMarkers,
+  };
+  constexpr size_t nTypes = sizeof(detectedArrays) / sizeof(detectedArrays[0]);
+
+  size_t totalDetectedMarkers = 0;
+  for (size_t i = 0; i < nTypes; ++i) {
+    totalDetectedMarkers += detectedArrays[i]->size();
   }
 
+  if (totalDetectedMarkers == 0) return;
+
+  // compute samples' validity
   for (int i = 0; i < numberOfSamples; ++i) {
-    const Pose2f samplePose = samples->at(i).getPose();
+    auto& sample = samples->at(i);
+    const Pose2f samplePose = sample.getPose();
     std::vector<RegisteredLandmark> landmarks;
     int numRegisteredLandmarks = 0;
 
-    if (detectedGoalPosts.size() > 0 && (i == idOfLastBestSample)) {
-      registerLandmarks(samplePose, detectedGoalPosts, goalPosts, landmarks);
-      prtDebug("Registered " + to_string(landmarks.size() - numRegisteredLandmarks) +
-               " goal posts");
-      numRegisteredLandmarks = landmarks.size();
+    for (size_t t = 0; t < nTypes; ++t) {
+      if (!detectedArrays[t]->empty()) {
+        registerLandmarks(samplePose, *detectedArrays[t], *groundTruthArrays[t], landmarks);
+        numRegisteredLandmarks = landmarks.size();
+      }
     }
 
-    if (detectedXMarkers.size() > 0 && (i == idOfLastBestSample)) {
-      registerLandmarks(samplePose, detectedXMarkers, xMarkers, landmarks);
-      prtDebug("Registered " + to_string(landmarks.size() - numRegisteredLandmarks) + " from " +
-               to_string(detectedXMarkers.size()) + "X markers");
-      numRegisteredLandmarks = landmarks.size();
+    for (const auto& landmark : landmarks) {
+      sample.updateByLandmark(landmark);
     }
 
-    if (detectedPenaltyPoints.size() > 0 && (i == idOfLastBestSample)) {
-      registerLandmarks(samplePose, detectedPenaltyPoints, penaltyMarkers, landmarks);
-      prtDebug("Registered " + to_string(landmarks.size() - numRegisteredLandmarks) +
-               " penalty points");
-      numRegisteredLandmarks = landmarks.size();
-    }
-
-    for (const auto& landmark : landmarks) samples->at(i).updateByLandmark(landmark);
-
-    float numerator = validityFactorLandmarkMeasurement *
-                      (static_cast<float>(landmarks.size()) / totalNumberOfAvailableLandmarks);
-    float denominator = validityFactorLandmarkMeasurement;
-    if (denominator != 0.f) {
-      const float currentValidity = numerator / denominator;
-      samples->at(i).updateValidity(numberOfConsideredFramesForValidity, currentValidity);
-      // validitiesHaveBeenUpdated = true;
-    }
+    const float currentValidity = (static_cast<float>(landmarks.size()) / totalDetectedMarkers);
+    sample.updateValidity(numberOfConsideredFramesForValidity, currentValidity);
   }
 }
 

@@ -6,6 +6,8 @@
 #include "utils/math.h"
 #include "joy_msg.h"
 
+#include "Math/Pose2f.h"
+
 using std::bind;
 using std::string;
 using std::vector;
@@ -50,7 +52,7 @@ void Brain::init() {
 
   data = std::make_shared<BrainData>();
   locator = std::make_shared<Locator>();
-  self_locator = std::make_shared<SelfLocator>(config->fieldDimensions);
+  self_locator = std::make_shared<SelfLocator>(this, config->fieldDimensions);
 
   log = std::make_shared<BrainLog>(this);
   tree = std::make_shared<BrainTree>(this);
@@ -85,8 +87,6 @@ void Brain::init() {
       config->visualOdomTopic, 1, bind(&Brain::visualOdomCallback, this, _1));
   headPoseSubscription = create_subscription<geometry_msgs::msg::Pose>(
       "/head_pose", 1, bind(&Brain::headPoseCallback, this, _1));
-  ballToRobotPub = create_publisher<geometry_msgs::msg::Point>("/brain/ball_to_robot", 10);
-  goalToRobotPub = create_publisher<geometry_msgs::msg::Point>("/brain/goal_to_robot", 10);
   recoveryStateSubscription = create_subscription<booster_interface::msg::RawBytesMsg>(
       "fall_down_recovery_state", 1, bind(&Brain::recoveryStateCallback, this, _1));
 }
@@ -110,8 +110,6 @@ void Brain::loadConfig() {
   get_parameter("image.height", imgHeight);
   config->camPixX = static_cast<double>(imgWidth);
   config->camPixY = static_cast<double>(imgHeight);
-
-  get_parameter("depth.topic", config->depthTopic);
 
   get_parameter("visual_odom.topic", config->visualOdomTopic);
 
@@ -177,7 +175,7 @@ void Brain::updateBallMemory() {
   data->ball.pitchToRobot = std::asin(config->robotHeight / data->ball.range);
 
   // mark ball as lost if long time no see
-  if (get_clock()->now().seconds() - data->ball.timePoint.seconds() > config->memoryLength) {
+  if (msecsSince(data->ball.timePoint) > config->memoryLength) {
     tree->setEntry<bool>("ball_location_known", false);
     data->ballDetected = false;
   }
@@ -196,20 +194,6 @@ void Brain::updateBallMemory() {
                .with_colors({tree->getEntry<bool>("ball_location_known") ? 0xFFFFFFFF : 0xFF0000FF})
                .with_radii({0.005})
                .with_draw_order(30));
-
-  geometry_msgs::msg::Point ballPosToRobot;
-  ballPosToRobot.x = data->ball.posToRobot.x;
-  ballPosToRobot.y = data->ball.posToRobot.y;
-  ballPosToRobot.z = 0;
-  ballToRobotPub->publish(ballPosToRobot);
-
-  geometry_msgs::msg::Point goalCenterToRobot;
-  Pose2D goalPoseToField = Pose2D{0.0, 0.0, 0.0};
-  Pose2D goalPoseToRobot = data->field2robot(goalPoseToField);
-  goalCenterToRobot.x = goalPoseToRobot.x;
-  goalCenterToRobot.y = goalPoseToRobot.y;
-  goalCenterToRobot.z = 0;
-  goalToRobotPub->publish(goalCenterToRobot);
 }
 
 vector<double> Brain::getGoalPostAngles(const double margin) {
@@ -252,6 +236,9 @@ void Brain::calibrateOdom(double x, double y, double theta) {
   y_or = std::sin(data->robotPoseToOdom.theta) * data->robotPoseToOdom.x -
          std::cos(data->robotPoseToOdom.theta) * data->robotPoseToOdom.y;
   theta_or = -data->robotPoseToOdom.theta;
+
+  // TODO: use Pose2f instead of transCoord
+  Pose2f fieldPose(theta, x, y);
 
   transCoord(x_or, y_or, theta_or, x, y, theta, data->odomToField.x, data->odomToField.y,
              data->odomToField.theta);
@@ -471,16 +458,16 @@ void Brain::detectionsCallback(const vision_interface::msg::Detections &msg) {
 }
 
 void Brain::odometerCallback(const booster_interface::msg::Odometer &msg) {
-  double new_odom_x = msg.x * config->robotOdomFactor;
-  double new_odom_y = msg.y * config->robotOdomFactor;
-  if (std::abs(new_odom_x - data->robotPoseToOdom.x) > 0.01 ||
-      std::abs(new_odom_y - data->robotPoseToOdom.y) > 0.01)
-    data->walking = true;
-  else
-    data->walking = false;
+  constexpr double odomMoveThreshold = 0.01;
 
-  data->robotPoseToOdom.x = msg.x * config->robotOdomFactor;
-  data->robotPoseToOdom.y = msg.y * config->robotOdomFactor;
+  double newOdomX = msg.x * config->robotOdomFactor;
+  double newOdomY = msg.y * config->robotOdomFactor;
+
+  data->walking = (std::abs(newOdomX - data->robotPoseToOdom.x) > odomMoveThreshold ||
+                   std::abs(newOdomY - data->robotPoseToOdom.y) > odomMoveThreshold);
+
+  data->robotPoseToOdom.x = newOdomX;
+  data->robotPoseToOdom.y = newOdomY;
   data->robotPoseToOdom.theta = msg.theta;
 
   transCoord(data->robotPoseToOdom.x, data->robotPoseToOdom.y, data->robotPoseToOdom.theta,
@@ -560,6 +547,7 @@ void Brain::imageCallback(const sensor_msgs::msg::Image &msg) {
 }
 
 void Brain::headPoseCallback(const geometry_msgs::msg::Pose &msg) {
+  // TODO: integrate with VO for sensor update
   // --- for test:
   // if (config->rerunLogEnable) {
   if (false) {
@@ -726,32 +714,30 @@ void Brain::detectProcessBalls(const vector<GameObject> &ballObjs) {
 }
 
 void Brain::detectProcessMarkings(const vector<GameObject> &markingObjs) {
-  const double confidenceValve = 20;
+  constexpr double confidenceValve = 20;
+  constexpr double minX = -0.5, maxX = 10.0;
 
   data->markings.clear();
+  data->markings.reserve(markingObjs.size());
 
-  for (int i = 0; i < markingObjs.size(); i++) {
-    auto marking = markingObjs[i];
-
+  for (const auto &marking : markingObjs) {
     if (marking.confidence < confidenceValve) continue;
-
-    if (marking.posToRobot.x < -0.5 || marking.posToRobot.x > 10.0) continue;
+    if (marking.posToRobot.x < minX || marking.posToRobot.x > maxX) continue;
 
     data->markings.push_back(marking);
   }
 }
 
 void Brain::detectProcessGoalPosts(const vector<GameObject> &goalpostObjs) {
-  const double confidenceValve = 20;
+  constexpr double confidenceValve = 20;
+  constexpr double minX = -0.5, maxX = 3.0, maxY = 3.0;
 
   data->goalposts.clear();
+  data->goalposts.reserve(goalpostObjs.size());
 
-  for (int i = 0; i < goalpostObjs.size(); i++) {
-    auto post = goalpostObjs[i];
-
+  for (const auto &post : goalpostObjs) {
     if (post.confidence < confidenceValve) continue;
-
-    if (post.posToRobot.x < -0.5 || post.posToRobot.x > 3.0 || post.posToRobot.y > 3.0) continue;
+    if (post.posToRobot.x < minX || post.posToRobot.x > maxX || post.posToRobot.y > maxY) continue;
 
     data->goalposts.push_back(post);
   }
