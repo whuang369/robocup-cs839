@@ -94,10 +94,48 @@ SelfLocator::SelfLocator(Brain* brain, const FieldDimensions& fd) : brain(brain)
       Vector2f(-fd.length / 2, -fd.goalWidth / 2),  // left post of right goal
       Vector2f(-fd.length / 2, fd.goalWidth / 2)    // right post of right goal
   };
-  xMarkers = {Vector2f(0.0, -fd.circleRadius), Vector2f(0.0, fd.circleRadius)};
+  xMarkers = {Vector2f(0.0, fd.circleRadius), Vector2f(0.0, -fd.circleRadius)};
+  tMarkers = {Vector2f(0.0, fd.width / 2),
+              Vector2f(0.0, -fd.width / 2),
+              Vector2f(fd.length / 2, fd.penaltyAreaWidth / 2),
+              Vector2f(fd.length / 2, -fd.penaltyAreaWidth / 2),
+              Vector2f(-fd.length / 2, fd.penaltyAreaWidth / 2),
+              Vector2f(-fd.length / 2, -fd.penaltyAreaWidth / 2)};
+  float penaltyDist = fd.length / 2 - fd.penaltyAreaLength / 2;
+  lMarkers = {Vector2f(penaltyDist, fd.penaltyAreaWidth / 2),
+              Vector2f(penaltyDist, -fd.penaltyAreaWidth / 2),
+              Vector2f(-penaltyDist, fd.penaltyAreaWidth / 2),
+              Vector2f(-penaltyDist, -fd.penaltyAreaWidth / 2)};
   penaltyMarkers = {Vector2f(fd.length / 2 - fd.penaltyDist, 0.0),
                     Vector2f(-fd.length / 2 + fd.penaltyDist, 0.0)};
   odomInitialized = false;
+
+  // rerun logging
+  std::vector<rerun::Vec2D> xPoints;
+  for (const auto& marker : xMarkers) {
+    xPoints.emplace_back(rerun::Vec2D{marker.x(), marker.y()});
+  }
+  std::vector<rerun::Vec2D> lPoints;
+  for (const auto& marker : lMarkers) {
+    lPoints.emplace_back(rerun::Vec2D{marker.x(), marker.y()});
+  }
+  std::vector<rerun::Vec2D> tPoints;
+  for (const auto& marker : tMarkers) {
+    tPoints.emplace_back(rerun::Vec2D{marker.x(), marker.y()});
+  }
+  std::vector<rerun::Vec2D> penaltyPoints;
+  for (const auto& marker : penaltyMarkers) {
+    penaltyPoints.emplace_back(rerun::Vec2D{marker.x(), marker.y()});
+  }
+
+  brain->log->log("localization/landmarks/x_markers",
+                  rerun::Points2D(xPoints).with_colors(0xFF0000FF).with_radii(0.05));
+  brain->log->log("localization/landmarks/l_markers",
+                  rerun::Points2D(lPoints).with_colors(0xFF00FF00).with_radii(0.05));
+  brain->log->log("localization/landmarks/t_markers",
+                  rerun::Points2D(tPoints).with_colors(0xFFFF00FF).with_radii(0.05));
+  brain->log->log("localization/landmarks/penalty_markers",
+                  rerun::Points2D(penaltyPoints).with_colors(0xFF00FFFF).with_radii(0.05));
 }
 
 Pose2f SelfLocator::getPose() {
@@ -353,38 +391,46 @@ double SelfLocator::solveAssignment(const MatrixXd& costMatrix, std::vector<int>
 }
 
 UKFRobotPoseHypothesis& SelfLocator::getMostValidSample() {
+  UKFRobotPoseHypothesis* lastBestSample = nullptr;
   float validityOfLastBestSample = -1.f;
-  UKFRobotPoseHypothesis* lastBestSample = 0;
+
+  // find last best sample by ID
   if (idOfLastBestSample != -1) {
     for (int i = 0; i < numberOfSamples; ++i) {
-      if (samples->at(i).id == idOfLastBestSample) {
-        validityOfLastBestSample = samples->at(i).validity;
-        lastBestSample = &(samples->at(i));
+      auto& sample = samples->at(i);
+      if (sample.id == idOfLastBestSample) {
+        lastBestSample = &sample;
+        validityOfLastBestSample = sample.validity;
         break;
       }
     }
   }
-  UKFRobotPoseHypothesis* returnSample = &(samples->at(0));
-  float maxValidity = -1.f;
-  float minVariance = 0.f;  // Initial value does not matter
+
+  UKFRobotPoseHypothesis* bestSample = &samples->at(0);
+  float maxValidity = bestSample->validity;
+  float minVariance = bestSample->getCombinedVariance();
+
   for (int i = 0; i < numberOfSamples; ++i) {
-    const float val = samples->at(i).validity;
-    if (val > maxValidity) {
-      maxValidity = val;
-      minVariance = samples->at(i).getCombinedVariance();
-      returnSample = &(samples->at(i));
-    } else if (val == maxValidity) {
-      float variance = samples->at(i).getCombinedVariance();
+    auto& sample = samples->at(i);
+    float v = sample.validity;
+    if (v > maxValidity) {
+      maxValidity = v;
+      minVariance = sample.getCombinedVariance();
+      bestSample = &sample;
+    } else if (v == maxValidity) {
+      float variance = sample.getCombinedVariance();
       if (variance < minVariance) {
-        maxValidity = val;
+        maxValidity = v;
         minVariance = variance;
-        returnSample = &(samples->at(i));
+        bestSample = &sample;
       }
     }
   }
-  if (lastBestSample &&
-      returnSample->validity <= validityOfLastBestSample * 1.5f)  // Bonus for stability
+
+  constexpr float stabilityBonusFactor = 1.5f;
+  if (lastBestSample && bestSample->validity <= validityOfLastBestSample * stabilityBonusFactor) {
     return *lastBestSample;
-  else
-    return *returnSample;
+  } else {
+    return *bestSample;
+  }
 }
