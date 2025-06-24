@@ -4,8 +4,14 @@
 
 void BrainConfig::handle() {
   // playerStartPos[left, right]
-  if (playerStartPos != "left" && playerStartPos != "right") {
-    throw invalid_argument("player_start_pos must be one of [left, right]. Got: " + playerStartPos);
+  if (playerAttackSide != "left" && playerAttackSide != "right") {
+    throw invalid_argument("player_attack_side must be one of [left, right]. Got: " +
+                           playerAttackSide);
+  }
+
+  if (playerStartPos < -1.0 || playerStartPos > 1.0) {
+    throw invalid_argument("player_start_pos must be in [-1.0, 1.0]. Got: " +
+                           to_string(playerStartPos));
   }
 
   // playerRole [striker, goal_keeper]
@@ -54,6 +60,7 @@ void BrainConfig::print(ostream &os) {
   os << "playerId = " << playerId << endl;
   os << "fieldType = " << fieldType << endl;
   os << "playerRole = " << playerRole << endl;
+  os << "playerAttackSide = " << playerAttackSide << endl;
   os << "playerStartPos = " << playerStartPos << endl;
   os << "----------------------------------------" << endl;
   os << "robotHeight = " << robotHeight << endl;
@@ -62,7 +69,6 @@ void BrainConfig::print(ostream &os) {
   os << "yawOffset = " << yawOffset << endl;
   os << "joystick = " << joystick << endl;
   os << "----------------------------------------" << endl;
-  os << "imageTopic = " << imageTopic << endl;
   os << "camPixX = " << camPixX << endl;
   os << "camPixY = " << camPixY << endl;
   os << "----------------------------------------" << endl;

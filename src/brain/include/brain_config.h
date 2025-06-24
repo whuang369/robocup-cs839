@@ -24,11 +24,12 @@ class BrainConfig {
   // added here to store them. These values will be overwritten in BrainNode, so even if a
   // configuration is not explicitly defined in config.yaml, the default values here will not take
   // effect. The actual default values should be configured in the BrainNode's declare_parameter.
-  int teamId;                  // game.team_id
-  int playerId;                // game.player_id
-  std::string fieldType;       // game.field_type  "adult_size"(14*9) | "kid_size" (9*6)
-  std::string playerRole;      // game.player_role   "striker" | "goal_keeper"
-  std::string playerStartPos;  // game.player_start_post  "left" | "right"
+  int teamId;                    // game.team_id
+  int playerId;                  // game.player_id
+  std::string fieldType;         // game.field_type  "adult_size"(14*9) | "kid_size" (9*6)
+  std::string playerRole;        // game.player_role   "striker" | "goal_keeper"
+  std::string playerAttackSide;  // game.player_attack_side  "left" | "right"
+  float playerStartPos;          // game.player_start_pos  [-1.0, 1.0]  // -1.0: left, 1.0: right
 
   double robotHeight;      // robot.robot_height
   double robotOdomFactor;  // robot.odom_factor odom
@@ -36,9 +37,8 @@ class BrainConfig {
   double yawOffset;  // robot.yaw_offset fix the issue of leftward bias during distance measurement
   std::string joystick;  // robot.joystick "logicall" | "beitong"
 
-  std::string imageTopic;  // image.topic the topic of the rgb image
-  double camPixX;          // image.width
-  double camPixY;          // image.height
+  double camPixX;  // image.width
+  double camPixY;  // image.height
 
   std::string visualOdomTopic;  // visual_odom.topic the topic of the visual odometry
 

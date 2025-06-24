@@ -5,7 +5,8 @@ brain_node:
       player_id: 0 # 0 | 1 | 2 | 3
       field_type: "gdc" # adult_size | kid_size | gdc
       player_role: "striker" # striker | goal_keeper
-      player_start_pos: "left" # right | left
+      player_attack_side: "left"
+      player_start_pos: 0.5 # [-1.0, 1.0] -1.0 is left side, 1.0 is right side
 
     robot:
       robot_height: 1.0
@@ -15,7 +16,6 @@ brain_node:
       joystick: "logitech" # logitech | beitong
 
     image:
-      topic: "/camera/camera/rgb/image_rect_color"
       width: 960
       height: 540
 

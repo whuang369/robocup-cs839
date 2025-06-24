@@ -24,7 +24,8 @@ Brain::Brain() : rclcpp::Node("brain_node") {
   declare_parameter<string>("game.field_type", "");
 
   declare_parameter<string>("game.player_role", "");
-  declare_parameter<string>("game.player_start_pos", "");
+  declare_parameter<string>("game.player_attack_side", "");
+  declare_parameter<float>("game.player_start_pos", 0.0f);
 
   declare_parameter<double>("robot.robot_height", 1.0);
   declare_parameter<double>("robot.odom_factor", 1.0);
@@ -32,7 +33,6 @@ Brain::Brain() : rclcpp::Node("brain_node") {
   declare_parameter<double>("robot.yaw_offset", 0.1);
   declare_parameter<string>("robot.joystick", "");
 
-  declare_parameter<string>("image.topic", "");
   declare_parameter<int>("image.width", 960);
   declare_parameter<int>("image.height", 540);
 
@@ -94,6 +94,7 @@ void Brain::loadConfig() {
   get_parameter("game.player_id", config->playerId);
   get_parameter("game.field_type", config->fieldType);
   get_parameter("game.player_role", config->playerRole);
+  get_parameter("game.player_attack_side", config->playerAttackSide);
   get_parameter("game.player_start_pos", config->playerStartPos);
 
   get_parameter("robot.robot_height", config->robotHeight);
@@ -102,7 +103,6 @@ void Brain::loadConfig() {
   get_parameter("robot.yaw_offset", config->yawOffset);
   get_parameter("robot.joystick", config->joystick);
 
-  get_parameter("image.topic", config->imageTopic);
   int imgWidth, imgHeight;
   get_parameter("image.width", imgWidth);
   get_parameter("image.height", imgHeight);
