@@ -39,24 +39,19 @@ bool detectPixelShiftCorruption(const cv::Mat &image) {
   }
 
   // Parameters (can be made configurable)
-  const int expected_shift = 515;
-  const int window = 5;
-  const double gradient_thresh = 60000.0;
-  const double jump_thresh = 6.0;
+  const double max_gradient_thresh = 60000.0;
+  const double edge_gradient_thresh = 80000.0;
+  const int roll_offset = 50;
 
   // Compute horizontal gradient (vertical edge strength)
   cv::Mat grad, col_strength;
   cv::Sobel(gray, grad, CV_32F, 1, 0, 3);
   cv::reduce(cv::abs(grad), col_strength, 0, cv::REDUCE_SUM, CV_32F);
 
-  // Search for strong peak around expected shift
-  int start = std::max(0, expected_shift - window);
-  int end = std::min(gray.cols - 2, expected_shift + window);
-
-  // Find the column with maximum strength in the window
-  int seam_col = start;
+  // Find the column with maximum strength
+  int seam_col = 0;
   double max_strength = 0.0;
-  for (int col = start; col < end; col++) {
+  for (int col = 0; col < gray.cols; col++) {
     double strength = col_strength.at<float>(0, col);
     if (strength > max_strength) {
       max_strength = strength;
@@ -64,18 +59,35 @@ bool detectPixelShiftCorruption(const cv::Mat &image) {
     }
   }
 
-  // Compare adjacent columns at seam
-  cv::Mat col_left, col_right, diff;
-  gray.col(seam_col).convertTo(col_left, CV_32F);
-  gray.col(seam_col + 1).convertTo(col_right, CV_32F);
-  cv::absdiff(col_left, col_right, diff);
-  double mean_jump = cv::mean(diff)[0];
+  // ---- Manual Horizontal Roll ----
+  int shift = roll_offset % gray.cols;
+  if (shift < 0) shift += gray.cols;
 
-  bool corrupted = (max_strength > gradient_thresh && mean_jump > jump_thresh);
+  cv::Mat right = gray.colRange(gray.cols - shift, gray.cols);
+  cv::Mat left = gray.colRange(0, gray.cols - shift);
+  cv::Mat rolled_image;
+  cv::hconcat(right, left, rolled_image);
+  // --------------------------------
+
+  // Edge strength after roll
+  cv::Mat edge_strength, edge_gradient;
+  cv::Sobel(rolled_image, edge_gradient, CV_32F, 1, 0, 3);
+  cv::reduce(cv::abs(edge_gradient), edge_strength, 0, cv::REDUCE_SUM, CV_32F);
+  double max_edge_strength = 0.0;
+  int seam_edge_col = 0;
+  for (int col = roll_offset - 5; col < roll_offset + 5; col++) {
+    double strength = edge_strength.at<float>(0, col);
+    if (strength > max_edge_strength) {
+      max_edge_strength = strength;
+      seam_edge_col = col;
+    }
+  }
+
+  bool corrupted = (max_strength > max_gradient_thresh && max_edge_strength < edge_gradient_thresh);
   if (corrupted) {
-    std::cout << "[Seam Detected] Column: " << seam_col << ", Edge Strength: " << std::fixed
-              << std::setprecision(2) << max_strength << ", Intensity Jump: " << std::fixed
-              << std::setprecision(2) << mean_jump << std::endl;
+    std::cout << "[Seam Detected] Column: " << seam_col << ", Max Strength: " << std::fixed
+              << std::setprecision(2) << max_strength << ", Edge Strength: " << std::fixed
+              << std::setprecision(2) << max_edge_strength << std::endl;
   }
   return corrupted;
 }
