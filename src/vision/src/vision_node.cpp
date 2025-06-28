@@ -113,10 +113,11 @@ void VisionNode::Init(const std::string &cfg_path, const std::string &cfg_local_
   }
   std::cout << "loaded cfg file: " << std::endl << node << std::endl;
 
-  this->declare_parameter<string>("rerunLog.server_addr", "");
+  this->declare_parameter<string>("rerunLog.server_addr", "rerun+http://127.0.0.1:9876/proxy");
   string rerun_server_addr;
   this->get_parameter("rerunLog.server_addr", rerun_server_addr);
-  log = std::make_shared<VisionLog>(this, node["rerun_log"].as<bool>(), rerun_server_addr);
+  log = std::make_shared<VisionLog>(this, node["rerun_log"].as<bool>(), rerun_server_addr,
+                                    node["rerun_id"].as<string>(""));
 
   // read camera param
   if (!node["camera"]) {
