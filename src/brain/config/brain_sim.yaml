@@ -27,4 +27,3 @@ brain_node:
     rerunLog:
       enable: true
       server_addr: "rerun+http://127.0.0.1:9876/proxy"
-      img_interval: 1

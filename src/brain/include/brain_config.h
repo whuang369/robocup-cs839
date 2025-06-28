@@ -44,7 +44,6 @@ class BrainConfig {
 
   bool rerunLogEnable;             // rerunLog.enable  Whether to enable rerunLog
   std::string rerunLogServerAddr;  // rerunLog.server_addr  rerunLog address
-  int rerunLogImgInterval;         // rerunLog.img_interval the interval to log the images
 
   std::string treeFilePath;  //  It is no longer placed in config.yaml; the path to the
                              //  behavior-tree file is now specified in launch.py.

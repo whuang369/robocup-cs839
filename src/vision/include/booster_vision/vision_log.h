@@ -9,7 +9,8 @@ class VisionNode;
 
 class VisionLog {
  public:
-  VisionLog(VisionNode* visionNode, bool enable, const std::string& rerunServerAddr);
+  VisionLog(VisionNode* visionNode, bool enable, const std::string& rerunServerAddr,
+            const std::string& logId);
 
   void setTimeNow();
   void setTimeSeconds(double seconds);

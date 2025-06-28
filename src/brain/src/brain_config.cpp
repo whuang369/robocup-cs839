@@ -76,7 +76,6 @@ void BrainConfig::print(ostream &os) {
   os << "----------------------------------------" << endl;
   os << "rerunLogEnable = " << rerunLogEnable << endl;
   os << "rerunLogServerAddr = " << rerunLogServerAddr << endl;
-  os << "rerunLogImgInterval = " << rerunLogImgInterval << endl;
   os << "----------------------------------------" << endl;
   os << "treeFilePath = " << treeFilePath << endl;
   os << "----------------------------------------" << endl;

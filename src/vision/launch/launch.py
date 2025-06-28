@@ -23,7 +23,7 @@ def handle_configuration(context, *args, **kwargs):
     # override parameters from launch arguments
     rerun = context.perform_substitution(LaunchConfiguration("rerun"))
     if not rerun == "":
-        config["rerunLog.server_addr"] = f"rerun+http://{rerun}:9877/proxy"
+        config["rerunLog.server_addr"] = f"rerun+http://{rerun}/proxy"
 
     return [
         Node(
@@ -52,7 +52,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "rerun",
-                default_value="rerun+http://127.0.0.1:9877/proxy",
+                default_value="rerun+http://127.0.0.1:9876/proxy",
                 description="Override the rerunLog server address",
             ),
             OpaqueFunction(function=handle_configuration),

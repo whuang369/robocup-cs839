@@ -5,8 +5,9 @@
 
 namespace booster_vision {
 
-VisionLog::VisionLog(VisionNode* visionNode, bool enable, const std::string& rerunServerAddr)
-    : enabled(enable), visionNode(visionNode), rerunLog("robocup_vision") {
+VisionLog::VisionLog(VisionNode* visionNode, bool enable, const std::string& rerunServerAddr,
+                     const std::string& logId)
+    : enabled(enable), visionNode(visionNode), rerunLog("robocup_vision_" + logId) {
   if (!enabled) return;
 
   rerun::Error err = rerunLog.connect_grpc(rerunServerAddr);

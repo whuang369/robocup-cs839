@@ -40,7 +40,6 @@ Brain::Brain() : rclcpp::Node("brain_node") {
 
   declare_parameter<bool>("rerunLog.enable", false);
   declare_parameter<string>("rerunLog.server_addr", "");
-  declare_parameter<int>("rerunLog.img_interval", 10);
 
   declare_parameter<bool>("enable_com", true);
 
@@ -113,7 +112,6 @@ void Brain::loadConfig() {
 
   get_parameter("rerunLog.enable", config->rerunLogEnable);
   get_parameter("rerunLog.server_addr", config->rerunLogServerAddr);
-  get_parameter("rerunLog.img_interval", config->rerunLogImgInterval);
 
   get_parameter("tree_file_path", config->treeFilePath);
 

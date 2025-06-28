@@ -39,7 +39,7 @@ def handle_configuration(context, *args, **kwargs):
         config["game.player_role"] = role
     rerun = context.perform_substitution(LaunchConfiguration("rerun"))
     if not rerun == "":
-        config["rerunLog.server_addr"] = f"rerun+http://{rerun}:9876/proxy"
+        config["rerunLog.server_addr"] = f"rerun+http://{rerun}/proxy"
 
     return [
         Node(

@@ -3,16 +3,15 @@
 #include "utils/math.h"
 #include "utils/print.h"
 
-BrainLog::BrainLog(Brain *argBrain) : enabled(false), brain(argBrain), rerunLog("robocup_brain") {
-  if (!brain->config->rerunLogEnable) {
-    enabled = false;
-    return;
-  }
+BrainLog::BrainLog(Brain *argBrain)
+    : enabled(false),
+      brain(argBrain),
+      rerunLog("robocup_brain" + std::to_string(brain->config->playerId)) {
+  if (!brain->config->rerunLogEnable) return;
 
   rerun::Error err = rerunLog.connect_grpc(brain->config->rerunLogServerAddr);
   if (err.is_err()) {
     prtErr("Connect rerunLog server failed: " + err.description);
-    enabled = false;
     return;
   }
 
