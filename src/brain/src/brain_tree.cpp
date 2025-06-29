@@ -91,6 +91,8 @@ void BrainTree::initEntry() {
 }
 
 void BrainTree::tick() {
+  tree.tickOnce();
+
   static int cnt = 0;
   cnt++;
   // print states
@@ -102,8 +104,6 @@ void BrainTree::tick() {
     //     brain->data->lastScore,
     //     getEntry<bool>("we_just_scored")));
   }
-
-  tree.tickOnce();
 }
 
 NodeStatus SetVelocity::tick() {
@@ -112,6 +112,9 @@ NodeStatus SetVelocity::tick() {
   getInput("x", x);
   getInput("y", y);
   getInput("theta", theta);
+
+  brain->log->log("tree/SetVelocity",
+                  rerun::TextLog(format("x: %.2f  y: %.2f  theta: %.2f", x, y, theta)));
 
   auto res = brain->client->setVelocity(x, y, theta);
   return NodeStatus::SUCCESS;
@@ -126,15 +129,15 @@ NodeStatus CamTrackBall::tick() {
     const double pixTolerance = 10;
 
     double deltaX = mean(brain->data->ball.boundingBox.xmax, brain->data->ball.boundingBox.xmin) -
-                    brain->config->camPixX / 2;
+                    brain->config->camPixX * 0.5;
     double deltaY = mean(brain->data->ball.boundingBox.ymax, brain->data->ball.boundingBox.ymin) -
-                    brain->config->camPixY * 2 / 3;
+                    brain->config->camPixY * 0.8;
 
     if (std::fabs(deltaX) < pixTolerance && std::fabs(deltaY) < pixTolerance) {
       return NodeStatus::SUCCESS;
     }
 
-    double smoother = 1.5;
+    double smoother = 2.0;
     double deltaYaw = deltaX / brain->config->camPixX * brain->config->camAngleX / smoother;
     double deltaPitch = deltaY / brain->config->camPixY * brain->config->camAngleY / smoother;
 
@@ -143,6 +146,9 @@ NodeStatus CamTrackBall::tick() {
   }
 
   brain->client->moveHead(pitch, yaw);
+
+  brain->log->log("CamTrackBall", rerun::TextLog(format("ballDetected: %d  pitch: %.2f  yaw: %.2f",
+                                                        brain->data->ballDetected, pitch, yaw)));
   return NodeStatus::SUCCESS;
 }
 
@@ -351,6 +357,7 @@ NodeStatus Adjust::tick() {
 
 NodeStatus Approach::tick() {
   if (brain->tree->getEntry<bool>("ball_location_known") == false) {
+    brain->log->log("tree/Approach", rerun::TextLog("Ball location not known, stopping approach."));
     brain->client->setVelocity(0, 0, 0);
     return NodeStatus::SUCCESS;
   }
@@ -463,6 +470,9 @@ NodeStatus Approach::tick() {
   vy = std::clamp(vy, -vyLimit, vyLimit);
   vtheta = std::clamp(vtheta, -vthetaLimit, vthetaLimit);
 
+  brain->log->log("tree/Approach",
+                  rerun::TextLog(format("vx: %.2f  vy: %.2f  vtheta: %.2f  phase: %d", vx, vy,
+                                        vtheta, static_cast<int>(_phase))));
   brain->client->setVelocity(vx, vy, vtheta, false, false, false);
   return NodeStatus::SUCCESS;
 }
@@ -732,20 +742,26 @@ NodeStatus Kick::onStart() {
     vx = vxLimit;
     vy = 0.0;
   } else {
-    vy = ty > 0 ? vyLimit : -vyLimit;
-    vx = vy / ty * tx * vxFactor;
-    if (fabs(vx) > vxLimit) {
-      vy *= vxLimit / vx;
-      vx = vxLimit;
-    }
+    double dirX = std::cos(adjustedYaw) * vxFactor;
+    double dirY = std::sin(adjustedYaw);
+
+    double scaleX = vxLimit / std::max(std::abs(dirX), 1e-6);
+    double scaleY = vyLimit / std::max(std::abs(dirY), 1e-6);
+    double scale = std::min(scaleX, scaleY);
+
+    vx = dirX * scale;
+    vy = dirY * scale;
   }
-  double vtheta = brain->data->ball.yawToRobot;
+  double vtheta = 0.0;
 
   double speed = norm(vx, vy);
 
   _msecKick = speed > 1e-5 ? minMSecKick + static_cast<int>(brain->data->ball.range / speed * 1000)
                            : minMSecKick;
-  prtDebug(to_string(vtheta));
+
+  brain->log->log("tree/Kick/onStart",
+                  rerun::TextLog(format("vx: %.2f  vy: %.2f  vtheta: %.2f  msecKick: %d", vx, vy,
+                                        vtheta, _msecKick)));
   brain->client->setVelocity(vx, vy, vtheta, false, false, false);
   return NodeStatus::RUNNING;
 }
@@ -794,13 +810,8 @@ void RobotFindBall::onHalted() {
 NodeStatus SelfLocate::tick() {
   brain->self_locator->motionUpdate(brain->data->robotPoseToOdom);
   brain->self_locator->sensorUpdate(brain->data->goalposts, brain->data->markings);
-  // if ((abs(brain->data->headYawD) > 0.1) || (abs(brain->data->headPitchD) > 0.01) ||
-  // brain->data->walking) {
-  //     prtDebug("Skipping sensor update");
-  // }
-  // else {
-  //     brain->self_locator->sensorUpdate(brain->data->goalposts, brain->data->markings);
-  // }
+  brain->data->markings.clear();
+
   auto pose = brain->self_locator->getPose();
   brain->calibrateOdom(pose.translation.x(), pose.translation.y(), pose.rotation);
   // brain->tree->setEntry<bool>("odom_calibrated", true);
@@ -810,6 +821,8 @@ NodeStatus SelfLocate::tick() {
   } else {
     brain->tree->setEntry<bool>("odom_calibrated", false);
   }
+
+  brain->self_locator->logSamples();
 
   /*
   string mode = getInput<string>("mode").value();
