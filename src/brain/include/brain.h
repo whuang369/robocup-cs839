@@ -95,12 +95,14 @@ class Brain : public rclcpp::Node {
   void odometerCallback(const booster_interface::msg::Odometer &msg);
   void visualOdomCallback(const geometry_msgs::msg::PoseStamped &msg);
   void lowStateCallback(const booster_interface::msg::LowState &msg);
+  void recoveryStateCallback(const booster_interface::msg::RawBytesMsg &msg);
   void headPoseCallback(const geometry_msgs::msg::Pose &msg);
+
   vector<GameObject> getGameObjects(const vision_interface::msg::Detections &msg);
   void detectProcessBalls(const vector<GameObject> &ballObjs);
   void detectProcessMarkings(const vector<GameObject> &markingObjs);
   void detectProcessGoalPosts(const vector<GameObject> &goalpostObjs);
-  void recoveryStateCallback(const booster_interface::msg::RawBytesMsg &msg);
+  void detectProcessRobots(const vector<GameObject> &robotObjs);
 
   rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joySubscription;
   rclcpp::Subscription<game_controller_interface::msg::GameControlData>::SharedPtr

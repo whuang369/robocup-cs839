@@ -58,12 +58,9 @@ class BrainData {
   bool needManualRelocate = false;
 
   // Other objects on the field
-  std::vector<GameObject> opponents =
-      {};  // Records information about opponent players, including position, bounding box, etc.
-  std::vector<GameObject> goalposts =
-      {};  // Records information about goalposts, including position, bounding box, etc.
-  std::vector<GameObject> markings =
-      {};  // Records information about field markings and intersections
+  std::vector<GameObject> opponents = {};  // Records information about opponent players
+  std::vector<GameObject> goalposts = {};  // Records information about goalposts
+  std::vector<GameObject> markings = {};   // Records information about field markings
 
   // Motion planning
   double dribbleTargetAngle;     // The direction for dribbling

@@ -485,12 +485,12 @@ NodeStatus StrikerDecide::tick() {
   getInput("decision_in", lastDecision);
   getInput("position", position);
 
-  double kickDir =
-      (position == "defense")
-          ? atan2(brain->data->ball.posToField.y,
-                  brain->data->ball.posToField.x + brain->config->fieldDimensions.length / 2)
-          : atan2(-brain->data->ball.posToField.y,
-                  brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
+  // double kickDir =
+  //     (position == "defense")
+  //         ? atan2(brain->data->ball.posToField.y,
+  //                 brain->data->ball.posToField.x + brain->config->fieldDimensions.length / 2)
+  //         : atan2(-brain->data->ball.posToField.y,
+  //                 brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
 
   Pose2D robotPose = brain->data->robotPoseToField;
   double dir_rb_f = brain->data->robotBallAngleToField;
@@ -503,28 +503,90 @@ NodeStatus StrikerDecide::tick() {
   bool rangeIsGood = (ballRange < kickRangeThreshold);
   bool headingIsGood = (fabs(ballYaw) < kickAngleThreshold);
 
+  // check if ball-goal dir and robot-ball dir are blocked by opponent
+  double ballGoalDir =
+      atan2(-brain->data->ball.posToField.y,
+            brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
+  double robotBallDir = atan2(brain->data->ball.posToField.y - brain->data->robotPoseToField.y,
+                              brain->data->ball.posToField.x - brain->data->robotPoseToField.x);
+
+  // iterate through all opponent robots
+  bool isBlockedGoal = false;   // if opponent is in front of the ball goal
+  bool isBlockedRobot = false;  // if opponent is in front of the robot
+  for (auto &opponent : brain->data->opponents) {
+    double ballOpponentDir = atan2(opponent.posToField.y - brain->data->ball.posToField.y,
+                                   opponent.posToField.x - brain->data->ball.posToField.x);
+    double ballOpponentRange = hypot(opponent.posToField.x - brain->data->ball.posToField.x,
+                                     opponent.posToField.y - brain->data->ball.posToField.y);
+    if (ballOpponentRange > 1.0) {
+      // Ignore opponent robots that are too far away
+      continue;
+    }
+    double angleDiffGoal = fabs(ballGoalDir - ballOpponentDir);
+    if (angleDiffGoal < M_PI / 6) {
+      isBlockedGoal = true;
+    }
+    double angleDiffRobot = fabs(robotBallDir - ballOpponentDir);
+    if (angleDiffRobot < M_PI / 6) {
+      isBlockedRobot = true;
+    }
+  }
+
+  double kickDir;
+  if (!isBlockedGoal) {
+    // Align and kick to the goal
+    kickDir = ballGoalDir;
+  } else if (!isBlockedRobot) {
+    // Kick straight into the ball without alignment
+    kickDir = robotBallDir;
+  } else {
+    // Kick straight into the ball with offset so the ball goes sideways
+    // TODO: add kickDir as part of the input and use offset to control kick direction
+    kickDir = robotBallDir;
+  }
+
+  // rerun logging
   string newDecision;
-  auto color = 0xFFFFFFFF;  // for log
   if (!brain->tree->getEntry<bool>("ball_location_known")) {
     newDecision = "find";
-    color = 0x0000FFFF;
-  } else if (angleIsGood && rangeIsGood && headingIsGood) {
+  } else if (isBlockedGoal && rangeIsGood) {
+    // Kick straight into the ball without alignment
+    // TODO: Kick direction based on if the robot ball is blocked by opponent
+    newDecision = "dribble";  // also calls the kick node
+  } else if (angleIsGood && rangeIsGood && headingIsGood && !isBlockedGoal) {
     newDecision = "kick";
-    color = 0xFF0000FF;
   } else {
     newDecision = "approach";
-    color = 0x00FFFFFF;
   }
 
   setOutput("decision_out", newDecision);
   setOutput("kick_dir_out", kickDir);
-  brain->log->logToScreen(
-      "tree/StrickerDecide",
+
+  static std::map<std::string, uint32_t> decisionColorMap = {
+      {"find", 0x0000FFFF},     // Blue
+      {"kick", 0xFF0000FF},     // Red
+      {"dribble", 0xFFA500FF},  // Orange
+      {"approach", 0x00FFFFFF}  // White
+  };
+
+  auto color = decisionColorMap[newDecision];
+
+  // Draw a line representing the kick direction
+  const auto kickLine =
+      rerun::LineStrip2D({{brain->data->ball.posToField.x, -brain->data->ball.posToField.y},
+                          {brain->data->ball.posToField.x + cos(kickDir) * 1.0,
+                           -brain->data->ball.posToField.y - sin(kickDir) * 1.0}});
+  brain->log->log("field/kick_dir",
+                  rerun::LineStrips2D(kickLine).with_colors({color}).with_radii({0.01}));
+
+  brain->log->logToField(
+      "field/StrickerDecide",
       format("Decision: %s | kickDir: %.2f | rbDir: %.2f | ballRange: %.2f | ballYaw: %.2f | "
-             "goodAngle: %d | goodRange: %d | goodHeading: %d",
+             "goodAngle: %d | goodRange: %d | goodHeading: %d | isBlockedGoal: %d | "
+             "isBlockedRobot: %d",
              newDecision.c_str(), kickDir, dir_rb_f, ballRange, ballYaw, angleIsGood, rangeIsGood,
-             headingIsGood),
-      color);
+             headingIsGood, isBlockedGoal, isBlockedRobot),
+      color, 0.2);
   return NodeStatus::SUCCESS;
 }
 
@@ -712,11 +774,11 @@ NodeStatus GoalieDecide::tick() {
   */
 
   setOutput("decision_out", newDecision);
-  brain->log->logToScreen(
+  brain->log->logToField(
       "tree/Decide",
       format("Decision: %s ballrange: %.2f ballyaw: %.2f kickDir: %.2f rbDir: %.2f angleIsGood: %d",
              newDecision.c_str(), ballRange, ballYaw, kickDir, dir_rb_f, angleIsGood),
-      color);
+      color, 0.2);
   return NodeStatus::SUCCESS;
 }
 

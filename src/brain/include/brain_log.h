@@ -31,7 +31,7 @@ class BrainLog {
     rerunLog.log(entity_path, archetypes_or_collections...);
   }
 
-  void logToScreen(std::string logPath, std::string text, uint32_t color, double padding = 0.0);
+  void logToField(std::string logPath, std::string text, uint32_t color, double padding = 0.0);
 
   inline bool isEnabled() { return enabled; }
 

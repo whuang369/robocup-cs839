@@ -13,7 +13,7 @@
             <Sequence>
                <StrikerDecide decision_out="{decision}" decision_in="{decision}"
                               kick_dir_out="{kick_dir}"
-                              kick_range_threshold="0.5" kick_angle_threshold="0.6" />
+                              kick_range_threshold="0.5" kick_angle_threshold="0.8" />
                <RobotFindBall _while="decision == 'find'" vyaw_limit="1.0" />
                <Approach _while="decision == 'approach'"
                            kick_dir="{kick_dir}" min_range="0.2" max_range="0.5"
@@ -21,7 +21,12 @@
                <Sequence  _while="decision == 'kick'">
                      <SetVelocity />
                      <Sleep msec="500" />
-                     <Kick vx_limit="1.2" vy_limit="1.0" min_msec_kick="1000"/>
+                     <Kick vx_limit="0.8" vy_limit="0.6" min_msec_kick="1000"/>
+               </Sequence>
+               <Sequence  _while="decision == 'dribble'">
+                     <SetVelocity />
+                     <Sleep msec="500" />
+                     <Kick vx_limit="0.4" vy_limit="0.2" min_msec_kick="1000"/>
                </Sequence>
             </Sequence>
          </ReactiveSequence>

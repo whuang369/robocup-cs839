@@ -127,6 +127,28 @@ SelfLocator::SelfLocator(Brain* brain, const FieldDimensions& fd) : brain(brain)
   logLandmarks();
 }
 
+void SelfLocator::init(const FieldDimensions& fd, std::string& attackSide, float startPos) {
+  startPos = std::clamp(startPos, -1.0f, 1.0f);
+  const float sideSign = (attackSide == "left") ? -1.0f : 1.0f;
+  const float initX = sideSign * static_cast<float>(fd.length / 2) * startPos;
+  const float initY = -sideSign * (static_cast<float>(fd.width / 2) + 0.5);
+  const float initTheta = sideSign * M_PI_2;
+
+  float thetaNoise = M_PI / 6;
+  float xNoise = static_cast<float>(fd.length) * 0.1f;
+  float yNoise = 0.5;
+
+  if (!samples) {
+    samples = new SampleSet<UKFRobotPoseHypothesis>(numberOfSamples);
+  }
+
+  int nextSampleId = 0;
+  for (int i = 0; i < numberOfSamples; ++i) {
+    samples->at(i).init({initTheta, initX, initY}, {thetaNoise, xNoise, yNoise}, nextSampleId++,
+                        0.5f);
+  }
+}
+
 Pose2f SelfLocator::getPose() {
   UKFRobotPoseHypothesis& bestSample = getMostValidSample();
   idOfLastBestSample = bestSample.id;
@@ -145,11 +167,12 @@ bool SelfLocator::isGood() {
   //    translationalStandardDeviation < maxTranslationDeviationForSuperbLocalizationQuality &&
   //    rotationalStandardDeviation < maxRotationalDeviationForSuperbLocalizationQuality) {
 
-  brain->log->log("localization/validity",
-                  rerun::TextLog(format("validity: %.2f  trans std: %.2f  rot std: %.2f",
-                                        bestSample.validity, transStd, rotStd)));
-
   bool isGood = (bestSample.validity >= minValidityForSuperbLocalizationQuality);
+
+  brain->log->log(
+      "localization/validity",
+      rerun::TextLog(format("isGood: %d  validity: %.2f  trans std: %.2f  rot std: %.2f", isGood,
+                            bestSample.validity, transStd, rotStd)));
   return isGood;
 };
 
@@ -450,7 +473,7 @@ void SelfLocator::logLandmarks() {
   brain->log->log("field/landmarks/t_markers",
                   rerun::Points2D(tPoints).with_colors(0x00FF00FF).with_radii(0.1));
   brain->log->log("field/landmarks/penalty_markers",
-                  rerun::Points2D(penaltyPoints).with_colors(0x7C00FFFF).with_radii(0.1));
+                  rerun::Points2D(penaltyPoints).with_colors(0xFFD700FF).with_radii(0.1));
 }
 
 void SelfLocator::logSamples() {

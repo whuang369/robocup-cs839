@@ -57,6 +57,7 @@ void Brain::init() {
 
   data = std::make_shared<BrainData>();
   self_locator = std::make_shared<SelfLocator>(this, config->fieldDimensions);
+  // self_locator->init(config->fieldDimensions, config->playerAttackSide, config->playerStartPos);
 
   tree = std::make_shared<BrainTree>(this);
   client = std::make_shared<RobotClient>(this);
@@ -174,6 +175,9 @@ void Brain::updateBallMemory() {
   if (get_clock()->now().seconds() - data->ball.timePoint.seconds() > config->memoryLength) {
     tree->setEntry<bool>("ball_location_known", false);
     data->ballDetected = false;
+    log->log("brain/updateBallMemory",
+             rerun::TextLog(format("Ball Lost! Last time: %.2f, Current time: %.2f`",
+                                   data->ball.timePoint.seconds(), get_clock()->now().seconds())));
   }
 
   // log mem ball pos
@@ -338,7 +342,9 @@ void Brain::gameControlCallback(const game_controller_interface::msg::GameContro
   } else if (msg.teams[1].team_number == config->teamId) {
     myTeamInfo = msg.teams[1];
   } else {
-    prtErr("received invalid game controller message");
+    log->log("brain/gameControlCallback",
+             rerun::TextLog("Received invalid game controller message, team ID not found.")
+                 .with_color(rerun::Color(0xFF0000FF)));
     return;
   }
 
@@ -357,22 +363,17 @@ void Brain::gameControlCallback(const game_controller_interface::msg::GameContro
   if (gameState == "SET") {
     tree->setEntry<bool>("we_just_scored", false);
   }
+
+  if (gameState != lastGameState) {
+    log->log("brain/gameControlCallback",
+             rerun::TextLog(format("Game state changed: %s -> %s", lastGameState.c_str(),
+                                   gameState.c_str()))
+                 .with_color(rerun::Color(0x00FF00FF)));  // Green
+  }
 }
 
 void Brain::detectionsCallback(const vision_interface::msg::Detections &msg) {
   double time = msg.header.stamp.sec + static_cast<double>(msg.header.stamp.nanosec) * 1e-9;
-
-  if (msg.corrupted_frame) {
-    // create a fake bounding box
-    rerun::Boxes2D corrupted_box =
-        rerun::Boxes2D::from_mins_and_sizes({{0.f, 0.f}}, {{config->camPixX, config->camPixY}})
-            .with_colors({rerun::Color(0xFF000080)})
-            .with_labels({rerun::Text("CORRUPTED FRAME")});
-
-    log->setTimeSeconds(time);
-    log->log("image/detection_boxes", corrupted_box);
-    return;
-  }
 
   auto gameObjects = getGameObjects(msg);
 
@@ -400,55 +401,49 @@ void Brain::detectionsCallback(const vision_interface::msg::Detections &msg) {
   detectProcessBalls(balls);
   detectProcessMarkings(markings);
   detectProcessGoalPosts(goalPosts);
+  detectProcessRobots(robots);
 
+  // rerun logging
   if (!log->isEnabled()) return;
 
-  // log detection boxes to rerun
+  // check vision/src/model/detector.cc
   static std::map<std::string, rerun::Color> detectColorMap = {
       {"Ball", rerun::Color(0xFFFFFFFF)},          // White
       {"LCross", rerun::Color(0xFFFF00FF)},        // Yellow
       {"TCross", rerun::Color(0x00FF00FF)},        // Bright Green
-      {"XCross", rerun::Color(0x00FFFFFF)},        // Cyan / Aqua
+      {"XCross", rerun::Color(0x00FFFFFF)},        // Cyan
+      {"PenaltyPoint", rerun::Color(0x87CEFAFF)},  // Light Sky Blue
       {"Person", rerun::Color(0xFF69B4FF)},        // Hot Pink
       {"Goalpost", rerun::Color(0xFFA500FF)},      // Orange
       {"Opponent", rerun::Color(0xFF4500FF)},      // Orange-Red
-      {"Corruption", rerun::Color(0xDC143CFF)},    // Crimson (bright red)
-      {"PenaltyPoint", rerun::Color(0x7C00FFFF)},  // Vivid Purple/Violet
-      {"Default", rerun::Color(0xFFFFFFFF)},       // White (default/fallback)
   };
 
-  // for logging boundingBoxes
-  vector<rerun::Text> labels;
-  vector<rerun::Color> colors;
-
-  // for logging marker points in robot frame
-  vector<rerun::Vec2D> points;
-  vector<rerun::Vec2D> points_r;  // robot frame
-
-  for (int i = 0; i < gameObjects.size(); i++) {
-    auto obj = gameObjects[i];
-    auto label = obj.label;
-    labels.push_back(rerun::Text(format("%s x:%.2f y:%.2f c:%.2f", obj.label.c_str(),
-                                        obj.posToRobot.x, obj.posToRobot.y, obj.confidence)));
-    points.push_back(rerun::Vec2D{obj.posToField.x, -obj.posToField.y});
-    points_r.push_back(rerun::Vec2D{obj.posToRobot.x, -obj.posToRobot.y});
-
+  auto getColor = [&](const std::string &label) {
     auto it = detectColorMap.find(label);
-    if (it != detectColorMap.end()) {
-      colors.push_back(detectColorMap[label]);
-    } else {
-      colors.push_back(rerun::Color(0xFFFFFFFF));
-    }
-  }
+    return it != detectColorMap.end() ? it->second : rerun::Color(0xFF8080FF);
+  };
 
+  // log processed detections
   log->setTimeSeconds(time);
-
-  log->log("field/detection_points", rerun::Points2D(points).with_colors(colors)
-           // .with_labels(labels)
-  );
-  log->log("robotframe/detection_points", rerun::Points2D(points_r).with_colors(colors)
-           // .with_labels(labels)
-  );
+  log->log("field/detections", rerun::Clear::RECURSIVE);
+  for (const auto &marking : data->markings) {
+    log->log("field/detections/" + marking.label,
+             rerun::Points2D({{marking.posToField.x, -marking.posToField.y}})
+                 .with_radii(0.05)
+                 .with_colors(getColor(marking.label)));
+  }
+  for (const auto &opponent : data->opponents) {
+    log->log("field/detections/opponents",
+             rerun::Points2D({{opponent.posToField.x, -opponent.posToField.y}})
+                 .with_radii(0.05)
+                 .with_colors(detectColorMap["Opponent"]));
+  }
+  if (data->ballDetected) {
+    log->log("field/detections/ball",
+             rerun::Points2D({{data->ball.posToField.x, -data->ball.posToField.y}})
+                 .with_radii(0.08)
+                 .with_colors(detectColorMap["Ball"]));
+  }
 }
 
 void Brain::odometerCallback(const booster_interface::msg::Odometer &msg) {
@@ -659,9 +654,7 @@ void Brain::detectProcessBalls(const vector<GameObject> &ballObjs) {
 
   if (indexRealBall >= 0) {
     data->ballDetected = true;
-
     data->ball = ballObjs[indexRealBall];
-
     tree->setEntry<bool>("ball_location_known", true);
   } else {
     data->ballDetected = false;
@@ -674,6 +667,8 @@ void Brain::detectProcessBalls(const vector<GameObject> &ballObjs) {
 
   data->robotBallAngleToField = std::atan2(data->ball.posToField.y - data->robotPoseToField.y,
                                            data->ball.posToField.x - data->robotPoseToField.x);
+
+  log->log("detectProcessBalls", rerun::TextLog(format("ballDetected: %d", data->ballDetected)));
 }
 
 void Brain::detectProcessMarkings(const vector<GameObject> &markingObjs) {
@@ -703,5 +698,21 @@ void Brain::detectProcessGoalPosts(const vector<GameObject> &goalpostObjs) {
     if (post.posToRobot.x < minX || post.posToRobot.x > maxX || post.posToRobot.y > maxY) continue;
 
     data->goalposts.push_back(post);
+  }
+}
+
+void Brain::detectProcessRobots(const vector<GameObject> &robotObjs) {
+  constexpr double confidenceValve = 20;
+  constexpr double minX = -0.5, maxX = 10.0, maxY = 3.0;
+
+  data->opponents.clear();
+  data->opponents.reserve(robotObjs.size());
+
+  for (const auto &robot : robotObjs) {
+    if (robot.confidence < confidenceValve) continue;
+    if (robot.posToRobot.x < minX || robot.posToRobot.x > maxX || robot.posToRobot.y > maxY)
+      continue;
+
+    data->opponents.push_back(robot);
   }
 }

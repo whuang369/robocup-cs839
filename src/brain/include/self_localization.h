@@ -83,6 +83,9 @@ class SelfLocator {
  public:
   SelfLocator(Brain* brain, const FieldDimensions& fd);
 
+  void init(const FieldDimensions& fd, std::string& attackSide, float startPos);
+  void init(float x, float y, float theta);
+
   Pose2f getPose();
 
   bool isGood();

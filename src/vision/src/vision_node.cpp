@@ -328,12 +328,12 @@ std::endl;
       {"Ball", rerun::Color(0xFFFFFFFF)},          // White
       {"LCross", rerun::Color(0xFFFF00FF)},        // Yellow
       {"TCross", rerun::Color(0x00FF00FF)},        // Bright Green
-      {"XCross", rerun::Color(0x00FFFFFF)},        // Cyan / Aqua
+      {"XCross", rerun::Color(0x00FFFFFF)},        // Cyan
+      {"PenaltyPoint", rerun::Color(0x87CEFAFF)},  // Light Sky Blue
       {"Person", rerun::Color(0xFF69B4FF)},        // Hot Pink
       {"Goalpost", rerun::Color(0xFFA500FF)},      // Orange
       {"Opponent", rerun::Color(0xFF4500FF)},      // Orange-Red
       {"Corruption", rerun::Color(0xDC143CFF)},    // Crimson (bright red)
-      {"PenaltyPoint", rerun::Color(0x7C00FFFF)},  // Vivid Purple/Violet
   };
 
   vector<rerun::Vec2D> mins, sizes;

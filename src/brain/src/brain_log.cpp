@@ -106,12 +106,13 @@ void BrainLog::prepare() {
   logStatics();
 }
 
-void BrainLog::logToScreen(string logPath, string text, u_int32_t color, double padding) {
+void BrainLog::logToField(string logPath, string text, uint32_t color, double padding) {
   if (!enabled) return;
 
+  FieldDimensions &fieldDimensions = brain->config->fieldDimensions;
   log(logPath, rerun::Boxes2D::from_mins_and_sizes(
-                   {{-padding, -padding}},
-                   {{brain->config->camPixX + padding, brain->config->camPixY + padding}})
+                   {{-fieldDimensions.length / 2 - padding, -fieldDimensions.width / 2 - padding}},
+                   {{fieldDimensions.length + 2 * padding, fieldDimensions.width + 2 * padding}})
                    .with_labels({text})
                    .with_colors({color}));
 }
