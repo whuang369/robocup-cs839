@@ -7,7 +7,7 @@
 
 #include "booster_vision/base/intrin.h"
 #include "booster_vision/base/pose.h"
-#include "booster_vision/model//detector.h"
+#include "booster_vision/model/detector.h"
 
 namespace booster_vision {
 

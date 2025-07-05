@@ -1,7 +1,12 @@
 #pragma once
 
 #include <string>
+
+#include <opencv2/core.hpp>
 #include <rerun.hpp>
+
+#include "booster_vision/base/pose.h"
+#include "vision_interface/msg/detections.hpp"
 
 namespace booster_vision {
 
@@ -20,6 +25,9 @@ class VisionLog {
   inline void log(std::string_view entity_path, const Ts&... archetypes_or_collections) const {
     if (enabled) rerunLog.log(entity_path, archetypes_or_collections...);
   }
+
+  void logDetections(const cv::Mat& color, const Pose& p_eye2base,
+                     const vision_interface::msg::Detections& detection_msg);
 
   inline bool isEnabled() { return enabled; }
 

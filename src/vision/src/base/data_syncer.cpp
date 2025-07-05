@@ -6,6 +6,82 @@
 
 namespace booster_vision {
 
+void DataSyncer::AddColor(const ColorDataBlock &color_data) {
+  std::lock_guard<std::mutex> lock(color_buffer_mutex_);
+  color_buffer_.push_back(color_data);
+}
+
+void DataSyncer::AddDepth(const DepthDataBlock &depth_data) {
+  if (!enable_depth_) return;
+  std::lock_guard<std::mutex> lock(depth_buffer_mutex_);
+  depth_buffer_.push_back(depth_data);
+}
+
+void DataSyncer::AddPose(const PoseDataBlock &pose_data) {
+  std::lock_guard<std::mutex> lock(pose_buffer_mutex_);
+  pose_buffer_.push_back(pose_data);
+}
+
+SyncedDataBlock DataSyncer::getLatestSyncedDataBlock() {
+  SyncedDataBlock synced_data;
+
+  ColorBuffer color_buffer_cp;
+  {
+    std::lock_guard<std::mutex> lock(color_buffer_mutex_);
+    color_buffer_cp = color_buffer_;
+  }
+  if (color_buffer_cp.empty()) return synced_data;
+
+  // Get the latest synced color, depth and pose data
+  DepthBuffer depth_buffer_cp;
+  {
+    std::lock_guard<std::mutex> lock(depth_buffer_mutex_);
+    depth_buffer_cp = depth_buffer_;
+  }
+
+  bool found_sync = false;
+  if (enable_depth_ && !depth_buffer_cp.empty()) {
+    for (auto d_it = depth_buffer_cp.rbegin(); d_it != depth_buffer_cp.rend(); ++d_it) {
+      for (auto c_it = color_buffer_cp.rbegin(); c_it != color_buffer_cp.rend(); ++c_it) {
+        double diff = std::abs(d_it->timestamp - c_it->timestamp);
+        if (diff < 0.001) {  // 1ms threshold for sync
+          synced_data.color_data = *c_it;
+          synced_data.depth_data = *d_it;
+          c_it->data.copyTo(synced_data.color_data.data);
+          d_it->data.copyTo(synced_data.depth_data.data);
+          found_sync = true;
+          break;
+        }
+      }
+      if (found_sync) break;
+    }
+  }
+
+  if (!found_sync) {
+    synced_data.color_data = color_buffer_cp.back();
+  }
+
+  // Pose sync
+  PoseBuffer pose_buffer_cp;
+  {
+    std::lock_guard<std::mutex> lock(pose_buffer_mutex_);
+    pose_buffer_cp = pose_buffer_;
+  }
+
+  double smallest_pose_timestamp_diff = DBL_MAX;
+  for (auto it = pose_buffer_cp.rbegin(); it != pose_buffer_cp.rend(); ++it) {
+    double diff = std::abs(it->timestamp - synced_data.color_data.timestamp);
+    if (diff < smallest_pose_timestamp_diff) {
+      smallest_pose_timestamp_diff = diff;
+      synced_data.pose_data = *it;
+    }
+  }
+
+  return synced_data;
+}
+
+///// Functions for eye2head calibration
+
 void DataSyncer::LoadData(const std::string &data_dir) {
   if (!std::filesystem::is_directory(data_dir)) {
     throw std::runtime_error("data directory does not exist: " + data_dir);
@@ -30,17 +106,6 @@ void DataSyncer::LoadData(const std::string &data_dir) {
   std::sort(time_stamp_list_.begin(), time_stamp_list_.end());
   data_index_ = 0;
   std::cout << "loaded " << time_stamp_list_.size() << " data" << std::endl;
-}
-
-void DataSyncer::AddDepth(const DepthDataBlock &depth_data) {
-  if (!enable_depth_) return;
-  std::lock_guard<std::mutex> lock(depth_buffer_mutex_);
-  depth_buffer_.push_back(depth_data);
-}
-
-void DataSyncer::AddPose(const PoseDataBlock &pose_data) {
-  std::lock_guard<std::mutex> lock(pose_buffer_mutex_);
-  pose_buffer_.push_back(pose_data);
 }
 
 SyncedDataBlock DataSyncer::getSyncedDataBlock() {

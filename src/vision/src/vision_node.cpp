@@ -25,6 +25,7 @@
 
 using std::string;
 using std::vector;
+using std::placeholders::_1;
 
 namespace {
 bool detectPixelShiftCorruption(const cv::Mat &image) {
@@ -95,7 +96,7 @@ bool detectPixelShiftCorruption(const cv::Mat &image) {
 
 namespace booster_vision {
 
-void VisionNode::Init(const std::string &cfg_path, const std::string &cfg_local_path) {
+void VisionNode::Init(const string &cfg_path, const string &cfg_local_path) {
   // load config file
   if (!std::filesystem::exists(cfg_path)) {
     std::cerr << "Error: Configuration file '" << cfg_path << "' does not exist." << std::endl;
@@ -116,8 +117,8 @@ void VisionNode::Init(const std::string &cfg_path, const std::string &cfg_local_
   this->declare_parameter<string>("rerunLog.server_addr", "rerun+http://127.0.0.1:9876/proxy");
   string rerun_server_addr;
   this->get_parameter("rerunLog.server_addr", rerun_server_addr);
-  log = std::make_shared<VisionLog>(this, node["rerun_log"].as<bool>(), rerun_server_addr,
-                                    node["rerun_id"].as<string>(""));
+  log_ = std::make_shared<VisionLog>(this, node["rerun_log"].as<bool>(), rerun_server_addr,
+                                     node["rerun_id"].as<string>(""));
 
   // read camera param
   if (!node["camera"]) {
@@ -169,64 +170,48 @@ void VisionNode::Init(const std::string &cfg_path, const std::string &cfg_local_
   }
 
   it_ = std::make_shared<image_transport::ImageTransport>(shared_from_this());
-  color_sub_ = it_->subscribe(color_topic, 1,
-                              std::bind(&VisionNode::ColorCallback, this, std::placeholders::_1));
-  depth_sub_ = it_->subscribe(depth_topic, 1,
-                              std::bind(&VisionNode::DepthCallback, this, std::placeholders::_1));
+  color_sub_ = it_->subscribe(color_topic, 1, std::bind(&VisionNode::ColorCallback, this, _1));
+  depth_sub_ = it_->subscribe(depth_topic, 10, std::bind(&VisionNode::DepthCallback, this, _1));
 
-  pose_sub_ = this->create_subscription<geometry_msgs::msg::Pose>(
-      "/head_pose", 10, std::bind(&VisionNode::PoseCallBack, this, std::placeholders::_1));
+  pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+      "/head_pose_stamped", 10, std::bind(&VisionNode::PoseCallBack, this, _1));
 
   detection_pub_ = this->create_publisher<vision_interface::msg::Detections>(
       "/booster_vision/detection", rclcpp::QoS(1));
+
+  //  start processing thread
+  processing_thread_ = std::thread([this]() {
+    rclcpp::Rate rate(20);  // 20 Hz processing loop
+
+    while (rclcpp::ok()) {
+      this->ProcessFrame();
+      rate.sleep();
+    }
+  });
 }
 
-void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &msg) {
-  if (!msg) {
-    std::cerr << "empty image message." << std::endl;
-    return;
-  }
-
-  cv::Mat imgBGR;
-  try {
-    imgBGR = toBGRMat(*msg);
-  } catch (const std::exception &e) {
-    std::cerr << "converting msg to BGR cv::Mat failed: " << e.what() << std::endl;
-    return;
-  }
-
-  double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
-  vision_interface::msg::Detections detection_msg;
-  detection_msg.header = msg->header;
-
-  bool is_corrupted = detectPixelShiftCorruption(imgBGR);
-  detection_msg.corrupted_frame = is_corrupted;
-
-  if (is_corrupted) {
-    std::cerr << "Pixel shift corruption detected, dropping frame." << std::endl;
-    detection_pub_->publish(detection_msg);
-
-    // TODO: remove this
-    vector<uint8_t> compressed_image;
-    cv::imencode(".jpg", imgBGR, compressed_image, {cv::IMWRITE_JPEG_QUALITY, 10});
-    log->setTimeSeconds(timestamp);
-    log->log("image/corrupted", rerun::EncodedImage::from_bytes(compressed_image));
-    return;
-  }
+void VisionNode::ProcessFrame() {
+  auto t0 = this->get_clock()->now().nanoseconds();
 
   // get synced data
-  SyncedDataBlock synced_data = data_syncer_->getSyncedDataBlock(ColorDataBlock(imgBGR, timestamp));
+  static double last_timestamp = 0.0;
+  SyncedDataBlock synced_data = data_syncer_->getLatestSyncedDataBlock();
+  if (synced_data.color_data.data.empty()) return;
+  if (synced_data.color_data.timestamp <= last_timestamp) return;
+  last_timestamp = synced_data.color_data.timestamp;
+
+  double elapsed = this->get_clock()->now().nanoseconds() - t0;
+  log_->setTimeSeconds(last_timestamp);
+  log_->log("ProcessFrame/getLatestSyncedDataBlock",
+            rerun::TextLog(std::to_string(elapsed * 1e-6) + "ms"));
+
   cv::Mat color = synced_data.color_data.data;
   cv::Mat depth = synced_data.depth_data.data;
   Pose p_head2base = synced_data.pose_data.data;
   Pose p_eye2base = p_head2base * p_headprime2head_ * p_eye2head_;
-  // std::cout << "p_head2base: \n" << p_head2base.toCVMat() << std::endl;
-  // std::cout << "p_eye2base: \n" << p_eye2base.toCVMat() << std::endl;
-  std::vector<float> eye2base_angles = p_eye2base.getEulerAnglesVec();
-  std::vector<float> eye2base_t = p_eye2base.getTranslationVec();
-  // std::cout << "p_eye2base roll: " << eye2base_angles[0] * 180.0 / M_PI << std::endl;
-  // std::cout << "p_eye2base pitch: " << eye2base_angles[1] * 180.0 / M_PI << std::endl;
-  // std::cout << "p_eye2base yaw: " << eye2base_angles[2] * 180.0 / M_PI << std::endl;
+
+  vector<float> eye2base_angles = p_eye2base.getEulerAnglesVec();
+  vector<float> eye2base_t = p_eye2base.getTranslationVec();
 
   bool estimateCameraRollPitch = false;
   Pose p_eye2base_from_depth;
@@ -244,161 +229,132 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
 
   // inference
   auto detections = detector_->Inference(color);
-  std::cout << detections.size() << " objects detected." << std::endl;
 
-  auto get_estimator = [&](const std::string &class_name) {
-    if (class_name == "Ball") {
-      return pose_estimator_map_.find("ball") != pose_estimator_map_.end()
-                 ? pose_estimator_map_["ball"]
-                 : pose_estimator_map_["default"];
-    } else if (class_name == "Person" || class_name == "Opponent" || class_name == "Goalpost") {
-      return pose_estimator_map_.find("human_like") != pose_estimator_map_.end()
-                 ? pose_estimator_map_["human_like"]
-                 : pose_estimator_map_["default"];
-    } else if (class_name.find("Cross") != std::string::npos || class_name == "PenaltyPoint") {
-      return pose_estimator_map_.find("field_marker") != pose_estimator_map_.end()
-                 ? pose_estimator_map_["field_marker"]
-                 : pose_estimator_map_["default"];
-    } else {
-      return pose_estimator_map_["default"];
-    }
+  // pose estimation in field frame
+  static const std::unordered_map<string, string> estimator_map = {
+      {"Ball", "ball"},
+      {"Person", "human_like"},
+      {"Opponent", "human_like"},
+      {"Goalpost", "human_like"},
   };
 
+  vision_interface::msg::Detections detection_msg;
+  detection_msg.header.stamp = rclcpp::Time(synced_data.color_data.timestamp * 1e9);
+  detection_msg.header.frame_id = "camera";
   for (auto &detection : detections) {
-    vision_interface::msg::DetectedObject detection_obj;
-
     detection.class_name = detector_->kClassLabels[detection.class_id];
 
-    auto pose_estimator = get_estimator(detection.class_name);
-    Pose pose_obj_by_color = pose_estimator->EstimateByColor(p_eye2base, detection, color);
+    // estimator by class name
+    std::string group = "default";
+    if (auto it = estimator_map.find(detection.class_name); it != estimator_map.end()) {
+      group = it->second;
+    }
+    auto pose_it = pose_estimator_map_.find(group);
+    auto pose_estimator = (pose_it != pose_estimator_map_.end() && pose_it->second)
+                              ? pose_it->second
+                              : pose_estimator_map_.at("default");
 
-    // Pose pose_obj_by_depth = pose_estimator->EstimateByDepth(p_eye2base, detection, depth);
-    /*
-if (estimateCameraRollPitch) {
-Pose pose_obj_by_color_est = pose_estimator->EstimateByColor(p_eye2base_from_depth, detection,
-color); Pose pose_obj_by_depth_est = pose_estimator->EstimateByDepth(p_eye2base_from_depth,
-detection, depth); if (detection.class_name == "XCross" || detection.class_name == "PenaltyPoint") {
-    std::cout << detection.class_name << " kinematics color: " <<
-pose_obj_by_color.getTranslation()[0] << ", " << pose_obj_by_color.getTranslation()[1] << std::endl;
-    std::cout << detection.class_name << " kinematics depth: " <<
-pose_obj_by_depth.getTranslation()[0] << ", " << pose_obj_by_depth.getTranslation()[1] << std::endl;
-    std::cout << detection.class_name << " estimated color: " <<
-pose_obj_by_color_est.getTranslation()[0] << ", " << pose_obj_by_color_est.getTranslation()[1] <<
-std::endl; std::cout << detection.class_name << " estimated depth: " <<
-pose_obj_by_depth_est.getTranslation()[0] << ", " << pose_obj_by_depth_est.getTranslation()[1] <<
-std::endl;
-}
-}
-    */
+    // pose estimation
+    Pose pose_by_color = pose_estimator->EstimateByColor(p_eye2base, detection, color);
+    Pose pose_by_depth = pose_estimator->EstimateByDepth(p_eye2base, detection, depth);
 
-    detection_obj.position_projection = pose_obj_by_color.getTranslationVec();
-    // detection_obj.position = pose_obj_by_depth.getTranslationVec();
-
-    auto xyz = p_head2base.getTranslationVec();
-    auto rpy = p_head2base.getEulerAnglesVec();
-    std::vector<float> xyzrpy = {xyz[0],
-                                 xyz[1],
-                                 xyz[2],
-                                 static_cast<float>(rpy[0] / CV_PI * 180),
-                                 static_cast<float>(rpy[1] / CV_PI * 180),
-                                 static_cast<float>(rpy[2] / CV_PI * 180)};
-    detection_obj.received_pos = xyzrpy;
-    // NOTE: currently, received_pos is not used in brain
-
+    vision_interface::msg::DetectedObject detection_obj;
+    detection_obj.label = detection.class_name;
     detection_obj.confidence = detection.confidence * 100;
     detection_obj.xmin = detection.bbox.x;
     detection_obj.ymin = detection.bbox.y;
     detection_obj.xmax = detection.bbox.x + detection.bbox.width;
     detection_obj.ymax = detection.bbox.y + detection.bbox.height;
-    detection_obj.label = detection.class_name;
+
+    detection_obj.position = pose_by_depth.getTranslationVec();
+    detection_obj.position_projection = pose_by_color.getTranslationVec();
+
+    // NOTE: currently, received_pos is not used in brain
+    auto xyz = p_head2base.getTranslationVec();
+    auto rpy = p_head2base.getEulerAnglesVec();
+    detection_obj.received_pos = {xyz[0],
+                                  xyz[1],
+                                  xyz[2],
+                                  static_cast<float>(rpy[0] * 180 / CV_PI),
+                                  static_cast<float>(rpy[1] * 180 / CV_PI),
+                                  static_cast<float>(rpy[2] * 180 / CV_PI)};
+
     detection_msg.detected_objects.push_back(detection_obj);
   }
 
   // publish msg
   detection_pub_->publish(detection_msg);
 
-  // rerun logging
-  vector<uint8_t> compressed_image;
-  cv::imencode(".jpg", color, compressed_image, {cv::IMWRITE_JPEG_QUALITY, 10});
+  log_->logDetections(color, p_eye2base, detection_msg);
 
-  log->setTimeSeconds(timestamp);
-  log->log("image/color", rerun::EncodedImage::from_bytes(compressed_image));
-
-  static std::map<std::string, rerun::Color> detectColorMap = {
-      {"Ball", rerun::Color(0xFFFFFFFF)},          // White
-      {"LCross", rerun::Color(0xFFFF00FF)},        // Yellow
-      {"TCross", rerun::Color(0x00FF00FF)},        // Bright Green
-      {"XCross", rerun::Color(0x00FFFFFF)},        // Cyan
-      {"PenaltyPoint", rerun::Color(0x87CEFAFF)},  // Light Sky Blue
-      {"Person", rerun::Color(0xFF69B4FF)},        // Hot Pink
-      {"Goalpost", rerun::Color(0xFFA500FF)},      // Orange
-      {"Opponent", rerun::Color(0xFF4500FF)},      // Orange-Red
-      {"Corruption", rerun::Color(0xDC143CFF)},    // Crimson (bright red)
-  };
-
-  vector<rerun::Vec2D> mins, sizes;
-  vector<rerun::Text> labels;
-  vector<rerun::Color> colors;
-  mins.reserve(detections.size());
-  sizes.reserve(detections.size());
-  labels.reserve(detections.size());
-  colors.reserve(detections.size());
-
-  for (const auto &detection : detections) {
-    std::ostringstream oss;
-    // clang-format off
-    oss << detection.class_name << " "
-        << "c:" << std::fixed << std::setprecision(2) << detection.confidence;
-    // TODO: add position info
-    // clang-format on
-    labels.emplace_back(rerun::Text(oss.str()));
-    mins.emplace_back(rerun::Vec2D(detection.bbox.x, detection.bbox.y));
-    sizes.emplace_back(rerun::Vec2D(detection.bbox.width, detection.bbox.height));
-    colors.emplace_back(detectColorMap[detection.class_name]);
-  }
-  log->log(
-      "image/detection_boxes",
-      rerun::Boxes2D::from_mins_and_sizes(mins, sizes).with_labels(labels).with_colors(colors));
+  // vector<float> depth_data(depth.begin<float>(), depth.end<float>());
+  // log_->log("image/depth",
+  //           rerun::DepthImage(depth_data.data(), {static_cast<uint32_t>(depth.cols),
+  //                                                 static_cast<uint32_t>(depth.rows)}));
 }
 
-void VisionNode::DepthCallback(const sensor_msgs::msg::Image::ConstSharedPtr &msg) {
+void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &msg) {
   if (!msg) {
-    std::cerr << "empty depth message." << std::endl;
+    std::cerr << "empty image message." << std::endl;
     return;
   }
 
-  cv::Mat depth;
-  if (msg->encoding == "16UC1") {
-    cv::Mat depthRaw(msg->height, msg->width, CV_16UC1, const_cast<uchar *>(msg->data.data()));
-    depthRaw.convertTo(depth, CV_32FC1, 0.001);  // mm to meters
-  } else if (msg->encoding == "32FC1") {
-    depth = cv::Mat(msg->height, msg->width, CV_32FC1, const_cast<uchar *>(msg->data.data()));
-  } else {
-    std::cerr << "Unsupported depth image encoding: " << msg->encoding << std::endl;
-    return;
-  }
+  cv::Mat imgBGR;
 
-  if (depth.empty()) {
-    std::cerr << "empty image recevied." << std::endl;
+  try {
+    imgBGR = toBGRMat(*msg);
+  } catch (const std::exception &e) {
+    std::cerr << "converting msg to BGR cv::Mat failed: " << e.what() << std::endl;
     return;
   }
 
   double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
-  data_syncer_->AddDepth(DepthDataBlock(depth, timestamp));
+  data_syncer_->AddColor(ColorDataBlock(imgBGR, timestamp));
+
+  log_->setTimeSeconds(timestamp);
+  log_->log("callback/color", rerun::TextLog(std::to_string(timestamp)));
 }
 
-void VisionNode::PoseCallBack(const geometry_msgs::msg::Pose::SharedPtr msg) {
-  auto current_time = this->get_clock()->now();
-  double timestamp = static_cast<double>(current_time.nanoseconds()) * 1e-9;
+void VisionNode::DepthCallback(const sensor_msgs::msg::Image::ConstSharedPtr &msg) {
+  if (!use_depth_ || !msg) return;
 
-  float x = msg->position.x;
-  float y = msg->position.y;
-  float z = msg->position.z;
-  float qx = msg->orientation.x;
-  float qy = msg->orientation.y;
-  float qz = msg->orientation.z;
-  float qw = msg->orientation.w;
-  auto pose = Pose(x, y, z, qx, qy, qz, qw);
+  if (msg->encoding != "32FC1") {
+    std::cerr << "Unsupported depth image encoding: " << msg->encoding << std::endl;
+    return;
+  }
+
+  // check message size and alignment
+  const uint8_t *raw = msg->data.data();
+  size_t expected_size = msg->height * msg->width * sizeof(float);
+  if (msg->data.size() != expected_size) return;
+  if (reinterpret_cast<uintptr_t>(raw) % alignof(float) != 0) return;
+
+  // convert raw data to cv::Mat
+  const float *float_ptr = reinterpret_cast<const float *>(raw);
+  cv::Mat depth(msg->height, msg->width, CV_32FC1, const_cast<float *>(float_ptr));
+  depth = depth.clone();
+
+  // check if depth image is valid
+  cv::Mat valid_mask = (depth >= 0.1f) & (depth <= 20.0f) & (depth == depth);
+  int valid_pixels = cv::countNonZero(valid_mask);
+  float valid_ratio = static_cast<float>(valid_pixels) / (depth.rows * depth.cols);
+  if (valid_ratio < 0.9f) return;
+  depth.setTo(0.0f, ~valid_mask);  // Set invalid pixels to 0
+
+  // add depth data to syncer
+  double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
+  data_syncer_->AddDepth(DepthDataBlock(depth, timestamp));
+
+  log_->setTimeSeconds(timestamp);
+  log_->log("callback/depth", rerun::TextLog(std::to_string(timestamp)));
+}
+
+void VisionNode::PoseCallBack(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+  double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
+  const auto &p = msg->pose.position;
+  const auto &q = msg->pose.orientation;
+  Pose pose(p.x, p.y, p.z, q.x, q.y, q.z, q.w);
+
   data_syncer_->AddPose(PoseDataBlock(pose, timestamp));
 }
 

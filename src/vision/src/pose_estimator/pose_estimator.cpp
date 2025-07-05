@@ -35,15 +35,31 @@ Pose PoseEstimator::EstimateByColor(const Pose &p_eye2base, const DetectionRes &
 Pose PoseEstimator::EstimateByDepth(const Pose &p_eye2base, const DetectionRes &detection,
                                     const cv::Mat &depth) {
   auto bbox = detection.bbox;
-  cv::Point2f target_uv = cv::Point2f(bbox.x + bbox.width / 2, bbox.y + bbox.height / 2);
-  float z = depth.at<float>(target_uv.y, target_uv.x);  // Get depth value
-  if (std::isnan(z) and (z > 0.01)) return Pose();
-  cv::Point3f point = intr_.BackProject(target_uv, z);
-  if (detection.class_name == "XCross" || detection.class_name == "PenaltyPoint") {
-    std::cout << detection.class_name << " to eye: " << target_uv.x << ", " << target_uv.y << ", "
-              << point.x << ", " << point.y << ", " << z << std::endl;
+  cv::Rect roi = bbox & cv::Rect(0, 0, depth.cols, depth.rows);
+  if (roi.width <= 1 || roi.height <= 1) return Pose();  // invalid bbox
+
+  std::vector<float> valid_depths;
+  for (int y = roi.y; y < roi.y + roi.height; ++y) {
+    const float *row = depth.ptr<float>(y);
+    for (int x = roi.x; x < roi.x + roi.width; ++x) {
+      float z = row[x];
+      if (z > 0.1f && z < 20.0f && std::isfinite(z)) {
+        valid_depths.push_back(z);
+      }
+    }
   }
 
+  if (valid_depths.size() < 10) return Pose();  // not enough valid depth data
+
+  // calculate median depth
+  std::nth_element(valid_depths.begin(), valid_depths.begin() + valid_depths.size() / 2,
+                   valid_depths.end());
+  float median_depth = valid_depths[valid_depths.size() / 2];
+
+  cv::Point2f uv = cv::Point2f(bbox.x + bbox.width * 0.5f, bbox.y + bbox.height * 0.5f);
+  cv::Point3f point = intr_.BackProject(uv, median_depth);
+
+  // transform point from eye to base frame
   Pose p_obj2eye = Pose(point.x, point.y, point.z, 0, 0, 0);
   Pose p_obj2base = p_eye2base * p_obj2eye;
   return p_obj2base;
@@ -67,13 +83,33 @@ Pose BallPoseEstimator::EstimateByColor(const Pose &p_eye2base, const DetectionR
 
 Pose BallPoseEstimator::EstimateByDepth(const Pose &p_eye2base, const DetectionRes &detection,
                                         const cv::Mat &depth) {
-  auto bbox = detection.bbox;
-  cv::Point2f target_uv = cv::Point2f(bbox.x + bbox.width / 2, bbox.y + bbox.height);
-  float z = depth.at<float>(target_uv.y, target_uv.x);  // Get depth value
-  if (std::isnan(z) and (z > 0.01)) return Pose();
-  cv::Point3f point = intr_.BackProject(target_uv, z);
-  std::cout << detection.class_name << " to eye: " << target_uv.x << ", " << target_uv.y << ", "
-            << point.x << ", " << point.y << ", " << z << std::endl;
+  const auto &bbox = detection.bbox;
+  if (depth.empty() || bbox.width <= 1 || bbox.height <= 1) return Pose();
+
+  int shrink = 0.25f * std::min(bbox.width, bbox.height);
+  cv::Rect roi(bbox.x + shrink, bbox.y + shrink, bbox.width - 2 * shrink, bbox.height - 2 * shrink);
+  roi &= cv::Rect(0, 0, depth.cols, depth.rows);
+  if (roi.width <= 1 || roi.height <= 1) return Pose();
+
+  std::vector<float> valid_depths;
+  for (int y = roi.y; y < roi.y + roi.height; ++y) {
+    const float *row = depth.ptr<float>(y);
+    for (int x = roi.x; x < roi.x + roi.width; ++x) {
+      float z = row[x];
+      if (z > 0.1f && z < 20.0f && std::isfinite(z)) {
+        valid_depths.push_back(z);
+      }
+    }
+  }
+
+  if (valid_depths.size() < 10) return Pose();  // not enough valid depth data
+
+  std::nth_element(valid_depths.begin(), valid_depths.begin() + valid_depths.size() / 2,
+                   valid_depths.end());
+  float median_depth = valid_depths[valid_depths.size() / 2];
+
+  cv::Point2f uv = cv::Point2f(bbox.x + bbox.width * 0.5f, bbox.y + bbox.height * 0.5f);
+  cv::Point3f point = intr_.BackProject(uv, median_depth + radius_);
 
   Pose p_obj2eye = Pose(point.x, point.y, point.z, 0, 0, 0);
   Pose p_obj2base = p_eye2base * p_obj2eye;
@@ -98,13 +134,35 @@ Pose HumanLikePoseEstimator::EstimateByColor(const Pose &p_eye2base, const Detec
 Pose HumanLikePoseEstimator::EstimateByDepth(const Pose &p_eye2base, const DetectionRes &detection,
                                              const cv::Mat &depth) {
   auto bbox = detection.bbox;
-  cv::Point2f target_uv = cv::Point2f(bbox.x + bbox.width / 2, bbox.y + bbox.height);
-  float z = depth.at<float>(target_uv.y, target_uv.x);  // Get depth value
-  if (std::isnan(z) and (z > 0.01)) return Pose();
-  cv::Point3f point = intr_.BackProject(target_uv, z);
-  std::cout << detection.class_name << " to eye: " << target_uv.x << ", " << target_uv.y << ", "
-            << point.x << ", " << point.y << ", " << z << std::endl;
+  const int margin = 2;
+  const int strip_height = std::max(1, bbox.height / 10);
+  cv::Rect roi(bbox.x + margin, bbox.y + bbox.height - strip_height, bbox.width - 2 * margin,
+               strip_height);
+  roi &= cv::Rect(0, 0, depth.cols, depth.rows);
+  if (roi.width <= 1 || roi.height <= 1) return Pose();  // invalid bbox
 
+  std::vector<float> valid_depths;
+  for (int y = roi.y; y < roi.y + roi.height; ++y) {
+    const float *row = depth.ptr<float>(y);
+    for (int x = roi.x; x < roi.x + roi.width; ++x) {
+      float z = row[x];
+      if (z > 0.1f && z < 20.0f && std::isfinite(z)) {
+        valid_depths.push_back(z);
+      }
+    }
+  }
+
+  if (valid_depths.size() < 10) return Pose();  // not enough valid depth data
+
+  // calculate median depth
+  std::nth_element(valid_depths.begin(), valid_depths.begin() + valid_depths.size() / 2,
+                   valid_depths.end());
+  float median_depth = valid_depths[valid_depths.size() / 2];
+
+  cv::Point2f uv = cv::Point2f(bbox.x + bbox.width * 0.5f, bbox.y + bbox.height);
+  cv::Point3f point = intr_.BackProject(uv, median_depth);
+
+  // transform point from eye to base frame
   Pose p_obj2eye = Pose(point.x, point.y, point.z, 0, 0, 0);
   Pose p_obj2base = p_eye2base * p_obj2eye;
   return p_obj2base;

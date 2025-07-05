@@ -8,6 +8,10 @@ brain_node:
       player_attack_side: "left" # left | right
       player_start_pos: 0.5 # [-1.0, 1.0] -1.0 is left side, 1.0 is right side
 
+    discover_ip_list:
+      - "100.119.183.125"
+      - "100.124.209.109"
+
     robot:
       robot_height: 1.0
       odom_factor: 1.0
@@ -16,8 +20,8 @@ brain_node:
       joystick: "beitong" # logitech | beitong
 
     image:
-      width: 960
-      height: 540
+      width: 640
+      height: 360
 
     visual_odom:
       topic: "/camera/camera/pose"

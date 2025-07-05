@@ -24,7 +24,19 @@ find_package(vision_interface REQUIRED)
 find_package(bhuman REQUIRED)
 
 # source files
-file(GLOB SOURCE_FILES src/*.cpp)
+set(SOURCE_FILES
+  src/main.cpp
+  src/brain.cpp
+  src/brain_tree.cpp
+  src/brain_config.cpp
+  src/brain_data.cpp
+  src/brain_log.cpp
+  src/brain_communication.cpp
+  src/joy_msg.cpp
+  src/locator.cpp
+  src/robot_client.cpp
+  src/self_localization.cpp
+)
 add_executable(brain_node ${SOURCE_FILES})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-narrowing -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers -Wno-unused-variable")

@@ -56,6 +56,7 @@ class DataBuffer : public std::deque<T, Allocator> {
   }
 };
 
+const int kColorBufferLength = 30;
 const int kDepthBufferLength = 30;
 const int kPoseBufferLength = 500;
 
@@ -63,17 +64,20 @@ class DataSyncer {
  public:
   DataSyncer(bool enable_depth) : enable_depth_(enable_depth) {}
 
-  void LoadData(const std::string &data_dir);
-
+  void AddColor(const ColorDataBlock &color_data);
   void AddDepth(const DepthDataBlock &depth_data);
   void AddPose(const PoseDataBlock &pose_data);
 
+  SyncedDataBlock getLatestSyncedDataBlock();
+
   SyncedDataBlock getSyncedDataBlock(const ColorDataBlock &color_data);
   SyncedDataBlock getSyncedDataBlock();
+  void LoadData(const std::string &data_dir);
 
  private:
   bool enable_depth_;
 
+  std::mutex color_buffer_mutex_;
   std::mutex depth_buffer_mutex_;
   std::mutex pose_buffer_mutex_;
 
@@ -81,9 +85,11 @@ class DataSyncer {
   std::string data_dir_;
   std::vector<double> time_stamp_list_;
 
+  using ColorBuffer = DataBuffer<kColorBufferLength, ColorDataBlock>;
   using DepthBuffer = DataBuffer<kDepthBufferLength, DepthDataBlock>;
   using PoseBuffer = DataBuffer<kPoseBufferLength, PoseDataBlock>;
 
+  ColorBuffer color_buffer_;
   DepthBuffer depth_buffer_;
   PoseBuffer pose_buffer_;
 };
