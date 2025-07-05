@@ -1,6 +1,6 @@
 <root BTCPP_format="4" >
    <include path="./subtree_cam_find_and_track_ball.xml" />
-   <BehaviorTree ID="CarrotStrikerPlay">
+   <BehaviorTree ID="CarrotGoaliePlay">
       <ReactiveSequence>
          <ReactiveSequence _while="wait_for_opponent_kickoff" name="wait">
             <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
@@ -11,10 +11,11 @@
             <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
             <SelfLocate />
             <Sequence>
-               <StrikerDecide decision_out="{decision}" decision_in="{decision}"
+               <GoalieDecide decision_out="{decision}" decision_in="{decision}"
                               kick_dir_out="{kick_dir}"
                               kick_range_threshold="0.5" kick_angle_threshold="0.8" />
                <RobotFindBall _while="decision == 'find'" vyaw_limit="1.0" />
+               <KeepGoal _while="decision == 'retreat'"/>
                <Approach _while="decision == 'approach'"
                            kick_dir="{kick_dir}" min_range="0.2" max_range="0.5"
                            vx_limit="1.0" vy_limit="0.5" vtheta_limit="1.0" />
@@ -26,7 +27,7 @@
                <Sequence  _while="decision == 'dribble'">
                      <SetVelocity />
                      <Sleep msec="500" />
-                     <Kick vx_limit="0.4" vy_limit="0.2" min_msec_kick="1000"/>
+                     <Kick vx_limit="0.6" vy_limit="0.4" min_msec_kick="1000"/>
                </Sequence>
             </Sequence>
          </ReactiveSequence>
