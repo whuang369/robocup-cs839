@@ -66,13 +66,11 @@ struct GameObject {
   // --- Obtained from the /detect message ---
   string label;  // What the object is identified as.
   BoundingBox
-      boundingBox;  // The recognition box of the object in the camera, with the upper left corner
-                    // as the origin, x increasing to the right and y increasing downward.
-  Point2D precisePixelPoint;  // The precise pixel point position of the object. Only ground
-                              // landmark points have this data.
-  double confidence;          // The confidence of the identification.
-  Point posToRobot;  // The position of the object in the robot's body coordinate system. The
-                     // position is 2D, ignoring the z value.
+      boundingBox;    // The recognition box of the object in the camera, with the upper left corner
+                      // as the origin, x increasing to the right and y increasing downward.
+  double confidence;  // The confidence of the identification.
+  Point posToRobot;   // The position of the object in the robot's body coordinate system. The
+                      // position is 2D, ignoring the z value.
 
   // --- Calculated and obtained in the processDetectedObject function ---
   string info;  // Used to store additional information. For example, for a goalpost object, it can

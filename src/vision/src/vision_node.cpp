@@ -210,23 +210,6 @@ void VisionNode::ProcessFrame() {
   Pose p_head2base = synced_data.pose_data.data;
   Pose p_eye2base = p_head2base * p_headprime2head_ * p_eye2head_;
 
-  vector<float> eye2base_angles = p_eye2base.getEulerAnglesVec();
-  vector<float> eye2base_t = p_eye2base.getTranslationVec();
-
-  bool estimateCameraRollPitch = false;
-  Pose p_eye2base_from_depth;
-  if (estimateCameraRollPitch) {
-    float roll = 0.0, pitch = 0.0, height = 0.0;
-    bool success = EstimateCameraRollPitch(depth, roll, pitch, height);
-    if (success) {
-      p_eye2base_from_depth =
-          Pose(eye2base_t[0], eye2base_t[1], eye2base_t[2], roll, pitch, eye2base_angles[2]);
-      std::cout << "p_eye2base_from_depth: \n" << p_eye2base_from_depth.toCVMat() << std::endl;
-      // p_eye2base = p_eye2base_from_depth;
-    } else
-      estimateCameraRollPitch = false;
-  }
-
   // inference
   auto detections = detector_->Inference(color);
 

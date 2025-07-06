@@ -33,6 +33,8 @@ const float SelfLocator::minValidityForSuperbLocalizationQuality = 0.5;
 const float SelfLocator::maxTranslationDeviationForSuperbLocalizationQuality = 100.0;
 const Angle SelfLocator::maxRotationalDeviationForSuperbLocalizationQuality =
     Angle((30 / 180.f) * pi);
+
+const Pose2f SelfLocator::defaultPoseDeviation = Pose2f(0.3, 0.5, 0.5);
 const Pose2f SelfLocator::filterProcessDeviation = Pose2f(0.002, 2.0, 2.0);
 const Pose2f SelfLocator::odometryDeviation = Pose2f(0.3, 0.2, 0.2);
 const Vector2f SelfLocator::odometryRotationDeviation = Vector2f(0.00157, 0.00157);
@@ -46,7 +48,9 @@ void UKFRobotPoseHypothesis::init(const Pose2f& pose, const Pose2f& poseDeviatio
   cov(0, 0) = sqr(poseDeviation.translation.x());
   cov(1, 1) = sqr(poseDeviation.translation.y());
   cov(2, 2) = sqr(poseDeviation.rotation);
-  for (int i = 0; i < 7; ++i) sigmaPoints[i] = Vector3f::Zero();
+  for (int i = 0; i < 7; ++i) {
+    sigmaPoints[i] = Vector3f::Zero();
+  }
 }
 
 void UKFRobotPoseHypothesis::mirror() {
@@ -77,7 +81,7 @@ void UKFRobotPoseHypothesis::updateByLandmark(const RegisteredLandmark& landmark
 }
 
 SelfLocator::SelfLocator(Brain* brain, const FieldDimensions& fd) : brain(brain) {
-  int nextSampleId = 0;
+  nextSampleId = 0;
 
   // Create sample set with samples at the typical walk-in positions
   samples = new SampleSet<UKFRobotPoseHypothesis>(numberOfSamples);
@@ -142,7 +146,6 @@ void SelfLocator::init(const FieldDimensions& fd, std::string& attackSide, float
     samples = new SampleSet<UKFRobotPoseHypothesis>(numberOfSamples);
   }
 
-  int nextSampleId = 0;
   for (int i = 0; i < numberOfSamples; ++i) {
     samples->at(i).init({initTheta, initX, initY}, {thetaNoise, xNoise, yNoise}, nextSampleId++,
                         0.5f);
@@ -189,26 +192,14 @@ void SelfLocator::motionUpdate(const Pose2D& robotToOdom) {
     return;
   }
 
-  const float distance = odometryOffset.translation.norm();
-  Matrix3f odometryOffsetCovariance;
-  odometryOffsetCovariance.setZero();
-  odometryOffsetCovariance(0, 0) = sigmaDistance * sigmaDistance * distance;
-  odometryOffsetCovariance(1, 1) = sigmaDistance * sigmaDistance * distance;
-  const float x = odometryOffset.translation.x();
-  const float y = odometryOffset.translation.y();
-  odometryOffsetCovariance += (Matrix3f() << y * y / 3.0f, -x * y / 3.0f, -y / 2.0f, -x * y / 3.0f,
-                               x * x / 3.0f, x / 2.0f, -y / 2.0f, x / 2.0f, 1.0f)
-                                  .finished() *
-                              sigmaAngle * sigmaAngle * distance;
-
   const float transX = odometryOffset.translation.x();
   const float transY = odometryOffset.translation.y();
+  const float dist = odometryOffset.translation.norm();
   const float angle = std::abs(odometryOffset.rotation);
   const float angleWeightNoise = movedAngleWeightRotationNoise;
 
   // Precalculate rotational error that has to be adapted to all samples
-  const float rotError =
-      std::max(distance * movedDistWeightRotationNoise, angle * angleWeightNoise);
+  const float rotError = std::max(dist * movedDistWeightRotationNoise, angle * angleWeightNoise);
 
   // pre-calculate translational error that has to be adapted to all samples
   const float transXError =
@@ -255,16 +246,16 @@ void SelfLocator::sensorUpdate(const std::vector<GameObject>& detectedGoalPosts,
   for (size_t i = 0; i < nTypes; ++i) {
     totalDetectedMarkers += detectedArrays[i]->size();
   }
-
   if (totalDetectedMarkers == 0) return;
 
-  // compute samples' validity
+  // sensor update for each sample
   for (int i = 0; i < numberOfSamples; ++i) {
     auto& sample = samples->at(i);
     const Pose2f samplePose = sample.getPose();
     std::vector<RegisteredLandmark> landmarks;
     int numRegisteredLandmarks = 0;
 
+    // register landmarks
     for (size_t t = 0; t < nTypes; ++t) {
       if (!detectedArrays[t]->empty()) {
         registerLandmarks(samplePose, *detectedArrays[t], *groundTruthArrays[t], landmarks);
@@ -272,10 +263,12 @@ void SelfLocator::sensorUpdate(const std::vector<GameObject>& detectedGoalPosts,
       }
     }
 
+    // pose update based on the perceived landmarks
     for (const auto& landmark : landmarks) {
       sample.updateByLandmark(landmark);
     }
 
+    // update sample validity
     const float currentValidity = (static_cast<float>(landmarks.size()) / totalDetectedMarkers);
     sample.updateValidity(numberOfConsideredFramesForValidity, currentValidity);
   }
@@ -285,165 +278,118 @@ void SelfLocator::registerLandmarks(const Pose2f& samplePose,
                                     const std::vector<GameObject>& detectedObjs,
                                     const std::vector<Vector2f>& groundTruthObjs,
                                     std::vector<RegisteredLandmark>& landmarks) {
-  int numDetected = detectedObjs.size();
-  int numGroundTruth = groundTruthObjs.size();
-  int maxDim = std::max(numDetected, numGroundTruth);
+  const float MAX_ASSOCIATION_DISTANCE = 1.0f;
 
-  // Initialize cost matrix with large values (padding with high costs)
-  MatrixXd costMatrix = MatrixXd::Constant(maxDim, maxDim, std::numeric_limits<double>::infinity());
+  if (groundTruthObjs.empty() || detectedObjs.empty()) return;
 
-  // Fill cost matrix with distances
-  for (int i = 0; i < numDetected; ++i) {
-    double x, y, z = 0;
-    transCoord(detectedObjs[i].posToRobot.x, detectedObjs[i].posToRobot.y, 0,
-               samplePose.translation.x(), samplePose.translation.y(), samplePose.rotation, x, y,
-               z);
-    for (int j = 0; j < numGroundTruth; ++j) {
-      costMatrix(i, j) = (Vector2f(x, y) - groundTruthObjs[j]).norm();
+  auto computeCovariance = [&](const GameObject& obj) {
+    float sigmaX = 0.01f * sqr(static_cast<float>(obj.range));
+    float confidence = std::max(static_cast<float>(obj.confidence), 0.1f);
+    float sigmaY = 0.01f / confidence * sqr(static_cast<float>(obj.range));
+
+    Matrix2f cov = Matrix2f::Zero();
+    cov(0, 0) = sqr(sigmaX);
+    cov(1, 1) = sqr(sigmaY);
+    return cov;
+  };
+
+  for (const auto& obj : detectedObjs) {
+    Vector2f perceptOnField = samplePose * Vector2f(obj.posToRobot.x, obj.posToRobot.y);
+
+    float minDistSq = -1.f;
+    int bestMatchIndex = -1;
+    for (int i = 0; i < groundTruthObjs.size(); ++i) {
+      float distSq = (perceptOnField - groundTruthObjs[i]).squaredNorm();
+      if (bestMatchIndex == -1 || distSq < minDistSq) {
+        minDistSq = distSq;
+        bestMatchIndex = i;
+      }
     }
-  }
 
-  std::vector<int> assignment;
-  int numRegistered = 0;
-  double totalCost = solveAssignment(costMatrix, assignment, 5.0);
-  for (int i = 0; i < detectedObjs.size(); ++i) {
-    if (assignment[i] != -1) {
+    // validation gate
+    if (bestMatchIndex != -1 && minDistSq < sqr(MAX_ASSOCIATION_DISTANCE)) {
       RegisteredLandmark newLandmark;
-      newLandmark.percept = Vector2f(detectedObjs[i].posToRobot.x, detectedObjs[i].posToRobot.y);
-      newLandmark.model = groundTruthObjs[assignment[i]];
-      newLandmark.covPercept = (Matrix2f() << 1.f, 0.f, 0.f, 1.f).finished();
+      newLandmark.percept = Vector2f(obj.posToRobot.x, obj.posToRobot.y);
+      newLandmark.model = groundTruthObjs[bestMatchIndex];
+      // newLandmark.covPercept = computeCovariance(obj);
+      newLandmark.covPercept = (Matrix2f() << 1.0f, 0.0f, 0.0f, 1.0f).finished();
       landmarks.push_back(newLandmark);
-      numRegistered++;
     }
   }
 }
 
-double SelfLocator::solveAssignment(const MatrixXd& costMatrix, std::vector<int>& assignment,
-                                    const double threshold) {
-  // Modified Hungarian Algorithm
+void SelfLocator::resampling() {
+  float totalValidity = 0.f;
+  for (int i = 0; i < numberOfSamples; ++i) {
+    totalValidity += samples->at(i).validity;
+  }
+  float averageWeighting = totalValidity / numberOfSamples;
+  if (averageWeighting == 0.f) return;
 
-  const double INF = std::numeric_limits<double>::infinity();
-  int n = (int)costMatrix.rows();
+  // resample
+  UKFRobotPoseHypothesis* oldSet = samples->swap();
+  const float weightingBetweenTwoDrawnSamples = totalValidity / numberOfSamples;
+  float nextPos = Random::uniform() * weightingBetweenTwoDrawnSamples;
+  float currentSum = 0.f;
 
-  // Pad the cost matrix with INF to make it square and apply the threshold
-  MatrixXd cost = MatrixXd::Constant(n, n, INF);
-  cost.block(0, 0, n, n) = costMatrix.unaryExpr([threshold](double val) {
-    return (val <= threshold) ? val : std::numeric_limits<double>::infinity();
-  });
-
-  // stringstream ss;
-  // ss << cost;
-  // prtDebug(ss.str());
-
-  assignment.resize(n, -1);
-
-  std::vector<double> u(n + 1), v(n + 1), p(n + 1), way(n + 1);
-  for (int i = 1; i <= n; i++) {
-    p[0] = i;
-    int j0 = 0;
-    std::vector<double> minv(n + 1, INF);
-    std::vector<bool> used(n + 1, false);
-    while (true) {
-      used[j0] = true;
-      int i0 = p[j0], j1 = 0;
-      double delta = INF;
-      for (int j = 1; j <= n; j++) {
-        if (!used[j]) {
-          double cur = cost(i0 - 1, j - 1) - u[i0] - v[j];
-          if (cur < minv[j]) {
-            minv[j] = cur;
-            way[j] = j0;
-          }
-          if (minv[j] < delta) {
-            delta = minv[j];
-            j1 = j;
-          }
-        }
+  int replacements = 0;
+  int j = 0;
+  for (int i = 0; i < numberOfSamples; ++i) {
+    currentSum += oldSet[i].weighting;
+    int replicationCount = 0;
+    while (currentSum > nextPos && j < numberOfSamples) {
+      samples->at(j) = oldSet[i];
+      if (replicationCount) {
+        samples->at(j).id = nextSampleId++;
+        replacements++;
       }
-      if (delta == INF) {
-        // No improvement possible, no augmenting path found.
-        // This means not all tasks can be assigned.
-        break;
-      }
-      for (int j = 0; j <= n; j++) {
-        if (used[j]) {
-          u[p[j]] += delta;
-          v[j] -= delta;
-        } else {
-          minv[j] -= delta;
-        }
-      }
-      j0 = j1;
-      if (p[j0] == 0) {
-        // Augment the matching
-        do {
-          int j1 = way[j0];
-          p[j0] = p[j1];
-          j0 = j1;
-        } while (j0);
-        break;
-      }
+      replicationCount++;
+      j++;
+      nextPos += weightingBetweenTwoDrawnSamples;
     }
   }
 
-  for (int j = 1; j <= n; j++) {
-    if (p[j] - 1 >= 0) {
-      assignment[p[j] - 1] = j - 1;
-    }
+  // fill up missing samples
+  for (; j < numberOfSamples; ++j) {
+    const Pose2f pose = samples->at(0).getPose();
+    samples->at(j).init(pose, defaultPoseDeviation, nextSampleId++, averageWeighting);
   }
-
-  double total_cost = 0;
-  for (int i = 0; i < n; i++) {
-    if (assignment[i] > -1) {
-      total_cost += cost(i, assignment[i]);
-      // prtDebug("Assigned " + to_string(i) + " to " + to_string(assignment[i]));
-    }
-  }
-  return total_cost;
 }
 
 UKFRobotPoseHypothesis& SelfLocator::getMostValidSample() {
-  UKFRobotPoseHypothesis* lastBestSample = nullptr;
   float validityOfLastBestSample = -1.f;
-
-  // find last best sample by ID
+  UKFRobotPoseHypothesis* lastBestSample = nullptr;
   if (idOfLastBestSample != -1) {
     for (int i = 0; i < numberOfSamples; ++i) {
-      auto& sample = samples->at(i);
-      if (sample.id == idOfLastBestSample) {
-        lastBestSample = &sample;
-        validityOfLastBestSample = sample.validity;
+      if (samples->at(i).id == idOfLastBestSample) {
+        validityOfLastBestSample = samples->at(i).validity;
+        lastBestSample = &(samples->at(i));
         break;
       }
     }
   }
-
-  UKFRobotPoseHypothesis* bestSample = &samples->at(0);
-  float maxValidity = bestSample->validity;
-  float minVariance = bestSample->getCombinedVariance();
-
+  UKFRobotPoseHypothesis* returnSample = &(samples->at(0));
+  float maxValidity = -1.0f;
+  float minVariance = 0.0f;  // Initial value does not matter
   for (int i = 0; i < numberOfSamples; ++i) {
-    auto& sample = samples->at(i);
-    float v = sample.validity;
-    if (v > maxValidity) {
-      maxValidity = v;
-      minVariance = sample.getCombinedVariance();
-      bestSample = &sample;
-    } else if (v == maxValidity) {
-      float variance = sample.getCombinedVariance();
+    const float val = samples->at(i).validity;
+    if (val > maxValidity) {
+      maxValidity = val;
+      minVariance = samples->at(i).getCombinedVariance();
+      returnSample = &(samples->at(i));
+    } else if (val == maxValidity) {
+      float variance = samples->at(i).getCombinedVariance();
       if (variance < minVariance) {
-        maxValidity = v;
+        maxValidity = val;
         minVariance = variance;
-        bestSample = &sample;
+        returnSample = &(samples->at(i));
       }
     }
   }
-
-  constexpr float stabilityBonusFactor = 1.5f;
-  if (lastBestSample && bestSample->validity <= validityOfLastBestSample * stabilityBonusFactor) {
+  if (lastBestSample && returnSample->validity <= validityOfLastBestSample * 1.5f) {
     return *lastBestSample;
   } else {
-    return *bestSample;
+    return *returnSample;
   }
 }
 

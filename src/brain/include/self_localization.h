@@ -18,11 +18,9 @@
 class Brain;
 
 struct RegisteredLandmark {
-  Vector2f percept =
-      Vector2f::Zero(); /**< The position of the perceived landmark (relative to the robot) */
-  Matrix2f covPercept = Matrix2f::Identity(); /**< The covariance of the landmark measurement */
-  Vector2f model =
-      Vector2f::Zero(); /**< The position of original landmark (in global coordinates) */
+  Vector2f percept = Vector2f::Zero();  // The position of the perceived landmark (in base frame)
+  Matrix2f covPercept = Matrix2f::Identity();  // The covariance of the landmark measurement
+  Vector2f model = Vector2f::Zero();           // The position of original landmark (in field frame)
 };
 
 /**
@@ -90,14 +88,15 @@ class SelfLocator {
 
   bool isGood();
 
-  // TODO: resampling
-
   /** Integrate odometry offset into hypotheses */
   void motionUpdate(const Pose2D& robotToOdom);
 
   /** Perform UKF measurement step for all samples */
   void sensorUpdate(const std::vector<GameObject>& detectedGoalPosts,
                     const std::vector<GameObject>& detectedMarkings);
+
+  /** Particle filter resampling step */
+  void resampling();
 
   void logLandmarks();
   void logSamples();
@@ -106,9 +105,6 @@ class SelfLocator {
   ~SelfLocator();
 
  protected:
-  double solveAssignment(const MatrixXd& costMatrix, std::vector<int>& assignment,
-                         const double threshold);
-
   void registerLandmarks(const Pose2f& samplePose, const std::vector<GameObject>& detectedObjs,
                          const std::vector<Vector2f>& groundTruthObjs,
                          std::vector<RegisteredLandmark>& landmarks);
@@ -116,6 +112,7 @@ class SelfLocator {
  private:
   SampleSet<UKFRobotPoseHypothesis>* samples; /**< Container for all samples. */
   int idOfLastBestSample; /**< Identifier of the best sample of the last frame */
+  int nextSampleId;
 
   // landmarks
   std::vector<Vector2f> goalPosts;
@@ -140,6 +137,7 @@ class SelfLocator {
   static const float minValidityForSuperbLocalizationQuality;
   static const float maxTranslationDeviationForSuperbLocalizationQuality;
   static const Angle maxRotationalDeviationForSuperbLocalizationQuality;
+  static const Pose2f defaultPoseDeviation;
   static const Pose2f filterProcessDeviation;
   static const Pose2f odometryDeviation;
   static const Vector2f odometryRotationDeviation;
