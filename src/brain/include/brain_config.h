@@ -31,6 +31,10 @@ class BrainConfig {
   std::string playerAttackSide;  // game.player_attack_side  "left" | "right"
   float playerStartPos;          // game.player_start_pos  [-1.0, 1.0]  // -1.0: left, 1.0: right
 
+  std::vector<std::string> discoveryIpList;
+  std::vector<std::string> gameControllerIpList;
+  bool enableCom;
+
   double robotHeight;      // robot.robot_height
   double robotOdomFactor;  // robot.odom_factor odom
   double vxFactor;   // robot.vx_factor fix the issue where the actual vx is larger than the command

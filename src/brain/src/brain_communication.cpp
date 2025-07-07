@@ -12,9 +12,15 @@ BrainCommunication::~BrainCommunication() {
 }
 
 void BrainCommunication::initUDPBroadcast() {
-  bool enableCom = false;
-  brain->get_parameter("enable_com", enableCom);
-  if (enableCom) {
+  cout << RED_CODE << "discovery_ip_list: " << RESET_CODE << endl;
+  for (const auto &ip : brain->config->discoveryIpList) {
+    cout << RED_CODE << "  - " << ip << RESET_CODE << endl;
+  }
+  cout << RED_CODE << "game_controller_ip_list: " << RESET_CODE << endl;
+  for (const auto &ip : brain->config->gameControllerIpList) {
+    cout << RED_CODE << "  - " << ip << RESET_CODE << endl;
+  }
+  if (brain->config->enableCom) {
     cout << RED_CODE << "Communication enabled." << RESET_CODE << endl;
     _discovery_udp_port = 20000 + brain->config->teamId;
     _unicast_udp_port = 30000 + brain->config->teamId;
@@ -29,6 +35,7 @@ void BrainCommunication::initUDPBroadcast() {
   }
 }
 
+// TODO (ZIFAN): consider moving this to game controller node
 void BrainCommunication::initGameControllerBroadcast() {
   try {
     _gc_send_socket = socket(AF_INET, SOCK_DGRAM, 0);
@@ -46,7 +53,8 @@ void BrainCommunication::initGameControllerBroadcast() {
     }
     // target address
     _gcsaddr.sin_family = AF_INET;
-    _gcsaddr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+    // _gcsaddr.sin_addr.s_addr = inet_addr(game_controller_ip.c_str());
+    // broadcast to all IP addresses from game_controller_ip_list
     _gcsaddr.sin_port = htons(GAMECONTROLLER_RETURN_PORT);
 
     _broadcast_gamecontrol_flag = true;
@@ -87,7 +95,8 @@ void BrainCommunication::initDiscoveryBroadcast() {
 
     // 配置广播地址
     _saddr.sin_family = AF_INET;
-    _saddr.sin_addr.s_addr = INADDR_BROADCAST;  // 255.255.255.255
+    // _saddr.sin_addr.s_addr = htonl(INADDR_BROADCAST);  // 255.255.255.255
+    // broadcast to all IP addresses from discovery_ip_list
     _saddr.sin_port = htons(_discovery_udp_port);
 
     _broadcast_discovery_flag = true;
@@ -170,10 +179,13 @@ void BrainCommunication::broadcastToGameController() {
     gc_return_data.player = brain->config->playerId + 1;  // player number starts with 1
     gc_return_data.message = GAMECONTROLLER_RETURN_MSG_ALIVE;
 
-    int ret = sendto(_gc_send_socket, &gc_return_data, sizeof(gc_return_data), 0,
-                     (sockaddr *)&_gcsaddr, sizeof(_gcsaddr));
-    if (ret < 0) {
-      cout << RED_CODE << format("gc sendto failed: %s", strerror(errno)) << RESET_CODE << endl;
+    for (const auto &ip : brain->config->gameControllerIpList) {
+      _gcsaddr.sin_addr.s_addr = inet_addr(ip.c_str());
+      int ret = sendto(_gc_send_socket, &gc_return_data, sizeof(gc_return_data), 0,
+                       (sockaddr *)&_gcsaddr, sizeof(_gcsaddr));
+      if (ret < 0) {
+        cout << RED_CODE << format("gc sendto failed: %s", strerror(errno)) << RESET_CODE << endl;
+      }
     }
     this_thread::sleep_for(chrono::milliseconds(BROADCAST_GAME_CONTROL_INTERVAL_MS));
   }
@@ -187,10 +199,13 @@ void BrainCommunication::broadcastDiscovery() {
     msg.teamId = brain->config->teamId;
     msg.playerId = brain->config->playerId;
 
-    int ret =
-        sendto(_discovery_send_socket, &msg, sizeof(msg), 0, (sockaddr *)&_saddr, sizeof(_saddr));
-    if (ret < 0) {
-      cout << RED_CODE << format("sendto failed: %s", strerror(errno)) << RESET_CODE << endl;
+    for (const auto &ip : brain->config->discoveryIpList) {
+      _saddr.sin_addr.s_addr = inet_addr(ip.c_str());
+      int ret =
+          sendto(_discovery_send_socket, &msg, sizeof(msg), 0, (sockaddr *)&_saddr, sizeof(_saddr));
+      if (ret < 0) {
+        cout << RED_CODE << format("sendto failed: %s", strerror(errno)) << RESET_CODE << endl;
+      }
     }
     this_thread::sleep_for(chrono::milliseconds(BROADCAST_DISCOVERY_INTERVAL_MS));
   }
@@ -241,7 +256,8 @@ void BrainCommunication::spinDiscoveryReceiver() {
 }
 
 void BrainCommunication::cleanupExpiredTeammates() {
-  std::lock_guard<std::mutex> lock(_teammate_addresses_mutex);
+  std::lock_guard<std::mutex> lock1(_teammate_addresses_mutex);
+  std::lock_guard<std::mutex> lock2(brain->data->teamCommunicationMutex);
   for (auto it = _teammate_addresses.begin(); it != _teammate_addresses.end();) {
     auto timeDiff =
         this->brain->get_clock()->now().nanoseconds() - it->second.lastUpdate.nanoseconds();
@@ -249,6 +265,7 @@ void BrainCommunication::cleanupExpiredTeammates() {
       cout << YELLOW_CODE << format("Teammate id %d timed out", it->second.playerId) << RESET_CODE
            << endl;
       it = _teammate_addresses.erase(it);
+      brain->data->teamMemberMessages.erase(it->second.playerId);
     } else {
       ++it;
     }
@@ -282,7 +299,9 @@ void BrainCommunication::unicastCommunication() {
     msg.teamId = brain->config->teamId;
     msg.playerId = brain->config->playerId;
     // TODO: add something you want to send to teammates, this is only an example
-    msg.testInfo = 1234567;
+    msg.timePoint = brain->get_clock()->now();
+    msg.ball = brain->data->ball;
+    msg.robotPoseToField = brain->data->robotPoseToField;
 
     std::lock_guard<std::mutex> lock(_teammate_addresses_mutex);
     for (auto it = _teammate_addresses.begin(); it != _teammate_addresses.end(); ++it) {
@@ -365,14 +384,24 @@ void BrainCommunication::spinCommunicationReceiver() {
     }
 
     if (msg.playerId == brain->config->playerId) {  // ignore self messages
-      cout << CYAN_CODE
-           << format("communicationId: %d, playerId: %d, testInfo: %d", msg.communicationId,
-                     msg.playerId, msg.testInfo)
-           << RESET_CODE << endl;
+      // cout << CYAN_CODE
+      //      << format("communicationId: %d, playerId: %d, testInfo: %d", msg.communicationId,
+      //                msg.playerId, msg.testInfo)
+      //      << RESET_CODE << endl;
       continue;
     }
 
+    cout << GREEN_CODE
+         << format(
+                "communicationId: %d, playerId: %d, ballX: %.2f, ballY: %.2f, robotPoseToFieldX: "
+                "%.2f, robotPoseToFieldY: %.2f, robotPoseToFieldYaw: %.2f",
+                msg.communicationId, msg.playerId, msg.ball.posToField.x, msg.ball.posToField.y,
+                msg.robotPoseToField.x, msg.robotPoseToField.y, msg.robotPoseToField.theta)
+         << RESET_CODE << endl;
+
     // TODO: dealing with the received message
+    std::lock_guard<std::mutex> lock(brain->data->teamCommunicationMutex);
+    brain->data->teamMemberMessages[msg.playerId] = msg;
   }
 }
 

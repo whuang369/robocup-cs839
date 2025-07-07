@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include "locator.h"
+#include "team_communication_msg.h"
 
 /**
  * The BrainData class records the data needed by the Brain during decision-making.
@@ -61,6 +62,10 @@ class BrainData {
   std::vector<GameObject> opponents = {};  // Records information about opponent players
   std::vector<GameObject> goalposts = {};  // Records information about goalposts
   std::vector<GameObject> markings = {};   // Records information about field markings
+
+  // Team communication
+  std::mutex teamCommunicationMutex;
+  std::unordered_map<uint32_t, TeamCommunicationMsg> teamMemberMessages;  // Records team messages
 
   // Motion planning
   double dribbleTargetAngle;     // The direction for dribbling

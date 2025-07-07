@@ -27,6 +27,10 @@ Brain::Brain() : rclcpp::Node("brain_node") {
   declare_parameter<string>("game.player_attack_side", "");
   declare_parameter<float>("game.player_start_pos", 0.0f);
 
+  declare_parameter<vector<string>>("discovery_ip_list", {});
+  declare_parameter<vector<string>>("game_controller_ip_list", {});
+  declare_parameter<bool>("enable_com", true);
+
   declare_parameter<double>("robot.robot_height", 1.0);
   declare_parameter<double>("robot.odom_factor", 1.0);
   declare_parameter<double>("robot.vx_factor", 0.95);
@@ -40,9 +44,6 @@ Brain::Brain() : rclcpp::Node("brain_node") {
 
   declare_parameter<bool>("rerunLog.enable", false);
   declare_parameter<string>("rerunLog.server_addr", "");
-
-  declare_parameter<bool>("enable_com", true);
-
   // The tree_file_path is configured in launch.py and not placed in config.yaml.
   declare_parameter<string>("tree_file_path", "");
 }
@@ -96,6 +97,10 @@ void Brain::loadConfig() {
   get_parameter("game.player_role", config->playerRole);
   get_parameter("game.player_attack_side", config->playerAttackSide);
   get_parameter("game.player_start_pos", config->playerStartPos);
+
+  get_parameter("discovery_ip_list", config->discoveryIpList);
+  get_parameter("game_controller_ip_list", config->gameControllerIpList);
+  get_parameter("enable_com", config->enableCom);
 
   get_parameter("robot.robot_height", config->robotHeight);
   get_parameter("robot.odom_factor", config->robotOdomFactor);
@@ -155,6 +160,31 @@ void Brain::updateMemory() {
 }
 
 void Brain::updateBallMemory() {
+  // mark ball as lost if long time no see
+  if (get_clock()->now().seconds() - data->ball.timePoint.seconds() > config->memoryLength) {
+    // use team member's ball memory if available
+    bool teamMemberBallFound = false;
+    for (const auto &it : data->teamMemberMessages) {
+      if (get_clock()->now().seconds() - it.second.ball.timePoint.seconds() <
+          config->memoryLength) {
+        data->ball.timePoint = it.second.ball.timePoint;
+        data->ball.posToField = it.second.ball.posToField;
+        teamMemberBallFound = true;
+        log->log("brain/updateBallMemory",
+                 rerun::TextLog(format("Ball found in team member %d", it.second.playerId)));
+        break;
+      }
+    }
+    tree->setEntry<bool>("ball_location_known", teamMemberBallFound);
+    data->ballDetected = teamMemberBallFound;
+    if (!teamMemberBallFound) {
+      log->log(
+          "brain/updateBallMemory",
+          rerun::TextLog(format("Ball Lost! Last time: %.2f, Current time: %.2f`",
+                                data->ball.timePoint.seconds(), get_clock()->now().seconds())));
+    }
+  }
+
   // update Pose to field from Pose to robot (based on odom)
   double xfr, yfr, thetafr;  // fr = field to robot
   yfr = std::sin(data->robotPoseToField.theta) * data->robotPoseToField.x -
@@ -170,30 +200,6 @@ void Brain::updateBallMemory() {
   tree->setEntry<double>("ball_range", data->ball.range);
   data->ball.yawToRobot = std::atan2(data->ball.posToRobot.y, data->ball.posToRobot.x);
   data->ball.pitchToRobot = std::asin(config->robotHeight / data->ball.range);
-
-  // mark ball as lost if long time no see
-  if (get_clock()->now().seconds() - data->ball.timePoint.seconds() > config->memoryLength) {
-    tree->setEntry<bool>("ball_location_known", false);
-    data->ballDetected = false;
-    log->log("brain/updateBallMemory",
-             rerun::TextLog(format("Ball Lost! Last time: %.2f, Current time: %.2f`",
-                                   data->ball.timePoint.seconds(), get_clock()->now().seconds())));
-  }
-
-  // log mem ball pos
-  log->setTimeNow();
-  log->log("field/memball",
-           rerun::LineStrips2D({
-                                   rerun::Collection<rerun::Vec2D>{
-                                       {data->ball.posToField.x - 0.2, -data->ball.posToField.y},
-                                       {data->ball.posToField.x + 0.2, -data->ball.posToField.y}},
-                                   rerun::Collection<rerun::Vec2D>{
-                                       {data->ball.posToField.x, -data->ball.posToField.y - 0.2},
-                                       {data->ball.posToField.x, -data->ball.posToField.y + 0.2}},
-                               })
-               .with_colors({tree->getEntry<bool>("ball_location_known") ? 0xFFFFFFFF : 0xFF0000FF})
-               .with_radii({0.005})
-               .with_draw_order(30));
 }
 
 vector<double> Brain::getGoalPostAngles(const double margin) {
@@ -426,14 +432,18 @@ void Brain::detectionsCallback(const vision_interface::msg::Detections &msg) {
   // log processed detections
   log->setTimeSeconds(time);
   log->log("field/detections", rerun::Clear::RECURSIVE);
+
+  std::unordered_map<string, int> label_counts;
   for (const auto &marking : data->markings) {
-    log->log("field/detections/" + marking.label,
+    int count = label_counts[marking.label]++;
+    log->log("field/detections/" + marking.label + "_" + std::to_string(count),
              rerun::Points2D({{marking.posToField.x, -marking.posToField.y}})
                  .with_radii(0.05)
                  .with_colors(getColor(marking.label)));
   }
   for (const auto &opponent : data->opponents) {
-    log->log("field/detections/opponents",
+    int count = label_counts["Opponent"]++;
+    log->log("field/detections/opponents_" + std::to_string(count),
              rerun::Points2D({{opponent.posToField.x, -opponent.posToField.y}})
                  .with_radii(0.05)
                  .with_colors(detectColorMap["Opponent"]));
@@ -443,6 +453,22 @@ void Brain::detectionsCallback(const vision_interface::msg::Detections &msg) {
              rerun::Points2D({{data->ball.posToField.x, -data->ball.posToField.y}})
                  .with_radii(0.08)
                  .with_colors(detectColorMap["Ball"]));
+
+    // log mem ball pos
+    log->setTimeNow();
+    log->log(
+        "field/memball",
+        rerun::LineStrips2D({
+                                rerun::Collection<rerun::Vec2D>{
+                                    {data->ball.posToField.x - 0.2, -data->ball.posToField.y},
+                                    {data->ball.posToField.x + 0.2, -data->ball.posToField.y}},
+                                rerun::Collection<rerun::Vec2D>{
+                                    {data->ball.posToField.x, -data->ball.posToField.y - 0.2},
+                                    {data->ball.posToField.x, -data->ball.posToField.y + 0.2}},
+                            })
+            .with_colors({tree->getEntry<bool>("ball_location_known") ? 0xFFFFFFFF : 0xFF0000FF})
+            .with_radii({0.005})
+            .with_draw_order(30));
   }
 }
 
@@ -491,17 +517,16 @@ void Brain::lowStateCallback(const booster_interface::msg::LowState &msg) {
   // prtDebug("Head Yaw dq " + to_string(msg.motor_state_serial[0].dq) + " pitch dq " +
   // to_string(msg.motor_state_serial[1].dq));
 
-  log->setTimeNow();
-
-  log->log("low_state_callback/imu/rpy/roll", rerun::Scalar(msg.imu_state.rpy[0]));
-  log->log("low_state_callback/imu/rpy/pitch", rerun::Scalar(msg.imu_state.rpy[1]));
-  log->log("low_state_callback/imu/rpy/yaw", rerun::Scalar(msg.imu_state.rpy[2]));
-  log->log("low_state_callback/imu/acc/x", rerun::Scalar(msg.imu_state.acc[0]));
-  log->log("low_state_callback/imu/acc/y", rerun::Scalar(msg.imu_state.acc[1]));
-  log->log("low_state_callback/imu/acc/z", rerun::Scalar(msg.imu_state.acc[2]));
-  log->log("low_state_callback/imu/gyro/x", rerun::Scalar(msg.imu_state.gyro[0]));
-  log->log("low_state_callback/imu/gyro/y", rerun::Scalar(msg.imu_state.gyro[1]));
-  log->log("low_state_callback/imu/gyro/z", rerun::Scalar(msg.imu_state.gyro[2]));
+  // log->setTimeNow();
+  // log->log("low_state_callback/imu/rpy/roll", rerun::Scalar(msg.imu_state.rpy[0]));
+  // log->log("low_state_callback/imu/rpy/pitch", rerun::Scalar(msg.imu_state.rpy[1]));
+  // log->log("low_state_callback/imu/rpy/yaw", rerun::Scalar(msg.imu_state.rpy[2]));
+  // log->log("low_state_callback/imu/acc/x", rerun::Scalar(msg.imu_state.acc[0]));
+  // log->log("low_state_callback/imu/acc/y", rerun::Scalar(msg.imu_state.acc[1]));
+  // log->log("low_state_callback/imu/acc/z", rerun::Scalar(msg.imu_state.acc[2]));
+  // log->log("low_state_callback/imu/gyro/x", rerun::Scalar(msg.imu_state.gyro[0]));
+  // log->log("low_state_callback/imu/gyro/y", rerun::Scalar(msg.imu_state.gyro[1]));
+  // log->log("low_state_callback/imu/gyro/z", rerun::Scalar(msg.imu_state.gyro[2]));
 }
 
 void Brain::headPoseCallback(const geometry_msgs::msg::Pose &msg) {
