@@ -76,18 +76,16 @@ class GoalieDecide : public SyncActionNode {
 
   static BT::PortsList providedPorts() {
     return {
-        InputPort<double>("chase_threshold", 1.0,
-                          "Perform the chasing action if the distance exceeds this threshold"),
-        InputPort<double>(
-            "adjust_angle_tolerance", 0.1,
-            "Consider the adjustment successful if the angle is smaller than this value"),
-        InputPort<double>("adjust_y_tolerance", 0.1,
-                          "Consider the y-direction adjustment successful if the offset is smaller "
-                          "than this value"),
+        InputPort<double>("kick_range_threshold", 1.5,
+                          "Perform the kick action if the distance less than this threshold"),
+        InputPort<double>("kick_angle_threshold", 0.2,
+                          "Perform the kick action if ball yaw is less than this threshold"),
         InputPort<string>("decision_in", "", "Used to read the last decision"),
+        InputPort<string>("position", "offense",
+                          "offense | defense, determines the direction to kick the ball"),
         OutputPort<string>("decision_out"),
-        OutputPort<double>("x_out"),
-        OutputPort<double>("y_out"),
+        OutputPort<double>("kick_dir_out"),
+
     };
   }
 
@@ -346,6 +344,36 @@ class MoveToPoseOnField : public SyncActionNode {
         InputPort<double>("x_tolerance", 0.2, "X tolerance"),
         InputPort<double>("y_tolerance", 0.2, "y tolerance"),
         InputPort<double>("theta_tolerance", 0.1, "theta tolerance"),
+    };
+  }
+
+  BT::NodeStatus tick() override;
+
+ private:
+  Brain *brain;
+};
+
+// Keep the goal by staying in front of the goal posts and facing the ball
+class KeepGoal : public SyncActionNode {
+ public:
+  KeepGoal(const std::string &name, const NodeConfig &config, Brain *_brain)
+      : SyncActionNode(name, config), brain(_brain) {}
+
+  static BT::PortsList providedPorts() {
+    return {
+        InputPort<double>("long_range_threshold", 1.5,
+                          "When the distance to the target point exceeds this value, prioritize "
+                          "moving towards it rather than fine-tuning position and orientation"),
+        InputPort<double>("turn_threshold", 0.4,
+                          "For long distances, if the angle to the target point exceeds this "
+                          "threshold, turn towards the target point first"),
+        InputPort<double>("vx_limit", 1.0, "x limit"),
+        InputPort<double>("vy_limit", 0.5, "y limit"),
+        InputPort<double>("vtheta_limit", 0.4, "theta limit"),
+        InputPort<double>("x_tolerance", 0.2, "X tolerance"),
+        InputPort<double>("y_tolerance", 0.2, "y tolerance"),
+        InputPort<double>("theta_tolerance", 0.1, "theta tolerance"),
+        InputPort<string>("role", "striker", "striker | goalie"),
     };
   }
 

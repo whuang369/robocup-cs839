@@ -45,6 +45,7 @@ void BrainTree::init() {
   REGISTER_BUILDER(SelfLocate)
   REGISTER_BUILDER(SetVelocity)
   REGISTER_BUILDER(CheckAndStandUp)
+  REGISTER_BUILDER(KeepGoal)
   REGISTER_BUILDER(RotateForRelocate)
   REGISTER_BUILDER(MoveToPoseOnField)
   REGISTER_BUILDER(GoalieDecide)
@@ -503,6 +504,14 @@ NodeStatus StrikerDecide::tick() {
   bool rangeIsGood = (ballRange < kickRangeThreshold);
   bool headingIsGood = (fabs(ballYaw) < kickAngleThreshold);
 
+  bool isKicker = true;
+  // decide if the current robot is the kicker
+  //  (1) if all the robots are 1 meters away or only one robot is within 1 meters, then the closest
+  //  robot is the kicker
+  //  (2) if more than one robot is within 1 meters, then the robot with the smallest angle
+  //  difference (ballGoalDir and robotBallDir alignment) to the ball is the kicker
+  // TODO: add behavior like block when the current player is not the kicker
+
   // check if ball-goal dir and robot-ball dir are blocked by opponent
   double ballGoalDir =
       atan2(-brain->data->ball.posToField.y,
@@ -697,87 +706,108 @@ void RotateForRelocate::onHalted() {
 }
 
 NodeStatus GoalieDecide::tick() {
-  double chaseRangeThreshold;
-  getInput("chase_threshold", chaseRangeThreshold);
+  double kickRangeThreshold, kickAngleThreshold;
+  getInput("kick_range_threshold", kickRangeThreshold);
+  getInput("kick_angle_threshold", kickAngleThreshold);
   string lastDecision, position;
   getInput("decision_in", lastDecision);
+  getInput("position", position);
 
-  double kickDir =
-      atan2(brain->data->ball.posToField.y,
-            brain->data->ball.posToField.x + brain->config->fieldDimensions.length / 2);
+  Pose2D robotPose = brain->data->robotPoseToField;
   double dir_rb_f = brain->data->robotBallAngleToField;
+  double ballRange = brain->data->ball.range;
+  double ballYaw = brain->data->ball.yawToRobot;
   auto goalPostAngles = brain->getGoalPostAngles(0.3);
   double theta_l = goalPostAngles[0];
   double theta_r = goalPostAngles[1];
-  bool angleIsGood = (dir_rb_f > -M_PI / 2 && dir_rb_f < M_PI / 2);
-  double ballRange = brain->data->ball.range;
-  double ballYaw = brain->data->ball.yawToRobot;
-  bool ballInPenalty =
-      (brain->data->ball.posToField.x - brain->config->fieldDimensions.penaltyAreaLength <
-       -brain->config->fieldDimensions.length / 2) &&
-      (abs(brain->data->ball.posToField.y) < brain->config->fieldDimensions.penaltyAreaWidth / 2);
-  double goalAreaX =
-      -(brain->config->fieldDimensions.length / 2 - brain->config->fieldDimensions.goalAreaLength);
-  bool robotInGoalArea =
-      (abs(brain->data->robotPoseToField.x - goalAreaX) <
-       brain->config->fieldDimensions.goalAreaLength) &&
-      (abs(brain->data->robotPoseToField.y) < brain->config->fieldDimensions.goalAreaWidth / 2);
+  bool angleIsGood = (theta_l > dir_rb_f && theta_r < dir_rb_f);
+  bool rangeIsGood = (ballRange < kickRangeThreshold);
+  bool headingIsGood = (fabs(ballYaw) < kickAngleThreshold);
+  // retreat when the ball is in the left half field and outside the penalty area
+  bool ballInPenaltyArea =
+      brain->data->ball.posToField.x < -brain->config->fieldDimensions.length / 2.0 +
+                                           brain->config->fieldDimensions.penaltyDist &&
+      brain->data->ball.posToField.y > -brain->config->fieldDimensions.penaltyAreaWidth / 2.0 &&
+      brain->data->ball.posToField.y < brain->config->fieldDimensions.penaltyAreaWidth / 2.0;
+  bool retreatBall = (brain->data->ball.posToField.x < 0 && !ballInPenaltyArea);
 
+  // check if ball-goal dir and robot-ball dir are blocked by opponent
+  double ballGoalDir =
+      atan2(-brain->data->ball.posToField.y,
+            brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
+  double robotBallDir = atan2(brain->data->ball.posToField.y - brain->data->robotPoseToField.y,
+                              brain->data->ball.posToField.x - brain->data->robotPoseToField.x);
+
+  // iterate through all opponent robots
+  bool isBlockedGoal = false;  // if opponent is in front of the ball goal
+  for (auto &opponent : brain->data->opponents) {
+    double ballOpponentDir = atan2(opponent.posToField.y - brain->data->ball.posToField.y,
+                                   opponent.posToField.x - brain->data->ball.posToField.x);
+    double ballOpponentRange = hypot(opponent.posToField.x - brain->data->ball.posToField.x,
+                                     opponent.posToField.y - brain->data->ball.posToField.y);
+    if (ballOpponentRange > 1.0) {
+      // Ignore opponent robots that are too far away
+      continue;
+    }
+    double angleDiffGoal = fabs(ballGoalDir - ballOpponentDir);
+    if (angleDiffGoal < M_PI / 6) {
+      isBlockedGoal = true;
+    }
+  }
+
+  double kickDir;
+  if (!isBlockedGoal) {
+    // Align and kick to the goal
+    kickDir = ballGoalDir;
+  } else {
+    // Kick straight into the ball with offset so the ball goes sideways
+    // TODO: add kickDir as part of the input and use offset to control kick direction
+    kickDir = robotBallDir;
+  }
+
+  // rerun logging
   string newDecision;
-  auto color = 0xFFFFFFFF;  // for log
   if (!brain->tree->getEntry<bool>("ball_location_known")) {
     newDecision = "find";
-    color = 0x0000FFFF;
-    setOutput("x_out", goalAreaX);
-    setOutput("y_out", 0.0);
-  }
-  // TODO: consider self and opponent position, stop if close enough to goal
-  else if ((!ballInPenalty) && (!robotInGoalArea)) {
+  } else if (retreatBall) {
+    // when ball enters the left half field and outside the penalty area
     newDecision = "retreat";
-    color = 0xFF00FFFF;
-    setOutput("x_out", goalAreaX);
-    setOutput("y_out", 0.0);
-  } else if ((!ballInPenalty) && robotInGoalArea) {
-    newDecision = "wait";
-    color = 0xFFFFFFFF;
-  } else if (ballRange > chaseRangeThreshold) {
-    newDecision = "chase";
-    color = 0x00FF00FF;
-  } else if ((angleIsGood) && (ballRange <= chaseRangeThreshold)) {
+  } else if (isBlockedGoal && rangeIsGood) {
+    // Kick straight into the ball without alignment
+    newDecision = "dribble";  // also calls the kick node
+  } else if (angleIsGood && rangeIsGood && headingIsGood && !isBlockedGoal) {
     newDecision = "kick";
-    color = 0xFF0000FF;
   } else {
-    newDecision = "adjust";
-    color = 0x00FFFFFF;
+    newDecision = "approach";
   }
-  /*
-  else if (brain->data->ball.posToField.x > 0 - static_cast<double>(lastDecision == "retreat"))
-  {
-      newDecision = "retreat";
-      color = 0xFF00FFFF;
-  }
-  else if (ballRange > chaseRangeThreshold * (lastDecision == "chase" ? 0.9 : 1.0))
-  {
-      newDecision = "chase";
-      color = 0x00FF00FF;
-  }
-  else if (angleIsGood)
-  {
-      newDecision = "kick";
-      color = 0xFF0000FF;
-  }
-  else
-  {
-      newDecision = "adjust";
-      color = 0x00FFFFFF;
-  }
-  */
 
   setOutput("decision_out", newDecision);
+  setOutput("kick_dir_out", kickDir);
+
+  static std::map<std::string, uint32_t> decisionColorMap = {
+      {"find", 0x0000FFFF},      // Blue
+      {"kick", 0xFF0000FF},      // Red
+      {"dribble", 0xFFA500FF},   // Orange
+      {"approach", 0x00FFFFFF},  // White
+      {"retreat", 0xFFFF00FF}    // Yellow
+  };
+
+  auto color = decisionColorMap[newDecision];
+
+  // Draw a line representing the kick direction
+  const auto kickLine =
+      rerun::LineStrip2D({{brain->data->ball.posToField.x, -brain->data->ball.posToField.y},
+                          {brain->data->ball.posToField.x + cos(kickDir) * 1.0,
+                           -brain->data->ball.posToField.y - sin(kickDir) * 1.0}});
+  brain->log->log("field/kick_dir",
+                  rerun::LineStrips2D(kickLine).with_colors({color}).with_radii({0.01}));
+
   brain->log->logToField(
-      "tree/Decide",
-      format("Decision: %s ballrange: %.2f ballyaw: %.2f kickDir: %.2f rbDir: %.2f angleIsGood: %d",
-             newDecision.c_str(), ballRange, ballYaw, kickDir, dir_rb_f, angleIsGood),
+      "field/GoalieDecide",
+      format("Decision: %s | kickDir: %.2f | rbDir: %.2f | ballRange: %.2f | ballYaw: %.2f | "
+             "goodAngle: %d | goodRange: %d | goodHeading: %d | isBlockedGoal: %d",
+             newDecision.c_str(), kickDir, dir_rb_f, ballRange, ballYaw, angleIsGood, rangeIsGood,
+             headingIsGood, isBlockedGoal),
       color, 0.2);
   return NodeStatus::SUCCESS;
 }
@@ -872,6 +902,9 @@ void RobotFindBall::onHalted() {
 NodeStatus SelfLocate::tick() {
   brain->self_locator->motionUpdate(brain->data->robotPoseToOdom);
   brain->self_locator->sensorUpdate(brain->data->goalposts, brain->data->markings);
+  // brain->self_locator->resampling();
+
+  brain->data->goalposts.clear();
   brain->data->markings.clear();
 
   auto pose = brain->self_locator->getPose();
@@ -884,115 +917,14 @@ NodeStatus SelfLocate::tick() {
     brain->tree->setEntry<bool>("odom_calibrated", false);
   }
 
-  brain->self_locator->logSamples();
+  brain->log->log("field/robot_pose_sample",
+                  rerun::Points2D({{pose.translation.x(), -pose.translation.y()},
+                                   {pose.translation.x() + 0.1 * cos(pose.rotation),
+                                    -pose.translation.y() - 0.1 * sin(pose.rotation)}})
+                      .with_radii({0.2, 0.1})
+                      .with_colors({0x00FFFFFF, 0xFF0000FF}));
 
-  /*
-  string mode = getInput<string>("mode").value();
-  double xMin = 0.0, xMax = 0.0, yMin = 0, yMax = 0.0, thetaMin = 0.0, thetaMax = 0.0;
-  auto markers = brain->data->getMarkers();
-
-  if (mode == "enter_field")
-  {
-
-      xMin = -brain->config->fieldDimensions.length / 2;
-      xMax = -brain->config->fieldDimensions.circleRadius;
-
-      if (brain->config->playerStartPos == "left")
-      {
-          yMin = brain->config->fieldDimensions.width / 2;
-          yMax = brain->config->fieldDimensions.width / 2 + 1.0;
-      }
-      else if (brain->config->playerStartPos == "right")
-      {
-          yMin = -brain->config->fieldDimensions.width / 2 - 1.0;
-          yMax = -brain->config->fieldDimensions.width / 2;
-      }
-
-      if (brain->config->playerStartPos == "left")
-      {
-          thetaMin = -M_PI / 2 - M_PI / 6;
-          thetaMax = -M_PI / 2 + M_PI / 6;
-      }
-      else if (brain->config->playerStartPos == "right")
-      {
-          thetaMin = M_PI / 2 - M_PI / 6;
-          thetaMax = M_PI / 2 + M_PI / 6;
-      }
-  }
-  else if (mode == "face_forward")
-  {
-      xMin = -brain->config->fieldDimensions.length / 2;
-      xMax = brain->config->fieldDimensions.length / 2;
-      yMin = -brain->config->fieldDimensions.width / 2;
-      yMax = brain->config->fieldDimensions.width / 2;
-      thetaMin = -M_PI / 4;
-      thetaMax = M_PI / 4;
-  }
-  else if (mode == "trust_direction")
-  {
-      int msec = static_cast<int>(brain->msecsSince(brain->data->lastSuccessfulLocalizeTime));
-      double maxDriftSpeed = 0.1;
-      double maxDrift = msec / 1000.0 * maxDriftSpeed;
-
-      xMin = max(-brain->config->fieldDimensions.length / 2, brain->data->robotPoseToField.x -
-  maxDrift); xMax = min(brain->config->fieldDimensions.length / 2, brain->data->robotPoseToField.x +
-  maxDrift); yMin = max(-brain->config->fieldDimensions.width / 2, brain->data->robotPoseToField.y -
-  maxDrift); yMax = min(brain->config->fieldDimensions.width / 2, brain->data->robotPoseToField.y +
-  maxDrift); thetaMin = brain->data->robotPoseToField.theta - M_PI / 18; thetaMax =
-  brain->data->robotPoseToField.theta + M_PI / 18;
-  }
-  else if (mode == "fall_recovery")
-  {
-      int msec = static_cast<int>(brain->msecsSince(brain->data->lastSuccessfulLocalizeTime));
-      double maxDriftSpeed = 0.1;                      // m/s
-      double maxDrift = msec / 1000.0 * maxDriftSpeed; // 在这个时间内, odom 最多漂移了多少距离
-
-      xMin = -brain->config->fieldDimensions.length / 2 - 2;
-      xMax = brain->config->fieldDimensions.length / 2 + 2;
-      yMin = -brain->config->fieldDimensions.width / 2 - 2;
-      yMax = brain->config->fieldDimensions.width / 2 + 2;
-      thetaMin = brain->data->robotPoseToField.theta - M_PI / 180;
-      thetaMax = brain->data->robotPoseToField.theta + M_PI / 180;
-  }
-
-
-  // TODO other modes
-
-  // Locate
-  PoseBox2D constraints{xMin, xMax, yMin, yMax, thetaMin, thetaMax};
-  double residual;
-  auto res = brain->locator->locateRobot(markers, constraints);
-
-  // if (brain->config->rerunLogEnable) {
-  if (false)
-  {
-      brain->log->setTimeNow();
-      brain->log->log("locator/time",
-                      rerun::Scalar(res.msecs));
-      brain->log->log("locator/residual",
-                      rerun::Scalar(res.residual));
-      brain->log->log("locator/result",
-                      rerun::Scalar(res.code));
-      brain->log->log("locator/constraints",
-                      rerun::TextLog(
-                          "xMin: " + to_string(xMin) + " " +
-                          "xMax: " + to_string(xMax) + " " +
-                          "yMin: " + to_string(yMin) + " " +
-                          "yMax: " + to_string(yMax) + " " +
-                          "thetaMin: " + to_string(thetaMin) + " " +
-                          "thetaMax: " + to_string(thetaMax)));
-  }
-  prtDebug("locate result: res: " + to_string(res.code) + " time: " + to_string(res.msecs));
-
-  if (!res.success)
-      return NodeStatus::SUCCESS; // Do not block following nodes.
-
-  brain->calibrateOdom(res.pose.x, res.pose.y, res.pose.theta);
-  brain->tree->setEntry<bool>("odom_calibrated", true);
-  brain->data->lastSuccessfulLocalizeTime = brain->get_clock()->now();
-  prtDebug("locate success: " + to_string(res.pose.x) + " " + to_string(res.pose.y) + " " +
-  to_string(rad2deg(res.pose.theta)) + " Dur: " + to_string(res.msecs));
-  */
+  // brain->self_locator->logSamples();
 
   return NodeStatus::SUCCESS;
 }
@@ -1012,6 +944,52 @@ NodeStatus MoveToPoseOnField::tick() {
   getInput("x_tolerance", xTolerance);
   getInput("y_tolerance", yTolerance);
   getInput("theta_tolerance", thetaTolerance);
+  brain->client->moveToPoseOnField(tx, ty, ttheta, longRangeThreshold, turnThreshold, vxLimit,
+                                   vyLimit, vthetaLimit, xTolerance, yTolerance, thetaTolerance);
+  return NodeStatus::SUCCESS;
+}
+
+NodeStatus KeepGoal::tick() {
+  string role;
+  double longRangeThreshold, turnThreshold, vxLimit, vyLimit, vthetaLimit, xTolerance, yTolerance,
+      thetaTolerance;
+  getInput("role", role);
+  getInput("long_range_threshold", longRangeThreshold);
+  getInput("turn_threshold", turnThreshold);
+  getInput("vx_limit", vxLimit);
+  getInput("vy_limit", vyLimit);
+  getInput("vtheta_limit", vthetaLimit);
+  getInput("x_tolerance", xTolerance);
+  getInput("y_tolerance", yTolerance);
+  getInput("theta_tolerance", thetaTolerance);
+
+  double tx, ty;
+  if (role == "goalie") {
+    // goalie keep the goal by standing in front of the goal
+    tx = -brain->config->fieldDimensions.length / 2.0 + 0.4;
+    ty = 0.0;
+  } else {
+    // striker keep the goal by standing behind the ball
+    double ballGoalDir =
+        atan2(-brain->data->ball.posToField.y,
+              -brain->data->ball.posToField.x - brain->config->fieldDimensions.length / 2);
+    tx = brain->data->ball.posToField.x + cos(ballGoalDir) * 1.6;
+    ty = brain->data->ball.posToField.y + sin(ballGoalDir) * 1.6;
+    // add offset so the robots won't collide
+    double ty_offset = 0.0;
+    if (brain->config->playerId == 0) {
+      ty_offset = 0.0;
+    } else if (brain->config->playerId == 1) {
+      ty_offset = -0.8;
+    } else if (brain->config->playerId == 2) {
+      ty_offset = 0.8;
+    }
+    ty += ty_offset;
+  }
+  // set the theta to face the ball
+  Pose2D robotPose = brain->data->robotPoseToField;
+  Point ballPos = brain->data->ball.posToField;
+  double ttheta = atan2(ballPos.y - robotPose.y, ballPos.x - robotPose.x);
   brain->client->moveToPoseOnField(tx, ty, ttheta, longRangeThreshold, turnThreshold, vxLimit,
                                    vyLimit, vthetaLimit, xTolerance, yTolerance, thetaTolerance);
   return NodeStatus::SUCCESS;

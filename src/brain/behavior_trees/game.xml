@@ -2,8 +2,8 @@
     <include path="./subtrees/subtree_cam_find_and_track_ball.xml" />
     <include path="./subtrees/subtree_striker_play.xml" />
     <include path="./subtrees/subtree_carrot_striker_play.xml" />
-    <include path="./subtrees/subtree_goal_keeper_play.xml" />
-    <include path="./subtrees/subtree_striker_freekick.xml" />
+    <include path="./subtrees/subtree_carrot_goalie_play.xml" />
+    <include path="./subtrees/subtree_carrot_freekick.xml" />
     <include path="./subtrees/subtree_goal_keeper_freekick.xml" />
     <include path="./subtrees/subtree_auto_standup_and_locate.xml" />
     <BehaviorTree ID="MainTree">
@@ -36,7 +36,7 @@
                             <CamScanField />
                             <SelfLocate/>
                             <MoveToPoseOnField x="-2.0" _while="player_role == 'striker'" vtheta_limit="2.0"  vx_limit="0.4" />
-                            <MoveToPoseOnField x="-5.5" _while="player_role == 'goal_keeper'" vtheta_limit="2.0"  vx_limit="0.4" />
+                            <KeepGoal _while="player_role == 'goal_keeper'" vtheta_limit="2.0"  vx_limit="0.4" />
                             <WaveHand _while="we_just_scored" action="start" />
                         </ReactiveSequence>
 
@@ -49,7 +49,7 @@
 
                         <ReactiveSequence _while="gc_game_state=='PLAY'" name="play">
                             <SubTree ID="CarrotStrikerPlay" _autoremap="true" _while="player_role == 'striker'" />
-                            <SubTree ID="GoalKeeperPlay" _autoremap="true" _while="player_role == 'goal_keeper'" />
+                            <SubTree ID="CarrotGoaliePlay" _autoremap="true" _while="player_role == 'goal_keeper'" />
                         </ReactiveSequence>
 
                         <ReactiveSequence _while="gc_game_state=='END'" name="end">
@@ -64,8 +64,7 @@
                             <SetVelocity />
                         </ReactiveSequence>
                         <ReactiveSequence _while="gc_game_sub_state=='GET_READY'">
-                            <SubTree ID="CarrotStrikerPlay" _autoremap="true" _while="player_role == 'striker'" />
-                            <SubTree ID="GoalKeeperFreekick" _autoremap="true" _while="player_role == 'goal_keeper'"/>
+                            <SubTree ID="CarrotFreekick" _autoremap="true"/>
                         </ReactiveSequence>
                         <ReactiveSequence _while="gc_game_sub_state=='SET'">
                             <SubTree ID="CamFindAndTrackBall" _autoremap="true" />

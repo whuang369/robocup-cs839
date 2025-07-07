@@ -1,0 +1,25 @@
+<root BTCPP_format="4" >
+   <include path="./subtree_cam_find_and_track_ball.xml" />
+   <BehaviorTree ID="CarrotFreekick">
+      <ReactiveSequence>
+         <ReactiveSequence _while="gc_is_sub_state_kickoff_side" name="move to attacker position">
+            <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
+            <SelfLocate />
+            <Sequence>
+               <StrikerDecide decision_out="{decision}" decision_in="{decision}"
+                              kick_dir_out="{kick_dir}"
+                              kick_range_threshold="0.5" kick_angle_threshold="0.8" />
+               <RobotFindBall _while="decision == 'find'" vyaw_limit="1.0" />
+               <Approach _while="decision == 'approach'"
+                           kick_dir="{kick_dir}" min_range="0.2" max_range="0.5"
+                           vx_limit="1.0" vy_limit="0.5" vtheta_limit="1.0" />
+            </Sequence>
+         </ReactiveSequence>
+         <ReactiveSequence _while="!gc_is_sub_state_kickoff_side" name="move to defender position">
+            <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
+            <SelfLocate />
+            <KeepGoal role="striker" />
+         </ReactiveSequence>
+      </ReactiveSequence>
+   </BehaviorTree>
+</root>
