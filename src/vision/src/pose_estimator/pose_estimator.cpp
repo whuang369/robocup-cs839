@@ -23,6 +23,8 @@ cv::Point3f CalculatePositionByIntersection(const Pose &p_eye2base, const cv::Po
                      mat_position.at<float>(2, 0));
 }
 
+PoseEstimator::~PoseEstimator() = default;
+
 Pose PoseEstimator::EstimateByColor(const Pose &p_eye2base, const DetectionRes &detection,
                                     const cv::Mat &rgb) {
   // TODO(GW): add modification for cross class

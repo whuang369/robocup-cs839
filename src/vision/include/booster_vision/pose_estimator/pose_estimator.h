@@ -15,10 +15,9 @@ class PoseEstimator {
  public:
   using Ptr = std::shared_ptr<PoseEstimator>;
   PoseEstimator(const Intrinsics &intr) : intr_(intr) {}
-  ~PoseEstimator() = default;
+  virtual ~PoseEstimator();
 
   virtual void Init(const YAML::Node &node){};
-
   virtual Pose EstimateByColor(const Pose &p_eye2base, const DetectionRes &detection,
                                const cv::Mat &rgb);
   virtual Pose EstimateByDepth(const Pose &p_eye2base, const DetectionRes &detection,
@@ -31,7 +30,6 @@ class PoseEstimator {
 class BallPoseEstimator : public PoseEstimator {
  public:
   BallPoseEstimator(const Intrinsics &intr) : PoseEstimator(intr) {}
-  ~BallPoseEstimator() = default;
 
   void Init(const YAML::Node &node) override;
   Pose EstimateByColor(const Pose &p_eye2base, const DetectionRes &detection,
@@ -50,7 +48,6 @@ class BallPoseEstimator : public PoseEstimator {
 class HumanLikePoseEstimator : public PoseEstimator {
  public:
   HumanLikePoseEstimator(const Intrinsics &intr) : PoseEstimator(intr) {}
-  ~HumanLikePoseEstimator() = default;
 
   void Init(const YAML::Node &node) override;
   Pose EstimateByColor(const Pose &p_eye2base, const DetectionRes &detection,
