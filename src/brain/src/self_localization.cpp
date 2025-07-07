@@ -19,23 +19,20 @@
 
 #include <rerun.hpp>
 
-const int SelfLocator::numberOfSamples = 12;
-const float SelfLocator::sigmaAngle = 0.0005;
-const float SelfLocator::sigmaDistance = 1;
+const int SelfLocator::numberOfSamples = 20;
+const float SelfLocator::baseValidityWeighting = 0.1f;
 const float SelfLocator::movedDistWeightRotationNoise = 0.0005;
 const float SelfLocator::movedAngleWeightRotationNoise = 0.25;
-const float SelfLocator::movedAngleWeightRotationNoiseNotWalking = 0.075;
 const float SelfLocator::majorDirTransWeight = 2;
 const float SelfLocator::minorDirTransWeight = 1;
 const float SelfLocator::validityFactorLandmarkMeasurement = 3;
 const int SelfLocator::numberOfConsideredFramesForValidity = 60;
 const float SelfLocator::minValidityForSuperbLocalizationQuality = 0.5;
-const float SelfLocator::maxTranslationDeviationForSuperbLocalizationQuality = 100.0;
+const float SelfLocator::maxTranslationDeviationForSuperbLocalizationQuality = 0.1;
 const Angle SelfLocator::maxRotationalDeviationForSuperbLocalizationQuality =
     Angle((30 / 180.f) * pi);
 
 const Pose2f SelfLocator::defaultPoseDeviation = Pose2f(0.3, 0.5, 0.5);
-const Pose2f SelfLocator::filterProcessDeviation = Pose2f(0.002, 2.0, 2.0);
 const Pose2f SelfLocator::odometryDeviation = Pose2f(0.3, 0.2, 0.2);
 const Vector2f SelfLocator::odometryRotationDeviation = Vector2f(0.00157, 0.00157);
 
@@ -81,7 +78,9 @@ void UKFRobotPoseHypothesis::updateByLandmark(const RegisteredLandmark& landmark
 }
 
 SelfLocator::SelfLocator(Brain* brain, const FieldDimensions& fd) : brain(brain) {
+  idOfLastBestSample = -1;
   nextSampleId = 0;
+  averageWeighting = 0.5f;
 
   // Create sample set with samples at the typical walk-in positions
   samples = new SampleSet<UKFRobotPoseHypothesis>(numberOfSamples);
@@ -183,7 +182,7 @@ SelfLocator::~SelfLocator() {
   delete samples;
 }
 
-void SelfLocator::motionUpdate(const Pose2D& robotToOdom) {
+void SelfLocator::motionUpdate(const Pose2D& robotToOdom, float dt) {
   Pose2f newOdometryData = Pose2f(robotToOdom.theta, robotToOdom.x, robotToOdom.y);
   Pose2f odometryOffset = newOdometryData - lastOdometryData;
   lastOdometryData = newOdometryData;
@@ -192,25 +191,27 @@ void SelfLocator::motionUpdate(const Pose2D& robotToOdom) {
     return;
   }
 
+  if (dt <= 0.f) return;
+
   const float transX = odometryOffset.translation.x();
   const float transY = odometryOffset.translation.y();
   const float dist = odometryOffset.translation.norm();
   const float angle = std::abs(odometryOffset.rotation);
-  const float angleWeightNoise = movedAngleWeightRotationNoise;
 
-  // Precalculate rotational error that has to be adapted to all samples
-  const float rotError = std::max(dist * movedDistWeightRotationNoise, angle * angleWeightNoise);
-
-  // pre-calculate translational error that has to be adapted to all samples
+  // Precalculate rotational and translational error that has to be adapted to all samples
+  const float rotError =
+      std::max(dist * movedDistWeightRotationNoise, angle * movedAngleWeightRotationNoise);
   const float transXError =
       std::max(std::abs(transX * majorDirTransWeight), std::abs(transY * minorDirTransWeight));
   const float transYError =
       std::max(std::abs(transY * majorDirTransWeight), std::abs(transX * minorDirTransWeight));
 
+  const Pose2f filterProcessDeviation(2.f * dt, 2.f * dt, 2.f * dt);
+
   // update samples
   for (int i = 0; i < numberOfSamples; ++i) {
-    const Vector2f transOffset((transX - transXError) + (2 * transXError) * Random::uniform(),
-                               (transY - transYError) + (2 * transYError) * Random::uniform());
+    const Vector2f transOffset(transX + Random::uniform(-transXError, transXError),
+                               transY + Random::uniform(-transYError, transYError));
     const float rotationOffset = odometryOffset.rotation + Random::uniform(-rotError, rotError);
 
     samples->at(i).motionUpdate(Pose2f(rotationOffset, transOffset), filterProcessDeviation,
@@ -272,63 +273,26 @@ void SelfLocator::sensorUpdate(const std::vector<GameObject>& detectedGoalPosts,
     const float currentValidity = (static_cast<float>(landmarks.size()) / totalDetectedMarkers);
     sample.updateValidity(numberOfConsideredFramesForValidity, currentValidity);
   }
-}
 
-void SelfLocator::registerLandmarks(const Pose2f& samplePose,
-                                    const std::vector<GameObject>& detectedObjs,
-                                    const std::vector<Vector2f>& groundTruthObjs,
-                                    std::vector<RegisteredLandmark>& landmarks) {
-  const float MAX_ASSOCIATION_DISTANCE = 1.0f;
-
-  if (groundTruthObjs.empty() || detectedObjs.empty()) return;
-
-  auto computeCovariance = [&](const GameObject& obj) {
-    float sigmaX = 0.01f * sqr(static_cast<float>(obj.range));
-    float confidence = std::max(static_cast<float>(obj.confidence), 0.1f);
-    float sigmaY = 0.01f / confidence * sqr(static_cast<float>(obj.range));
-
-    Matrix2f cov = Matrix2f::Zero();
-    cov(0, 0) = sqr(sigmaX);
-    cov(1, 1) = sqr(sigmaY);
-    return cov;
-  };
-
-  for (const auto& obj : detectedObjs) {
-    Vector2f perceptOnField = samplePose * Vector2f(obj.posToRobot.x, obj.posToRobot.y);
-
-    float minDistSq = -1.f;
-    int bestMatchIndex = -1;
-    for (int i = 0; i < groundTruthObjs.size(); ++i) {
-      float distSq = (perceptOnField - groundTruthObjs[i]).squaredNorm();
-      if (bestMatchIndex == -1 || distSq < minDistSq) {
-        minDistSq = distSq;
-        bestMatchIndex = i;
-      }
-    }
-
-    // validation gate
-    if (bestMatchIndex != -1 && minDistSq < sqr(MAX_ASSOCIATION_DISTANCE)) {
-      RegisteredLandmark newLandmark;
-      newLandmark.percept = Vector2f(obj.posToRobot.x, obj.posToRobot.y);
-      newLandmark.model = groundTruthObjs[bestMatchIndex];
-      // newLandmark.covPercept = computeCovariance(obj);
-      newLandmark.covPercept = (Matrix2f() << 1.0f, 0.0f, 0.0f, 1.0f).finished();
-      landmarks.push_back(newLandmark);
-    }
+  // compute weights
+  float weightingSum = 0.f;
+  for (int i = 0; i < numberOfSamples; ++i) {
+    samples->at(i).computeWeightingBasedOnValidity(baseValidityWeighting);
+    const float w = samples->at(i).weighting;
+    weightingSum += w;
   }
+  averageWeighting = weightingSum / numberOfSamples;
 }
 
 void SelfLocator::resampling() {
-  float totalValidity = 0.f;
-  for (int i = 0; i < numberOfSamples; ++i) {
-    totalValidity += samples->at(i).validity;
+  if (averageWeighting == 0.f) {
+    prtDebug("SelfLocator: No valid samples, skipping resampling.");
+    return;
   }
-  float averageWeighting = totalValidity / numberOfSamples;
-  if (averageWeighting == 0.f) return;
 
   // resample
   UKFRobotPoseHypothesis* oldSet = samples->swap();
-  const float weightingBetweenTwoDrawnSamples = totalValidity / numberOfSamples;
+  const float weightingBetweenTwoDrawnSamples = averageWeighting;
   float nextPos = Random::uniform() * weightingBetweenTwoDrawnSamples;
   float currentSum = 0.f;
 
@@ -350,9 +314,52 @@ void SelfLocator::resampling() {
   }
 
   // fill up missing samples
+  const Pose2f fallbackPose = getMostValidSample().getPose();
   for (; j < numberOfSamples; ++j) {
-    const Pose2f pose = samples->at(0).getPose();
-    samples->at(j).init(pose, defaultPoseDeviation, nextSampleId++, averageWeighting);
+    samples->at(j).init(fallbackPose, defaultPoseDeviation, nextSampleId++, averageWeighting);
+  }
+}
+
+void SelfLocator::registerLandmarks(const Pose2f& samplePose,
+                                    const std::vector<GameObject>& detectedObjs,
+                                    const std::vector<Vector2f>& groundTruthObjs,
+                                    std::vector<RegisteredLandmark>& landmarks) {
+  const float MAX_ASSOCIATION_DISTANCE = 1.0f;
+
+  if (groundTruthObjs.empty() || detectedObjs.empty()) return;
+
+  auto computeCovariance = [&](const GameObject& obj) {
+    float confidence = std::max(static_cast<float>(obj.confidence), 0.1f);
+    float sigma = 1.f / confidence * sqr(static_cast<float>(obj.range));
+
+    Matrix2f cov = Matrix2f::Zero();
+    cov(0, 0) = sigma;
+    cov(1, 1) = sigma;
+    return cov;
+  };
+
+  for (const auto& obj : detectedObjs) {
+    Vector2f perceptOnField = samplePose * Vector2f(obj.posToRobot.x, obj.posToRobot.y);
+
+    float minDistSq = -1.f;
+    int bestMatchIndex = -1;
+    for (int i = 0; i < groundTruthObjs.size(); ++i) {
+      float distSq = (perceptOnField - groundTruthObjs[i]).squaredNorm();
+      if (bestMatchIndex == -1 || distSq < minDistSq) {
+        minDistSq = distSq;
+        bestMatchIndex = i;
+      }
+    }
+
+    // validation gate
+    if (bestMatchIndex != -1 && minDistSq < sqr(MAX_ASSOCIATION_DISTANCE)) {
+      RegisteredLandmark newLandmark;
+      newLandmark.percept = Vector2f(obj.posToRobot.x, obj.posToRobot.y);
+      newLandmark.model = groundTruthObjs[bestMatchIndex];
+      newLandmark.covPercept = computeCovariance(obj);
+      // newLandmark.covPercept = (Matrix2f() << 1.0f, 0.0f, 0.0f, 1.0f).finished();
+      landmarks.push_back(newLandmark);
+    }
   }
 }
 
@@ -386,7 +393,7 @@ UKFRobotPoseHypothesis& SelfLocator::getMostValidSample() {
       }
     }
   }
-  if (lastBestSample && returnSample->validity <= validityOfLastBestSample * 1.5f) {
+  if (lastBestSample && returnSample->validity <= validityOfLastBestSample * 1.1f) {
     return *lastBestSample;
   } else {
     return *returnSample;
@@ -428,8 +435,7 @@ void SelfLocator::logSamples() {
     float x = pose.translation.x();
     float y = pose.translation.y();
     float theta = pose.rotation;
-    string id = std::to_string(samples->at(i).id);
-    brain->log->log("field/pose_samples/" + id,
+    brain->log->log("field/pose_samples/" + std::to_string(i),
                     rerun::Points2D({{x, -y}, {x + 0.05 * cos(theta), -y - 0.05 * sin(theta)}})
                         .with_radii({0.1, 0.05})
                         .with_colors({0xFFAA00FF, 0xFFFF00FF}));

@@ -48,16 +48,23 @@ Pose PoseEstimator::EstimateByDepth(const Pose &p_eye2base, const DetectionRes &
       }
     }
   }
-
   if (valid_depths.size() < 10) return Pose();  // not enough valid depth data
 
-  // calculate median depth
-  std::nth_element(valid_depths.begin(), valid_depths.begin() + valid_depths.size() / 2,
-                   valid_depths.end());
-  float median_depth = valid_depths[valid_depths.size() / 2];
+  // calculate average depth (trimmed mean)
+  std::sort(valid_depths.begin(), valid_depths.end());
+  size_t trim = valid_depths.size() / 10;  // 10% trim
+  size_t start = trim;
+  size_t end = valid_depths.size() - trim;
+  if (end <= start) return Pose();
+
+  float sum = 0.0f;
+  for (size_t i = start; i < end; ++i) {
+    sum += valid_depths[i];
+  }
+  float avg_depth = sum / (end - start);
 
   cv::Point2f uv = cv::Point2f(bbox.x + bbox.width * 0.5f, bbox.y + bbox.height * 0.5f);
-  cv::Point3f point = intr_.BackProject(uv, median_depth);
+  cv::Point3f point = intr_.BackProject(uv, avg_depth);
 
   // transform point from eye to base frame
   Pose p_obj2eye = Pose(point.x, point.y, point.z, 0, 0, 0);
@@ -101,15 +108,23 @@ Pose BallPoseEstimator::EstimateByDepth(const Pose &p_eye2base, const DetectionR
       }
     }
   }
-
   if (valid_depths.size() < 10) return Pose();  // not enough valid depth data
 
-  std::nth_element(valid_depths.begin(), valid_depths.begin() + valid_depths.size() / 2,
-                   valid_depths.end());
-  float median_depth = valid_depths[valid_depths.size() / 2];
+  // calculate average depth (trimmed mean)
+  std::sort(valid_depths.begin(), valid_depths.end());
+  size_t trim = valid_depths.size() / 10;  // 10% trim
+  size_t start = trim;
+  size_t end = valid_depths.size() - trim;
+  if (end <= start) return Pose();
+
+  float sum = 0.0f;
+  for (size_t i = start; i < end; ++i) {
+    sum += valid_depths[i];
+  }
+  float avg_depth = sum / (end - start);
 
   cv::Point2f uv = cv::Point2f(bbox.x + bbox.width * 0.5f, bbox.y + bbox.height * 0.5f);
-  cv::Point3f point = intr_.BackProject(uv, median_depth + radius_);
+  cv::Point3f point = intr_.BackProject(uv, avg_depth + radius_);
 
   Pose p_obj2eye = Pose(point.x, point.y, point.z, 0, 0, 0);
   Pose p_obj2base = p_eye2base * p_obj2eye;
@@ -151,16 +166,23 @@ Pose HumanLikePoseEstimator::EstimateByDepth(const Pose &p_eye2base, const Detec
       }
     }
   }
-
   if (valid_depths.size() < 10) return Pose();  // not enough valid depth data
 
-  // calculate median depth
-  std::nth_element(valid_depths.begin(), valid_depths.begin() + valid_depths.size() / 2,
-                   valid_depths.end());
-  float median_depth = valid_depths[valid_depths.size() / 2];
+  // calculate average depth (trimmed mean)
+  std::sort(valid_depths.begin(), valid_depths.end());
+  size_t trim = valid_depths.size() / 10;  // 10% trim
+  size_t start = trim;
+  size_t end = valid_depths.size() - trim;
+  if (end <= start) return Pose();
+
+  float sum = 0.0f;
+  for (size_t i = start; i < end; ++i) {
+    sum += valid_depths[i];
+  }
+  float avg_depth = sum / (end - start);
 
   cv::Point2f uv = cv::Point2f(bbox.x + bbox.width * 0.5f, bbox.y + bbox.height);
-  cv::Point3f point = intr_.BackProject(uv, median_depth);
+  cv::Point3f point = intr_.BackProject(uv, avg_depth);
 
   // transform point from eye to base frame
   Pose p_obj2eye = Pose(point.x, point.y, point.z, 0, 0, 0);

@@ -89,7 +89,7 @@ class SelfLocator {
   bool isGood();
 
   /** Integrate odometry offset into hypotheses */
-  void motionUpdate(const Pose2D& robotToOdom);
+  void motionUpdate(const Pose2D& robotToOdom, float dt = 0.01f);
 
   /** Perform UKF measurement step for all samples */
   void sensorUpdate(const std::vector<GameObject>& detectedGoalPosts,
@@ -110,9 +110,10 @@ class SelfLocator {
                          std::vector<RegisteredLandmark>& landmarks);
 
  private:
-  SampleSet<UKFRobotPoseHypothesis>* samples; /**< Container for all samples. */
-  int idOfLastBestSample; /**< Identifier of the best sample of the last frame */
-  int nextSampleId;
+  SampleSet<UKFRobotPoseHypothesis>* samples;
+  int nextSampleId;        // Unique sample identifiers
+  int idOfLastBestSample;  // Identifier of the best sample of the last frame
+  float averageWeighting;  // The average of the weightings of all samples in the sample set
 
   // landmarks
   std::vector<Vector2f> goalPosts;
@@ -125,11 +126,9 @@ class SelfLocator {
   bool odomInitialized;
 
   static const int numberOfSamples;
-  static const float sigmaAngle;
-  static const float sigmaDistance;
+  static const float baseValidityWeighting;
   static const float movedDistWeightRotationNoise;
   static const float movedAngleWeightRotationNoise;
-  static const float movedAngleWeightRotationNoiseNotWalking;
   static const float majorDirTransWeight;
   static const float minorDirTransWeight;
   static const float validityFactorLandmarkMeasurement;
@@ -138,7 +137,6 @@ class SelfLocator {
   static const float maxTranslationDeviationForSuperbLocalizationQuality;
   static const Angle maxRotationalDeviationForSuperbLocalizationQuality;
   static const Pose2f defaultPoseDeviation;
-  static const Pose2f filterProcessDeviation;
   static const Pose2f odometryDeviation;
   static const Vector2f odometryRotationDeviation;
 

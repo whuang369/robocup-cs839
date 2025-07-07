@@ -27,13 +27,13 @@ detection_model:
   confidence_threshold: 0.2
 use_depth: true
 ball_pose_estimator:
-  use_depth: false
+  use_depth: true
   radius: 0.15
   down_sample_leaf_size: 0.01
   cluster_distance_threshold: 0.01
   fitting_distance_threshold: 0.01
 human_like_pose_estimator:
-  use_depth: false
+  use_depth: true
   down_sample_leaf_size: 0.01
   fitting_distance_threshold: 0.01
   statistic_outlier_multiplier: 0.01

@@ -4,10 +4,14 @@ topics:
 camera:
   type: "zed" # realsense or zed
   intrin:
-    fx: 540.932129
-    fy: 540.932129
-    cx: 478.401062
-    cy: 258.701477
+    # fx: 540.932129
+    # fy: 540.932129
+    # cx: 478.401062
+    # cy: 258.701477
+    fx: 265.876801
+    fy: 265.876801
+    cx: 317.860718
+    cy: 173.117950
     distortion_coeffs: [0., 0., 0., 0., 0., 0., 0., 0.] # /camera/camera/rgb
     distortion_model: 0 # 0: none, 1: opencv format, 2: for rs d455 only
   extrin:
@@ -23,13 +27,13 @@ detection_model:
   confidence_threshold: 0.2
 use_depth: true
 ball_pose_estimator:
-  use_depth: false
-  radius: 1.109
+  use_depth: true
+  radius: 0.15
   down_sample_leaf_size: 0.01
   cluster_distance_threshold: 0.01
   fitting_distance_threshold: 0.01
 human_like_pose_estimator:
-  use_depth: false
+  use_depth: true
   down_sample_leaf_size: 0.01
   fitting_distance_threshold: 0.01
   statistic_outlier_multiplier: 0.01
