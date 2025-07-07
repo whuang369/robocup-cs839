@@ -19,7 +19,7 @@
 
 #include <rerun.hpp>
 
-const int SelfLocator::numberOfSamples = 20;
+const int SelfLocator::numberOfSamples = 30;
 const float SelfLocator::baseValidityWeighting = 0.1f;
 const float SelfLocator::movedDistWeightRotationNoise = 0.0005;
 const float SelfLocator::movedAngleWeightRotationNoise = 0.25;
@@ -206,7 +206,7 @@ void SelfLocator::motionUpdate(const Pose2D& robotToOdom, float dt) {
   const float transYError =
       std::max(std::abs(transY * majorDirTransWeight), std::abs(transX * minorDirTransWeight));
 
-  const Pose2f filterProcessDeviation(2.f * dt, 2.f * dt, 2.f * dt);
+  const Pose2f filterProcessDeviation(3.f * dt, 3.f * dt, 3.f * dt);
 
   // update samples
   for (int i = 0; i < numberOfSamples; ++i) {
@@ -357,7 +357,6 @@ void SelfLocator::registerLandmarks(const Pose2f& samplePose,
       newLandmark.percept = Vector2f(obj.posToRobot.x, obj.posToRobot.y);
       newLandmark.model = groundTruthObjs[bestMatchIndex];
       newLandmark.covPercept = computeCovariance(obj);
-      // newLandmark.covPercept = (Matrix2f() << 1.0f, 0.0f, 0.0f, 1.0f).finished();
       landmarks.push_back(newLandmark);
     }
   }

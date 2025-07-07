@@ -902,7 +902,7 @@ void RobotFindBall::onHalted() {
 NodeStatus SelfLocate::tick() {
   brain->self_locator->motionUpdate(brain->data->robotPoseToOdom);
   brain->self_locator->sensorUpdate(brain->data->goalposts, brain->data->markings);
-  // brain->self_locator->resampling();
+  brain->self_locator->resampling();
 
   brain->data->goalposts.clear();
   brain->data->markings.clear();
@@ -924,7 +924,7 @@ NodeStatus SelfLocate::tick() {
                       .with_radii({0.2, 0.1})
                       .with_colors({0x00FFFFFF, 0xFF0000FF}));
 
-  // brain->self_locator->logSamples();
+  brain->self_locator->logSamples();
 
   return NodeStatus::SUCCESS;
 }

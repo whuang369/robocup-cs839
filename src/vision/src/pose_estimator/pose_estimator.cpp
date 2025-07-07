@@ -34,9 +34,13 @@ Pose PoseEstimator::EstimateByColor(const Pose &p_eye2base, const DetectionRes &
 
 Pose PoseEstimator::EstimateByDepth(const Pose &p_eye2base, const DetectionRes &detection,
                                     const cv::Mat &depth) {
-  auto bbox = detection.bbox;
-  cv::Rect roi = bbox & cv::Rect(0, 0, depth.cols, depth.rows);
-  if (roi.width <= 1 || roi.height <= 1) return Pose();  // invalid bbox
+  const auto &bbox = detection.bbox;
+  if (depth.empty() || bbox.width <= 1 || bbox.height <= 1) return Pose();
+
+  int shrink = 0.25f * std::min(bbox.width, bbox.height);
+  cv::Rect roi(bbox.x + shrink, bbox.y + shrink, bbox.width - 2 * shrink, bbox.height - 2 * shrink);
+  roi &= cv::Rect(0, 0, depth.cols, depth.rows);
+  if (roi.width <= 1 || roi.height <= 1) return Pose();
 
   std::vector<float> valid_depths;
   for (int y = roi.y; y < roi.y + roi.height; ++y) {
