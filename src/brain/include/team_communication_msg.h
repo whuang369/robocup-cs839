@@ -11,7 +11,8 @@ struct TeamCommunicationMsg {
   int playerId;
   // TODO: You need to add something you want to send to teammates
   rclcpp::Time timePoint;
-  GameObject ball;
+  rclcpp::Time ballTimePoint;
+  Point ballPosToField;
   Pose2D robotPoseToField;
 };
 

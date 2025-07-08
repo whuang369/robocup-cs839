@@ -16,6 +16,7 @@
   <depend>opencv</depend>
   <depend>eigen3</depend>
   <depend>behaviortree_cpp</depend>
+  <depend>backward_ros</depend>
   
   <depend>game_controller_interface</depend>
   <depend>vision_interface</depend>

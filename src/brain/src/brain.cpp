@@ -165,10 +165,10 @@ void Brain::updateBallMemory() {
     // use team member's ball memory if available
     bool teamMemberBallFound = false;
     for (const auto &it : data->teamMemberMessages) {
-      if (get_clock()->now().seconds() - it.second.ball.timePoint.seconds() <
+      if (get_clock()->now().seconds() - it.second.ballTimePoint.seconds() <
           config->memoryLength) {
-        data->ball.timePoint = it.second.ball.timePoint;
-        data->ball.posToField = it.second.ball.posToField;
+        data->ball.timePoint = it.second.ballTimePoint;
+        data->ball.posToField = it.second.ballPosToField;
         teamMemberBallFound = true;
         log->log("brain/updateBallMemory",
                  rerun::TextLog(format("Ball found in team member %d", it.second.playerId)));

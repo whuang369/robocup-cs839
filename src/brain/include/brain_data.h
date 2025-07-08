@@ -65,7 +65,7 @@ class BrainData {
 
   // Team communication
   std::mutex teamCommunicationMutex;
-  std::unordered_map<uint32_t, TeamCommunicationMsg> teamMemberMessages;  // Records team messages
+  std::unordered_map<int, TeamCommunicationMsg> teamMemberMessages;  // Records team messages
 
   // Motion planning
   double dribbleTargetAngle;     // The direction for dribbling

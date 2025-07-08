@@ -26,6 +26,7 @@
 #include "brain_communication.h"
 
 #include "self_localization.h"
+#include <backward_ros/backward.hpp>
 
 using namespace std;
 

@@ -298,9 +298,10 @@ void BrainCommunication::unicastCommunication() {
     msg.communicationId = _team_communication_msg_id++;
     msg.teamId = brain->config->teamId;
     msg.playerId = brain->config->playerId;
-    // TODO: add something you want to send to teammates, this is only an example
+
     msg.timePoint = brain->get_clock()->now();
-    msg.ball = brain->data->ball;
+    msg.ballTimePoint = brain->data->ball.timePoint;
+    msg.ballPosToField = brain->data->ball.posToField;
     msg.robotPoseToField = brain->data->robotPoseToField;
 
     std::lock_guard<std::mutex> lock(_teammate_addresses_mutex);
@@ -395,11 +396,10 @@ void BrainCommunication::spinCommunicationReceiver() {
          << format(
                 "communicationId: %d, playerId: %d, ballX: %.2f, ballY: %.2f, robotPoseToFieldX: "
                 "%.2f, robotPoseToFieldY: %.2f, robotPoseToFieldYaw: %.2f",
-                msg.communicationId, msg.playerId, msg.ball.posToField.x, msg.ball.posToField.y,
+                msg.communicationId, msg.playerId, msg.ballPosToField.x, msg.ballPosToField.y,
                 msg.robotPoseToField.x, msg.robotPoseToField.y, msg.robotPoseToField.theta)
          << RESET_CODE << endl;
 
-    // TODO: dealing with the received message
     std::lock_guard<std::mutex> lock(brain->data->teamCommunicationMutex);
     brain->data->teamMemberMessages[msg.playerId] = msg;
   }
