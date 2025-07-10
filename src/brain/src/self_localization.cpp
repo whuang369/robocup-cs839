@@ -425,7 +425,7 @@ void SelfLocator::logLandmarks() {
   brain->log->log("field/landmarks/t_markers",
                   rerun::Points2D(tPoints).with_colors(0x00FF00FF).with_radii(0.1));
   brain->log->log("field/landmarks/penalty_markers",
-                  rerun::Points2D(penaltyPoints).with_colors(0xFFD700FF).with_radii(0.1));
+                  rerun::Points2D(penaltyPoints).with_colors(0x87CEFAFF).with_radii(0.1));
 }
 
 void SelfLocator::logSamples() {
