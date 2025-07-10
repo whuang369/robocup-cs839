@@ -35,6 +35,13 @@ Pose2D BrainData::robot2field(const Pose2D &poseToRobot) {
   return poseToField;
 }
 
+Point BrainData::robot2field(const Point &pointToRobot) {
+  Point pointToField;
+  transCoord(pointToRobot.x, pointToRobot.y, 0, robotPoseToField.x, robotPoseToField.y,
+             robotPoseToField.theta, pointToField.x, pointToField.y, pointToField.z);
+  return pointToField;
+}
+
 Pose2D BrainData::field2robot(const Pose2D &poseToField) {
   Pose2D poseToRobot;
   double xfr, yfr, thetafr;  // fr = field to robot
@@ -46,4 +53,17 @@ Pose2D BrainData::field2robot(const Pose2D &poseToField) {
   transCoord(poseToField.x, poseToField.y, poseToField.theta, xfr, yfr, thetafr, poseToRobot.x,
              poseToRobot.y, poseToRobot.theta);
   return poseToRobot;
+}
+
+Point BrainData::field2robot(const Point &pointToField) {
+  Point pointToRobot;
+  double xfr, yfr, thetafr;  // fr = field to robot
+  yfr = sin(robotPoseToField.theta) * robotPoseToField.x -
+        cos(robotPoseToField.theta) * robotPoseToField.y;
+  xfr = -cos(robotPoseToField.theta) * robotPoseToField.x -
+        sin(robotPoseToField.theta) * robotPoseToField.y;
+  thetafr = -robotPoseToField.theta;
+  transCoord(pointToField.x, pointToField.y, 0, xfr, yfr, thetafr, pointToRobot.x, pointToRobot.y,
+             pointToRobot.z);
+  return pointToRobot;
 }

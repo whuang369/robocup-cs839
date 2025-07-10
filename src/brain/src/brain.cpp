@@ -165,8 +165,7 @@ void Brain::updateBallMemory() {
     // use team member's ball memory if available
     bool teamMemberBallFound = false;
     for (const auto &it : data->teamMemberMessages) {
-      if (get_clock()->now().seconds() - it.second.ballTimePoint.seconds() <
-          config->memoryLength) {
+      if (get_clock()->now().seconds() - it.second.ballTimePoint.seconds() < config->memoryLength) {
         data->ball.timePoint = it.second.ballTimePoint;
         data->ball.posToField = it.second.ballPosToField;
         teamMemberBallFound = true;
@@ -185,21 +184,24 @@ void Brain::updateBallMemory() {
     }
   }
 
-  // update Pose to field from Pose to robot (based on odom)
-  double xfr, yfr, thetafr;  // fr = field to robot
-  yfr = std::sin(data->robotPoseToField.theta) * data->robotPoseToField.x -
-        std::cos(data->robotPoseToField.theta) * data->robotPoseToField.y;
-  xfr = -std::cos(data->robotPoseToField.theta) * data->robotPoseToField.x -
-        std::sin(data->robotPoseToField.theta) * data->robotPoseToField.y;
-  thetafr = -data->robotPoseToField.theta;
-  transCoord(data->ball.posToField.x, data->ball.posToField.y, 0, xfr, yfr, thetafr,
-             data->ball.posToRobot.x, data->ball.posToRobot.y, data->ball.posToRobot.z);
+  // // update Pose to field from Pose to robot (based on odom)
+  // double xfr, yfr, thetafr;  // fr = field to robot
+  // yfr = std::sin(data->robotPoseToField.theta) * data->robotPoseToField.x -
+  //       std::cos(data->robotPoseToField.theta) * data->robotPoseToField.y;
+  // xfr = -std::cos(data->robotPoseToField.theta) * data->robotPoseToField.x -
+  //       std::sin(data->robotPoseToField.theta) * data->robotPoseToField.y;
+  // thetafr = -data->robotPoseToField.theta;
+  // transCoord(data->ball.posToField.x, data->ball.posToField.y, 0, xfr, yfr, thetafr,
+  //            data->ball.posToRobot.x, data->ball.posToRobot.y, data->ball.posToRobot.z);
+  data->ball.posToRobot = data->field2robot(data->ball.posToField);
 
   data->ball.range = std::sqrt(data->ball.posToRobot.x * data->ball.posToRobot.x +
                                data->ball.posToRobot.y * data->ball.posToRobot.y);
   tree->setEntry<double>("ball_range", data->ball.range);
   data->ball.yawToRobot = std::atan2(data->ball.posToRobot.y, data->ball.posToRobot.x);
   data->ball.pitchToRobot = std::asin(config->robotHeight / data->ball.range);
+  data->robotBallAngleToField = std::atan2(data->ball.posToField.y - data->robotPoseToField.y,
+                                           data->ball.posToField.x - data->robotPoseToField.x);
 }
 
 vector<double> Brain::getGoalPostAngles(const double margin) {
@@ -243,9 +245,6 @@ void Brain::calibrateOdom(double x, double y, double theta) {
          std::cos(data->robotPoseToOdom.theta) * data->robotPoseToOdom.y;
   theta_or = -data->robotPoseToOdom.theta;
 
-  // TODO: use Pose2f instead of transCoord
-  Pose2f fieldPose(theta, x, y);
-
   transCoord(x_or, y_or, theta_or, x, y, theta, data->odomToField.x, data->odomToField.y,
              data->odomToField.theta);
 
@@ -257,23 +256,6 @@ void Brain::calibrateOdom(double x, double y, double theta) {
            rerun::Points2D({{x, -y}, {x + 0.1 * cos(theta), -y - 0.1 * sin(theta)}})
                .with_radii({0.2, 0.1})
                .with_colors({0x00FFFFFF, 0xFF0000FF}));
-
-  double placeHolder;
-  // ball
-  // transCoord(
-  //     data->ball.posToRobot.x, data->ball.posToRobot.y, 0,
-  //     data->robotPoseToField.x, data->robotPoseToField.y, data->robotPoseToField.theta,
-  //     data->ball.posToField.x, data->ball.posToField.y, placeHolder);
-
-  // opponents
-  // for (int i = 0; i < data->opponents.size(); i++)
-  // {
-  //     auto obj = data->opponents[i];
-  //     transCoord(
-  //         obj.posToRobot.x, obj.posToRobot.y, 0,
-  //         data->robotPoseToField.x, data->robotPoseToField.y, data->robotPoseToField.theta,
-  //         obj.posToField.x, obj.posToField.y, placeHolder);
-  // }
 }
 
 double Brain::msecsSince(rclcpp::Time time) {
@@ -621,9 +603,10 @@ vector<GameObject> Brain::getGameObjects(const vision_interface::msg::Detections
     gObj.yawToRobot = std::atan2(gObj.posToRobot.y, gObj.posToRobot.x);
     gObj.pitchToRobot = std::atan2(config->robotHeight, gObj.range);
 
-    transCoord(gObj.posToRobot.x, gObj.posToRobot.y, 0, data->robotPoseToField.x,
-               data->robotPoseToField.y, data->robotPoseToField.theta, gObj.posToField.x,
-               gObj.posToField.y, gObj.posToField.z);
+    gObj.posToField = data->robot2field(gObj.posToRobot);
+    // transCoord(gObj.posToRobot.x, gObj.posToRobot.y, 0, data->robotPoseToField.x,
+    //            data->robotPoseToField.y, data->robotPoseToField.theta, gObj.posToField.x,
+    //            gObj.posToField.y, gObj.posToField.z);
 
     res.push_back(gObj);
   }
