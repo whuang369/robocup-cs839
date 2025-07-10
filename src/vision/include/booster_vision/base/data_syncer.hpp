@@ -47,7 +47,7 @@ struct SyncedDataBlock {
 template <int MaxLength, typename T, typename Allocator = std::allocator<T>>
 class DataBuffer : public std::deque<T, Allocator> {
  public:
-  DataBuffer() : std::deque<T, Allocator>(MaxLength) {}
+  DataBuffer() : std::deque<T, Allocator>() {}
   void push_back(const T &value) {
     if (this->size() == MaxLength) {
       this->pop_front();

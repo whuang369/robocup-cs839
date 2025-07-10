@@ -239,7 +239,7 @@ void VisionNode::ProcessFrame() {
 
     // pose estimation
     Pose pose_by_color = pose_estimator->EstimateByColor(p_eye2base, detection, color);
-    Pose pose_by_depth = pose_estimator->EstimateByDepth(p_eye2base, detection, depth);
+    Pose pose_by_depth = pose_estimator->EstimateByDepth(p_eye2base, detection, color, depth);
 
     vision_interface::msg::DetectedObject detection_obj;
     detection_obj.label = detection.class_name;
@@ -293,9 +293,6 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
 
   double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
   data_syncer_->AddColor(ColorDataBlock(imgBGR, timestamp));
-
-  log_->setTimeSeconds(timestamp);
-  log_->log("callback/color", rerun::TextLog(std::to_string(timestamp)));
 }
 
 void VisionNode::DepthCallback(const sensor_msgs::msg::Image::ConstSharedPtr &msg) {
@@ -327,9 +324,6 @@ void VisionNode::DepthCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
   // add depth data to syncer
   double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
   data_syncer_->AddDepth(DepthDataBlock(depth, timestamp));
-
-  log_->setTimeSeconds(timestamp);
-  log_->log("callback/depth", rerun::TextLog(std::to_string(timestamp)));
 }
 
 void VisionNode::PoseCallBack(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {

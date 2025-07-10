@@ -35,7 +35,7 @@ Pose PoseEstimator::EstimateByColor(const Pose &p_eye2base, const DetectionRes &
 }
 
 Pose PoseEstimator::EstimateByDepth(const Pose &p_eye2base, const DetectionRes &detection,
-                                    const cv::Mat &depth) {
+                                    const cv::Mat &rgb, const cv::Mat &depth) {
   const auto &bbox = detection.bbox;
   if (depth.empty() || bbox.width <= 1 || bbox.height <= 1) return Pose();
 
@@ -95,7 +95,7 @@ Pose BallPoseEstimator::EstimateByColor(const Pose &p_eye2base, const DetectionR
 }
 
 Pose BallPoseEstimator::EstimateByDepth(const Pose &p_eye2base, const DetectionRes &detection,
-                                        const cv::Mat &depth) {
+                                        const cv::Mat &rgb, const cv::Mat &depth) {
   const auto &bbox = detection.bbox;
   if (depth.empty() || bbox.width <= 1 || bbox.height <= 1) return Pose();
 
@@ -153,7 +153,7 @@ Pose HumanLikePoseEstimator::EstimateByColor(const Pose &p_eye2base, const Detec
 }
 
 Pose HumanLikePoseEstimator::EstimateByDepth(const Pose &p_eye2base, const DetectionRes &detection,
-                                             const cv::Mat &depth) {
+                                             const cv::Mat &rgb, const cv::Mat &depth) {
   auto bbox = detection.bbox;
   const int margin = 2;
   const int strip_height = std::max(1, bbox.height / 10);

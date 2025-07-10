@@ -21,7 +21,7 @@ class PoseEstimator {
   virtual Pose EstimateByColor(const Pose &p_eye2base, const DetectionRes &detection,
                                const cv::Mat &rgb);
   virtual Pose EstimateByDepth(const Pose &p_eye2base, const DetectionRes &detection,
-                               const cv::Mat &depth);
+                               const cv::Mat &rgb, const cv::Mat &depth);
 
  protected:
   Intrinsics intr_;
@@ -34,7 +34,7 @@ class BallPoseEstimator : public PoseEstimator {
   void Init(const YAML::Node &node) override;
   Pose EstimateByColor(const Pose &p_eye2base, const DetectionRes &detection,
                        const cv::Mat &rgb) override;
-  Pose EstimateByDepth(const Pose &p_eye2base, const DetectionRes &detection,
+  Pose EstimateByDepth(const Pose &p_eye2base, const DetectionRes &detection, const cv::Mat &rgb,
                        const cv::Mat &depth) override;
 
  private:
@@ -52,7 +52,7 @@ class HumanLikePoseEstimator : public PoseEstimator {
   void Init(const YAML::Node &node) override;
   Pose EstimateByColor(const Pose &p_eye2base, const DetectionRes &detection,
                        const cv::Mat &rgb) override;
-  Pose EstimateByDepth(const Pose &p_eye2base, const DetectionRes &detection,
+  Pose EstimateByDepth(const Pose &p_eye2base, const DetectionRes &detection, const cv::Mat &rgb,
                        const cv::Mat &depth) override;
 
  private:
