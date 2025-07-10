@@ -19,7 +19,7 @@ namespace {
 
 bool isShotBlocked(const double kickDir, const Point &ballPosToField,
                    const std::shared_ptr<BrainData> data) {
-  constexpr double MIN_DRIBBLE_DISTANCE = 1.0;
+  constexpr double MIN_BLOCK_DISTANCE = 1.0;
   constexpr double MAX_KICK_ANGLE = 0.5;
 
   bool blocked = false;
@@ -28,13 +28,13 @@ bool isShotBlocked(const double kickDir, const Point &ballPosToField,
     double dy = opponent.posToField.y - ballPosToField.y;
 
     double ballOpponentRange = hypot(dx, dy);  // Distance from ball to opponent
-    if (ballOpponentRange > MIN_DRIBBLE_DISTANCE) {
+    if (ballOpponentRange > MIN_BLOCK_DISTANCE) {
       continue;
     }
 
     double ballOpponentAngle = atan2(dy, dx);  // Angle from ball to opponent
     double angleDiffRobot = fabs(toPInPI(kickDir - ballOpponentAngle));
-    if (angleDiffRobot < MAX_KICK_ANGLE) {
+    if (angleDiffRobot < MAX_KICK_ANGLE) {  // TODO: proportional to inverse of distance
       blocked = true;
       break;
     }
@@ -692,10 +692,11 @@ NodeStatus StrikerDecide::tick() {
 
   brain->log->logToField(
       "field/StrikerDecide",
-      format("Decision: %s | kickDir: %.2f | rbDir: %.2f | ballRange: %.2f | ballYaw: %.2f | "
-             "goodAngle: %d | goodRange: %d | goodHeading: %d | isShotBlocked: %d",
-             newDecision.c_str(), kickDir, dir_rb_f, ballRange, brain->data->ball.yawToRobot,
-             angleIsGood, rangeIsGood, headingIsGood, shotBlocked),
+      format(
+          "Decision: %s | kickDir: %.2f | rbDir: %.2f | ballRange: %.2f | ballYaw: %.2f | "
+          "goodAngle: %d | goodRange: %d | goodHeading: %d | isShotBlocked: %d | isLocalKicker: %d",
+          newDecision.c_str(), kickDir, dir_rb_f, ballRange, brain->data->ball.yawToRobot,
+          angleIsGood, rangeIsGood, headingIsGood, shotBlocked, brain->data->isKicker),
       color, 0.2);
   return NodeStatus::SUCCESS;
 }
@@ -1066,9 +1067,17 @@ NodeStatus KeepGoal::tick() {
 
   double tx, ty;
   if (role == "goalie") {
-    // goalie keep the goal by standing in front of the goal
-    tx = -brain->config->fieldDimensions.length / 2.0 + 0.4;
-    ty = 0.0;
+    // check if the ball is moving towards the goal (intersection with the bottom line of the goal)
+    double ballIntersectionY = brain->data->ballIntersectionY;
+    if (ballIntersectionY > -brain->config->fieldDimensions.penaltyAreaWidth / 2.0 &&
+        ballIntersectionY < brain->config->fieldDimensions.penaltyAreaWidth / 2.0 &&
+        brain->data->ballVelocity.x < 0) {
+      tx = -brain->config->fieldDimensions.length / 2.0;
+      ty = ballIntersectionY;
+    } else {
+      tx = -brain->config->fieldDimensions.length / 2.0 + 0.4;
+      ty = 0.0;
+    }
   } else {
     // striker keep the goal by standing behind the ball
     double ballGoalDir =

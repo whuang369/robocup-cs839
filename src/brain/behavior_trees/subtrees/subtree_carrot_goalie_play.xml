@@ -12,8 +12,8 @@
             <SelfLocate />
             <Sequence>
                <GoalieDecide decision_out="{decision}" decision_in="{decision}"
-                              kick_dir_out="{kick_dir}"
-                              kick_range_threshold="0.5" kick_angle_threshold="0.8" />
+                             kick_dir_out="{kick_dir}"
+                             kick_range_threshold="1.0" kick_angle_threshold="0.8" />
                <RobotFindBall _while="decision == 'find'" vyaw_limit="1.0" />
                <KeepGoal role="goalie" _while="decision == 'retreat'"/>
                <Approach _while="decision == 'approach'"

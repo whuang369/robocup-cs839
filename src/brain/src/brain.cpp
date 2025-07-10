@@ -182,17 +182,21 @@ void Brain::updateBallMemory() {
           rerun::TextLog(format("Ball Lost! Last time: %.2f, Current time: %.2f`",
                                 data->ball.timePoint.seconds(), get_clock()->now().seconds())));
     }
+    log->log(
+        "field/memball",
+        rerun::LineStrips2D({
+                                rerun::Collection<rerun::Vec2D>{
+                                    {data->ball.posToField.x - 0.2, -data->ball.posToField.y},
+                                    {data->ball.posToField.x + 0.2, -data->ball.posToField.y}},
+                                rerun::Collection<rerun::Vec2D>{
+                                    {data->ball.posToField.x, -data->ball.posToField.y - 0.2},
+                                    {data->ball.posToField.x, -data->ball.posToField.y + 0.2}},
+                            })
+            .with_colors({tree->getEntry<bool>("ball_location_known") ? 0x0000FFFF : 0xFF0000FF})
+            .with_radii({0.005})
+            .with_draw_order(30));
   }
 
-  // // update Pose to field from Pose to robot (based on odom)
-  // double xfr, yfr, thetafr;  // fr = field to robot
-  // yfr = std::sin(data->robotPoseToField.theta) * data->robotPoseToField.x -
-  //       std::cos(data->robotPoseToField.theta) * data->robotPoseToField.y;
-  // xfr = -std::cos(data->robotPoseToField.theta) * data->robotPoseToField.x -
-  //       std::sin(data->robotPoseToField.theta) * data->robotPoseToField.y;
-  // thetafr = -data->robotPoseToField.theta;
-  // transCoord(data->ball.posToField.x, data->ball.posToField.y, 0, xfr, yfr, thetafr,
-  //            data->ball.posToRobot.x, data->ball.posToRobot.y, data->ball.posToRobot.z);
   data->ball.posToRobot = data->field2robot(data->ball.posToField);
 
   data->ball.range = std::sqrt(data->ball.posToRobot.x * data->ball.posToRobot.x +
@@ -306,10 +310,10 @@ void Brain::gameControlCallback(const game_controller_interface::msg::GameContro
   vector<string> gameStateMap = {
       "INITIAL",  // Initialization state, players are ready outside the field.
       "READY",    // Ready state, players enter the field and walk to their starting positions.
-      "SET",   // Stop action, waiting for the referee machine to issue the instruction to start the
-               // game.
-      "PLAY",  // Normal game.
-      "END"    // The game is over.
+      "SET",      // Stop action, waiting for the referee machine to issue the instruction to start
+                  // the game.
+      "PLAY",     // Normal game.
+      "END"       // The game is over.
   };
   string gameState = gameStateMap[static_cast<int>(msg.state)];
   tree->setEntry<string>("gc_game_state", gameState);
@@ -437,20 +441,18 @@ void Brain::detectionsCallback(const vision_interface::msg::Detections &msg) {
                  .with_colors(detectColorMap["Ball"]));
 
     // log mem ball pos
-    log->setTimeNow();
-    log->log(
-        "field/memball",
-        rerun::LineStrips2D({
-                                rerun::Collection<rerun::Vec2D>{
-                                    {data->ball.posToField.x - 0.2, -data->ball.posToField.y},
-                                    {data->ball.posToField.x + 0.2, -data->ball.posToField.y}},
-                                rerun::Collection<rerun::Vec2D>{
-                                    {data->ball.posToField.x, -data->ball.posToField.y - 0.2},
-                                    {data->ball.posToField.x, -data->ball.posToField.y + 0.2}},
-                            })
-            .with_colors({tree->getEntry<bool>("ball_location_known") ? 0xFFFFFFFF : 0xFF0000FF})
-            .with_radii({0.005})
-            .with_draw_order(30));
+    log->log("field/memball",
+             rerun::LineStrips2D({
+                                     rerun::Collection<rerun::Vec2D>{
+                                         {data->ball.posToField.x - 0.2, -data->ball.posToField.y},
+                                         {data->ball.posToField.x + 0.2, -data->ball.posToField.y}},
+                                     rerun::Collection<rerun::Vec2D>{
+                                         {data->ball.posToField.x, -data->ball.posToField.y - 0.2},
+                                         {data->ball.posToField.x, -data->ball.posToField.y + 0.2}},
+                                 })
+                 .with_colors({0xFFFFFFFF})
+                 .with_radii({0.005})
+                 .with_draw_order(30));
   }
 }
 
@@ -664,6 +666,72 @@ void Brain::detectProcessBalls(const vector<GameObject> &ballObjs) {
     data->ballDetected = true;
     data->ball = ballObjs[indexRealBall];
     tree->setEntry<bool>("ball_location_known", true);
+
+    // add to ball history
+    // data->ballHistory.push_back(data->ball);
+    // if (data->ballHistory.size() > 10) {
+    //   data->ballHistory.pop_front();
+    // }
+
+    // // calculate ball velocity
+    // if (data->ballHistory.size() >= 6) {
+    //   // calculate ball velocity based on linear regression
+    //   std::vector<double> t, x, y;
+    //   for (const auto &ball : data->ballHistory) {
+    //     if ((get_clock()->now() - ball.timePoint).seconds() < 4.0) {
+    //       t.push_back(ball.timePoint.seconds());
+    //       x.push_back(ball.posToField.x);
+    //       y.push_back(ball.posToField.y);
+    //     }
+    //   }
+
+    //   double sum_t = 0, sum_x = 0, sum_y = 0;
+    //   for (int i = 0; i < t.size(); i++) {
+    //     sum_t += t[i];
+    //     sum_x += x[i];
+    //     sum_y += y[i];
+    //   }
+
+    //   double n = t.size();
+    //   double mean_t = sum_t / n;
+    //   double mean_x = sum_x / n;
+    //   double mean_y = sum_y / n;
+
+    //   double sum_t2 = 0, sum_tx = 0, sum_ty = 0;
+    //   for (int i = 0; i < t.size(); i++) {
+    //     sum_t2 += (t[i] - mean_t) * (t[i] - mean_t);
+    //     sum_tx += (t[i] - mean_t) * (x[i] - mean_x);
+    //     sum_ty += (t[i] - mean_t) * (y[i] - mean_y);
+    //   }
+
+    //   double slope_x = sum_tx / sum_t2;
+    //   double slope_y = sum_ty / sum_t2;
+
+    //   data->ballVelocity.x = slope_x;
+    //   data->ballVelocity.y = slope_y;
+    //   data->ballVelocity.theta = std::atan2(slope_y, slope_x);
+
+    //   // calculate ball intersection with the bottom line of the goal
+    //   double ballVelocityAngle = data->ballVelocity.theta;
+    //   double ballDistanceX = data->ball.posToField.x + config->fieldDimensions.length / 2.0;
+    //   double ballDistanceY = data->ball.posToField.y;
+    //   double goalLineX = -config->fieldDimensions.length / 2.0;
+    //   double intersectionY = (ballDistanceX - goalLineX) / tan(ballVelocityAngle) +
+    //   ballDistanceY; double intersectionX = goalLineX; data->ballIntersectionY = intersectionY;
+
+    //   log->setTimeNow();
+    //   const auto ballVelocityLine =
+    //       rerun::LineStrip2D({{data->ball.posToField.x, -data->ball.posToField.y},
+    //                           {data->ball.posToField.x + data->ballVelocity.x,
+    //                            -data->ball.posToField.y - data->ballVelocity.y}});
+    //   log->log("field/ball_velocity",
+    //            rerun::LineStrips2D(ballVelocityLine).with_colors({0xFF0000FF}).with_radii({0.01}));
+
+    //   const auto ballIntersectionLine =
+    //       rerun::LineStrip2D({{intersectionX-0.2, -data->ballIntersectionY+0.2},
+    //                           {intersectionX+0.2, -data->ballIntersectionY-0.2}});
+    //   log->log("field/ball_intersection",
+    //            rerun::LineStrips2D(ballIntersectionLine).with_colors({0xFFFF00FF}).with_radii({0.01}));
   } else {
     data->ballDetected = false;
     data->ball.boundingBox.xmin = 0;
