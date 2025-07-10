@@ -15,6 +15,135 @@ using std::hypot;
 using std::sin;
 using std::string;
 
+namespace {
+
+bool isShotBlocked(const double kickDir, const Point &ballPosToField,
+                   const std::shared_ptr<BrainData> data) {
+  constexpr double MIN_DRIBBLE_DISTANCE = 1.0;
+  constexpr double MAX_KICK_ANGLE = 0.5;
+
+  bool blocked = false;
+  for (const auto &opponent : data->opponents) {
+    double dx = opponent.posToField.x - ballPosToField.x;
+    double dy = opponent.posToField.y - ballPosToField.y;
+
+    double ballOpponentRange = hypot(dx, dy);  // Distance from ball to opponent
+    if (ballOpponentRange > MIN_DRIBBLE_DISTANCE) {
+      continue;
+    }
+
+    double ballOpponentAngle = atan2(dy, dx);  // Angle from ball to opponent
+    double angleDiffRobot = fabs(toPInPI(kickDir - ballOpponentAngle));
+    if (angleDiffRobot < MAX_KICK_ANGLE) {
+      blocked = true;
+      break;
+    }
+  }
+  return blocked;
+}
+
+bool isDribbleBlocked(const Pose2D &robotPose, const Point &ballPosToField,
+                      const std::shared_ptr<BrainData> data) {
+  constexpr double MIN_DRIBBLE_DISTANCE = 1.0;
+  constexpr double MAX_DRIBBLE_ANGLE = 0.5;
+
+  bool blocked = false;
+  for (const auto &opponent : data->opponents) {
+    double dx = opponent.posToField.x - ballPosToField.x;
+    double dy = opponent.posToField.y - ballPosToField.y;
+
+    double ballOpponentRange = hypot(dx, dy);  // Distance from ball to opponent
+    if (ballOpponentRange > MIN_DRIBBLE_DISTANCE) {
+      continue;
+    }
+
+    double ballOpponentAngle = atan2(dy, dx);  // Angle from ball to opponent
+    double angleDiffRobot = fabs(toPInPI(data->robotBallAngleToField - ballOpponentAngle));
+    if (angleDiffRobot < MAX_DRIBBLE_ANGLE) {
+      blocked = true;
+      break;
+    }
+  }
+  return blocked;
+}
+
+bool isLocalKicker(int playerId, double ballGoalDir, const std::shared_ptr<BrainData> data) {
+  constexpr double MIN_KICKER_DISTANCE = 2.0;
+
+  // how good the kicker is
+  double selfShootAlignment = fabs(toPInPI(ballGoalDir - data->robotBallAngleToField));
+  bool selfBlocked = isDribbleBlocked(data->robotPoseToField, data->ball.posToField, data);
+
+  // Store close robots - <playerId, isBlocked, shootAlignment>
+  std::vector<std::tuple<int, bool, double>> closeRobots;
+
+  if (data->ball.range < MIN_KICKER_DISTANCE) {
+    closeRobots.emplace_back(playerId, selfBlocked, selfShootAlignment);
+  }
+
+  // Loop over teammates
+  for (const auto &[id, msg] : data->teamMemberMessages) {
+    double dx = msg.robotPoseToField.x - data->ball.posToField.x;
+    double dy = msg.robotPoseToField.y - data->ball.posToField.y;
+    double dist = hypot(dx, dy);
+
+    if (dist > MIN_KICKER_DISTANCE) {
+      continue;  // Ignore teammates that are too far away
+    }
+
+    double teammateBallDir = atan2(data->ball.posToField.y - msg.robotPoseToField.y,
+                                   data->ball.posToField.x - msg.robotPoseToField.x);
+    double shootAlignment = fabs(toPInPI(ballGoalDir - teammateBallDir));
+    bool blocked = isDribbleBlocked(msg.robotPoseToField, data->ball.posToField, data);
+
+    closeRobots.emplace_back(msg.playerId, blocked, shootAlignment);
+  }
+
+  if (closeRobots.empty()) return true;  // No close teammates, self is the kicker
+
+  // Rule application
+  int kickerId = playerId;
+
+  bool shotBlocked = isShotBlocked(ballGoalDir, data->ball.posToField, data);
+  if (!shotBlocked) {
+    double bestAlignment = std::numeric_limits<double>::max();
+    for (const auto &[id, blocked, alignment] : closeRobots) {
+      if (alignment < bestAlignment) {
+        bestAlignment = alignment;
+        kickerId = id;
+      }
+    }
+  } else {
+    // If the shot is blocked, prefer someone with clear robot-ball path and alignment
+    double bestAlignment = std::numeric_limits<double>::max();
+    bool foundUnblocked = false;
+
+    for (const auto &[id, blocked, alignment] : closeRobots) {
+      if (!blocked) {
+        foundUnblocked = true;
+        if (alignment < bestAlignment) {
+          bestAlignment = alignment;
+          kickerId = id;
+        }
+      }
+    }
+
+    if (!foundUnblocked) {
+      bestAlignment = selfShootAlignment;
+      for (const auto &[id, blocked, alignment] : closeRobots) {
+        if (alignment < bestAlignment) {
+          bestAlignment = alignment;
+          kickerId = id;
+        }
+      }
+    }
+  }
+
+  return playerId == kickerId;
+}
+
+}  // namespace
+
 /**
  * Here, a macro definition is used to reduce the amount of code in RegisterBuilder.
  * The effect after expanding REGISTER_BUILDER(Test) is as follows:
@@ -486,96 +615,69 @@ NodeStatus StrikerDecide::tick() {
   getInput("decision_in", lastDecision);
   getInput("position", position);
 
-  // double kickDir =
-  //     (position == "defense")
-  //         ? atan2(brain->data->ball.posToField.y,
-  //                 brain->data->ball.posToField.x + brain->config->fieldDimensions.length / 2)
-  //         : atan2(-brain->data->ball.posToField.y,
-  //                 brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
-
-  Pose2D robotPose = brain->data->robotPoseToField;
-  double dir_rb_f = brain->data->robotBallAngleToField;
-  double ballRange = brain->data->ball.range;
-  double ballYaw = brain->data->ball.yawToRobot;
-  auto goalPostAngles = brain->getGoalPostAngles(0.3);
-  double theta_l = goalPostAngles[0];
-  double theta_r = goalPostAngles[1];
-  bool angleIsGood = (theta_l > dir_rb_f && theta_r < dir_rb_f);
-  bool rangeIsGood = (ballRange < kickRangeThreshold);
-  bool headingIsGood = (fabs(ballYaw) < kickAngleThreshold);
-
-  bool isKicker = true;
-  // decide if the current robot is the kicker
-  //  (1) if all the robots are 1 meters away or only one robot is within 1 meters, then the closest
-  //  robot is the kicker
-  //  (2) if more than one robot is within 1 meters, then the robot with the smallest angle
-  //  difference (ballGoalDir and robotBallDir alignment) to the ball is the kicker
-  // TODO: add behavior like block when the current player is not the kicker
-
-  // check if ball-goal dir and robot-ball dir are blocked by opponent
+  // ----- Kicker decision logic -----
   double ballGoalDir =
       atan2(-brain->data->ball.posToField.y,
             brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
-  double robotBallDir = atan2(brain->data->ball.posToField.y - brain->data->robotPoseToField.y,
-                              brain->data->ball.posToField.x - brain->data->robotPoseToField.x);
 
-  // iterate through all opponent robots
-  bool isBlockedGoal = false;   // if opponent is in front of the ball goal
-  bool isBlockedRobot = false;  // if opponent is in front of the robot
-  for (auto &opponent : brain->data->opponents) {
-    double ballOpponentDir = atan2(opponent.posToField.y - brain->data->ball.posToField.y,
-                                   opponent.posToField.x - brain->data->ball.posToField.x);
-    double ballOpponentRange = hypot(opponent.posToField.x - brain->data->ball.posToField.x,
-                                     opponent.posToField.y - brain->data->ball.posToField.y);
-    if (ballOpponentRange > 1.0) {
-      // Ignore opponent robots that are too far away
-      continue;
+  bool isKicker = isLocalKicker(brain->config->playerId, ballGoalDir, brain->data);
+  brain->data->isKicker = isKicker;
+
+  bool foundKicker = isKicker;
+  for (const auto &[id, msg] : brain->data->teamMemberMessages) {
+    // give in the kicker role two player with lower id
+    if (msg.playerId < brain->config->playerId && msg.isKicker) {
+      isKicker = false;
+      break;
     }
-    double angleDiffGoal = fabs(ballGoalDir - ballOpponentDir);
-    if (angleDiffGoal < M_PI / 6) {
-      isBlockedGoal = true;
-    }
-    double angleDiffRobot = fabs(robotBallDir - ballOpponentDir);
-    if (angleDiffRobot < M_PI / 6) {
-      isBlockedRobot = true;
+    if (msg.isKicker) {
+      foundKicker = true;
     }
   }
-
-  double kickDir;
-  if (!isBlockedGoal) {
-    // Align and kick to the goal
-    kickDir = ballGoalDir;
-  } else if (!isBlockedRobot) {
-    // Kick straight into the ball without alignment
-    kickDir = robotBallDir;
-  } else {
-    // Kick straight into the ball with offset so the ball goes sideways
-    // TODO: add kickDir as part of the input and use offset to control kick direction
-    kickDir = robotBallDir;
+  if (!foundKicker) {
+    isKicker = true;  // if no one is kicker, self is the kicker
   }
 
-  // rerun logging
+  // ----- Kick direction and Descision making logic -----
+  double dir_rb_f = brain->data->robotBallAngleToField;
+  double ballRange = brain->data->ball.range;
+  double robotBallDir = brain->data->robotBallAngleToField;
+  auto goalPostAngles = brain->getGoalPostAngles(0.3);
+
+  bool shotBlocked = isShotBlocked(ballGoalDir, brain->data->ball.posToField, brain->data);
+  bool angleIsGood = (goalPostAngles[0] > dir_rb_f && goalPostAngles[1] < dir_rb_f);
+  bool rangeIsGood = (ballRange < kickRangeThreshold);
+  bool headingIsGood = (fabs(brain->data->ball.yawToRobot) < kickAngleThreshold);
+
   string newDecision;
+  double kickDir = ballGoalDir;  // Default kick direction
   if (!brain->tree->getEntry<bool>("ball_location_known")) {
     newDecision = "find";
-  } else if (isBlockedGoal && rangeIsGood) {
-    // Kick straight into the ball without alignment
-    // TODO: Kick direction based on if the robot ball is blocked by opponent
-    newDecision = "dribble";  // also calls the kick node
-  } else if (angleIsGood && rangeIsGood && headingIsGood && !isBlockedGoal) {
+  } else if (!isKicker) {
+    newDecision = "scramble";
+    kickDir = ballGoalDir + M_PI / 2;  // TODO: give teammates a chance to kick
+  } else if (shotBlocked && rangeIsGood) {
+    // We're the kicker, but can't shoot — fallback to dribbling forward
+    newDecision = "dribble";
+    kickDir = robotBallDir;
+  } else if (!shotBlocked && angleIsGood && rangeIsGood && headingIsGood) {
     newDecision = "kick";
+    kickDir = ballGoalDir;
   } else {
     newDecision = "approach";
+    kickDir = ballGoalDir;
   }
 
   setOutput("decision_out", newDecision);
   setOutput("kick_dir_out", kickDir);
 
+  // rerun logging
   static std::map<std::string, uint32_t> decisionColorMap = {
-      {"find", 0x0000FFFF},     // Blue
-      {"kick", 0xFF0000FF},     // Red
-      {"dribble", 0xFFA500FF},  // Orange
-      {"approach", 0x00FFFFFF}  // White
+      {"find", 0x0000FFFF},      // Blue
+      {"kick", 0xFF0000FF},      // Red
+      {"dribble", 0xFFA500FF},   // Orange
+      {"approach", 0x00FFFFFF},  // White
+      {"scramble", 0x00FF00FF}   // Green
   };
 
   auto color = decisionColorMap[newDecision];
@@ -589,12 +691,11 @@ NodeStatus StrikerDecide::tick() {
                   rerun::LineStrips2D(kickLine).with_colors({color}).with_radii({0.01}));
 
   brain->log->logToField(
-      "field/StrickerDecide",
+      "field/StrikerDecide",
       format("Decision: %s | kickDir: %.2f | rbDir: %.2f | ballRange: %.2f | ballYaw: %.2f | "
-             "goodAngle: %d | goodRange: %d | goodHeading: %d | isBlockedGoal: %d | "
-             "isBlockedRobot: %d",
-             newDecision.c_str(), kickDir, dir_rb_f, ballRange, ballYaw, angleIsGood, rangeIsGood,
-             headingIsGood, isBlockedGoal, isBlockedRobot),
+             "goodAngle: %d | goodRange: %d | goodHeading: %d | isShotBlocked: %d",
+             newDecision.c_str(), kickDir, dir_rb_f, ballRange, brain->data->ball.yawToRobot,
+             angleIsGood, rangeIsGood, headingIsGood, shotBlocked),
       color, 0.2);
   return NodeStatus::SUCCESS;
 }
@@ -909,7 +1010,7 @@ NodeStatus SelfLocate::tick() {
 
   auto pose = brain->self_locator->getPose();
   brain->calibrateOdom(pose.translation.x(), pose.translation.y(), pose.rotation);
-  // brain->tree->setEntry<bool>("odom_calibrated", true);
+
   if (brain->self_locator->isGood()) {
     brain->tree->setEntry<bool>("odom_calibrated", true);
     brain->data->lastSuccessfulLocalizeTime = brain->get_clock()->now();

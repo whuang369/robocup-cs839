@@ -14,6 +14,7 @@ struct TeamCommunicationMsg {
   rclcpp::Time ballTimePoint;
   Point ballPosToField;
   Pose2D robotPoseToField;
+  bool isKicker;
 };
 
 struct TeamDiscoveryMsg {

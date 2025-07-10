@@ -35,6 +35,7 @@ class BrainData {
                             // towards the opponent's goal (forward), and the y-axis pointing to the
                             // left. The positive direction of theta is counterclockwise.
   bool walking;             // Whether the robot is walking
+  bool isKicker;            // Whether the robot is the kicker, used for team communication
 
   // Head position, updated through lowStateCallback
   double headPitch;   // The current head pitch, in radians. 0 is horizontal forward, positive is
@@ -76,6 +77,8 @@ class BrainData {
   std::vector<FieldMarker> getMarkers();
   // Convert a Pose from the robot coordinate system to the field coordinate system.
   Pose2D robot2field(const Pose2D &poseToRobot);
+  Point robot2field(const Point &pointToRobot);
   // Convert a Pose from the field coordinate system to the robot coordinate system.
   Pose2D field2robot(const Pose2D &poseToField);
+  Point field2robot(const Point &pointToField);
 };

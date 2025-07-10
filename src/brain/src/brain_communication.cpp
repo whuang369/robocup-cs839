@@ -303,6 +303,7 @@ void BrainCommunication::unicastCommunication() {
     msg.ballTimePoint = brain->data->ball.timePoint;
     msg.ballPosToField = brain->data->ball.posToField;
     msg.robotPoseToField = brain->data->robotPoseToField;
+    msg.isKicker = brain->data->isKicker;
 
     std::lock_guard<std::mutex> lock(_teammate_addresses_mutex);
     for (auto it = _teammate_addresses.begin(); it != _teammate_addresses.end(); ++it) {
