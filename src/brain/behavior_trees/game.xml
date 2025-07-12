@@ -1,18 +1,15 @@
 <root BTCPP_format="4">
     <include path="./subtrees/subtree_cam_find_and_track_ball.xml" />
-    <include path="./subtrees/subtree_striker_play.xml" />
     <include path="./subtrees/subtree_carrot_striker_play.xml" />
     <include path="./subtrees/subtree_carrot_goalie_play.xml" />
     <include path="./subtrees/subtree_freekick_ready.xml" />
-    <include path="./subtrees/subtree_goal_keeper_freekick.xml" />
     <include path="./subtrees/subtree_auto_standup_and_locate.xml" />
     <BehaviorTree ID="MainTree">
         <Sequence name="root">
             <RunOnce> <Script code="treat_person_as_robot:=true" /> </RunOnce>
 
             <ReactiveSequence _while="control_state==2" name="pickup">
-                <CamScanField  _while="!odom_calibrated"/>
-                <SubTree ID="CamFindAndTrackBall" _autoremap="true" _while="odom_calibrated" />
+                <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
                 <SelfLocate/>
             </ReactiveSequence>
 
@@ -28,25 +25,21 @@
                     <ReactiveSequence _while="gc_game_sub_state_type=='NONE'" name="normal-none">
 
                         <ReactiveSequence _while="gc_game_state=='INITIAL'" name="init">
-                            <CamScanField _while="!odom_calibrated"/>
-                            <SubTree ID="CamFindAndTrackBall" _autoremap="true" _while="odom_calibrated" />
+                            <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
                             <SelfLocate/>
                         </ReactiveSequence>
 
                         <ReactiveSequence _while="gc_game_state=='READY'" name="ready">
-                            <CamScanField />
+                            <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
                             <SelfLocate/>
-                            <!-- <MoveToPoseOnField x="-2.0" _while="player_role == 'striker'" vtheta_limit="2.0"  vx_limit="0.4" /> -->
                             <BlockGoal _while="player_role == 'striker'" dist_to_ball="1.6" />
                             <BlockGoal _while="player_role == 'goal_keeper'" dist_to_ball="3.0" />
-                            <!-- <WaveHand _while="we_just_scored" action="start" /> -->
                         </ReactiveSequence>
 
                         <ReactiveSequence _while="gc_game_state=='SET'" name="set">
                             <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
-                            <SetVelocity />
-                            <!-- <WaveHand action="stop" /> -->
                             <SelfLocate/>
+                            <SetVelocity />
                         </ReactiveSequence>
 
                         <ReactiveSequence _while="gc_game_state=='PLAY'" name="play">

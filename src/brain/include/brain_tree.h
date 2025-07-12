@@ -136,7 +136,7 @@ class RobotFindBall : public StatefulActionNode {
 
   static PortsList providedPorts() {
     return {
-        InputPort<double>("vyaw_limit", 1.0, "yaw limit"),
+        InputPort<double>("vtheta_limit", 1.0, "yaw limit"),
     };
   }
 
@@ -436,7 +436,7 @@ class RotateForRelocate : public StatefulActionNode {
 
   static PortsList providedPorts() {
     return {
-        InputPort<double>("vyaw_limit", 1.0, "转向的速度上限"),
+        InputPort<double>("vtheta_limit", 1.0, "转向的速度上限"),
         InputPort<int>("max_msec_locate", 5000, "最长重新定位时间"),
     };
   }

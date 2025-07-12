@@ -208,6 +208,8 @@ void BrainTree::initEntry() {
   setEntry<string>("defend_decision", "chase");
   setEntry<double>("ball_range", 0);
 
+  setEntry<bool>("robot_find_ball", false);
+
   setEntry<bool>("gamecontroller_isKickOff", true);
   setEntry<bool>("gamecontroller_isKickOffExecuted", true);
 
@@ -306,22 +308,28 @@ CamFindBall::CamFindBall(const string &name, const NodeConfig &config, Brain *_b
 }
 
 NodeStatus CamFindBall::tick() {
-  if (brain->data->ballDetected) {
-    return NodeStatus::SUCCESS;
-  }
+  if (brain->data->ballDetected) return NodeStatus::SUCCESS;
+
+  bool isTurning = brain->tree->getEntry<bool>("robot_find_ball");
 
   auto curTime = brain->get_clock()->now();
   auto timeSinceLastCmd = (curTime - _timeLastCmd).nanoseconds() / 1e6;
-  if (timeSinceLastCmd < _cmdIntervalMSec) {
-    return NodeStatus::SUCCESS;
-  } else if (timeSinceLastCmd > _cmdRestartIntervalMSec) {
+
+  double intervalThreshold = isTurning ? _cmdIntervalMSec * 2 : _cmdIntervalMSec;
+  if (timeSinceLastCmd < intervalThreshold) return NodeStatus::SUCCESS;
+
+  if (timeSinceLastCmd > _cmdRestartIntervalMSec) {
     _cmdIndex = 0;
   } else {
     _cmdIndex = (_cmdIndex + 1) % (sizeof(_cmdSequence) / sizeof(_cmdSequence[0]));
   }
 
-  brain->client->moveHead(_cmdSequence[_cmdIndex][0], _cmdSequence[_cmdIndex][1]);
-  _timeLastCmd = brain->get_clock()->now();
+  // only move pitch when we turn in place (RobotFindBall)
+  double pitch = _cmdSequence[_cmdIndex][0];
+  double yaw = isTurning ? 0.0 : _cmdSequence[_cmdIndex][1];
+
+  brain->client->moveHead(pitch, yaw);
+  _timeLastCmd = curTime;
   return NodeStatus::SUCCESS;
 }
 
@@ -776,13 +784,13 @@ NodeStatus RotateForRelocate::onStart() {
 }
 
 NodeStatus RotateForRelocate::onRunning() {
-  double vyaw_limit;
-  getInput("vyaw_limit", vyaw_limit);
+  double vtheta_limit;
+  getInput("vtheta_limit", vtheta_limit);
   int max_msec_locate;
   getInput("max_msec_locate", max_msec_locate);
 
   brain->client->moveHead(0.4, 0.0);
-  brain->client->setVelocity(0, 0, vyaw_limit);
+  brain->client->setVelocity(0, 0, vtheta_limit);
 
   if (this->_lastSuccessfulLocalizeTime.nanoseconds() !=
       brain->data->lastSuccessfulLocalizeTime.nanoseconds()) {
@@ -955,21 +963,24 @@ NodeStatus RobotFindBall::onStart() {
 NodeStatus RobotFindBall::onRunning() {
   if (brain->data->ballDetected) {
     brain->client->setVelocity(0, 0, 0);
+    brain->tree->setEntry<bool>("robot_find_ball", false);
     return NodeStatus::SUCCESS;
   }
 
   double vyawLimit;
-  getInput("vyaw_limit", vyawLimit);
+  getInput("vtheta_limit", vyawLimit);
 
   double vx = 0;
   double vy = 0;
   double vtheta = 0;
   brain->client->setVelocity(0, 0, vyawLimit * _turnDir);
+  brain->tree->setEntry<bool>("robot_find_ball", true);
   return NodeStatus::RUNNING;
 }
 
 void RobotFindBall::onHalted() {
   _turnDir = 1.0;
+  brain->tree->setEntry<bool>("robot_find_ball", false);
 }
 
 NodeStatus SelfLocate::tick() {
