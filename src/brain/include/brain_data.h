@@ -52,6 +52,7 @@ class BrainData {
                                  // in the field coordinate system, (-PI, PI]
   double ballVelocityX;          // The velocity of the ball in the field coordinate system
   double ballVelocityY;          // The velocity of the ball in the field coordinate system
+  rclcpp::Time lastOpponentNearBallTime;
 
   // 起身
   RobotRecoveryState recoveryState = RobotRecoveryState::IS_READY;

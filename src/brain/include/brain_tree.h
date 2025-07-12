@@ -361,6 +361,9 @@ class KeepGoal : public SyncActionNode {
 
   static BT::PortsList providedPorts() {
     return {
+        InputPort<double>("min_ball_dist", 1.0,
+                          "The distance to the ball when keeping the goal, used to determine "
+                          "the position behind the ball"),
         InputPort<double>("long_range_threshold", 1.5,
                           "When the distance to the target point exceeds this value, prioritize "
                           "moving towards it rather than fine-tuning position and orientation"),

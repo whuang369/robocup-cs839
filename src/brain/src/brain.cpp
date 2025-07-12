@@ -743,5 +743,11 @@ void Brain::detectProcessRobots(const vector<GameObject> &robotObjs) {
       continue;
 
     data->opponents.push_back(robot);
+
+    double opponentBallDist = hypot(robot.posToField.x - data->ball.posToField.x,
+                                    robot.posToField.y - data->ball.posToField.y);
+    if (opponentBallDist < 1.0) {
+      data->lastOpponentNearBallTime = get_clock()->now();
+    }
   }
 }

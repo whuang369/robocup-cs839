@@ -1,0 +1,10 @@
+<root BTCPP_format="4" >
+   <include path="./subtree_cam_find_and_track_ball.xml" />
+   <BehaviorTree ID="GoalieFreeKickReady">
+      <ReactiveSequence>
+         <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
+         <SelfLocate />
+         <KeepGoal min_ball_dist="3.0" />
+      </ReactiveSequence>
+   </BehaviorTree>
+</root>

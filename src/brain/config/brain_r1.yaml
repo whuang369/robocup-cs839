@@ -2,7 +2,7 @@ brain_node:
   ros__parameters:
     game:
       team_id: 29 # consistant with GameControl
-      player_id: 0 # 0 | 1 | 2 | 3
+      player_id: 0 # 0 | 1 | 2 | 3 (NOTE: 0 for goal_keeper)
       field_type: "gdc" # adult_size | kid_size | gdc
       player_role: "striker" # striker | goal_keeper
       player_attack_side: "left" # left | right

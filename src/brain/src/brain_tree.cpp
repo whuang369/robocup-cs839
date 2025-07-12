@@ -829,10 +829,24 @@ NodeStatus GoalieDecide::tick() {
   double velThreshold = (lastDecision == "keepgoal") ? 0.1 : 0.2;
   bool ballStopped = hypot(brain->data->ballVelocityX, brain->data->ballVelocityY) < velThreshold;
 
-  // ----- Kick direction and Descision making logic -----
+  double currTime = brain->get_clock()->now().seconds();
+  bool opponentAroundBall = (currTime - brain->data->lastOpponentNearBallTime.seconds()) < 2.0;
+  bool ballInDanger = ballInDangerArea && (!ballStopped || opponentAroundBall);
+  bool behindBall = (brain->data->robotPoseToField.x - brain->data->ball.posToField.x) < 0.0;
+
   double ballGoalDir =
       atan2(-brain->data->ball.posToField.y,
             brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
+  bool isKicker = !ballInDanger && isLocalKicker(brain->config->playerId, ballGoalDir, brain->data);
+  for (const auto &[id, msg] : brain->data->teamMemberMessages) {
+    if (msg.isKicker) {
+      isKicker = false;
+      break;
+    }
+  }
+  brain->data->isKicker = isKicker;
+
+  // ----- Kick direction and Descision making logic -----
   double dir_rb_f = brain->data->robotBallAngleToField;
   double ballRange = brain->data->ball.range;
   double robotBallDir = brain->data->robotBallAngleToField;
@@ -847,7 +861,7 @@ NodeStatus GoalieDecide::tick() {
   double kickDir = ballGoalDir;  // Default kick direction
   if (!brain->tree->getEntry<bool>("ball_location_known")) {
     newDecision = "find";
-  } else if (ballInDangerArea && !ballStopped) {
+  } else if (ballInDanger && behindBall) {
     newDecision = "keepgoal";
   } else if (shotBlocked && rangeIsGood) {
     newDecision = "dribble";
@@ -1034,8 +1048,10 @@ NodeStatus MoveToPoseOnField::tick() {
 }
 
 NodeStatus KeepGoal::tick() {
+  double minBallDist;
   double longRangeThreshold, turnThreshold, vxLimit, vyLimit, vthetaLimit;
   double xTolerance, yTolerance, thetaTolerance;
+  getInput("min_ball_dist", minBallDist);
   getInput("long_range_threshold", longRangeThreshold);
   getInput("turn_threshold", turnThreshold);
   getInput("vx_limit", vxLimit);
@@ -1048,9 +1064,14 @@ NodeStatus KeepGoal::tick() {
   const auto angles = brain->getGoalPostAngles(0.0, true);
   double midAngle = atan2(sin(angles[0]) + sin(angles[1]), cos(angles[0]) + cos(angles[1]));
 
+  double ballGoalDist =
+      hypot(brain->data->ball.posToField.x + brain->config->fieldDimensions.length / 2,
+            brain->data->ball.posToField.y);
+  double goalieDist = std::clamp(brain->data->ball.range, minBallDist, ballGoalDist);
+
   Point ballPos = brain->data->ball.posToField;
-  double goalieDist = std::clamp(brain->data->ball.range, 0.5, 1.5);
   double tx = ballPos.x + goalieDist * cos(midAngle);
+  tx = max(tx, -brain->config->fieldDimensions.length / 2 + 0.5);
   double ty = ballPos.y + goalieDist * sin(midAngle);
 
   // set the theta to face the ball
@@ -1071,7 +1092,6 @@ NodeStatus KeepGoal::tick() {
   return NodeStatus::SUCCESS;
 }
 
-// TODO: test BlockGoal for READY and FreeKick (different position by playerId)
 NodeStatus BlockGoal::tick() {
   double distToBall;
   double longRangeThreshold, turnThreshold, vxLimit, vyLimit, vthetaLimit;
@@ -1093,16 +1113,10 @@ NodeStatus BlockGoal::tick() {
             -brain->data->ball.posToField.x - brain->config->fieldDimensions.length / 2);
   tx = brain->data->ball.posToField.x + cos(ballGoalDir) * distToBall;
   ty = brain->data->ball.posToField.y + sin(ballGoalDir) * distToBall;
+
   // add offset so the robots won't collide
-  double ty_offset = 0.0;
-  if (brain->config->playerId == 0) {
-    ty_offset = 0.0;
-  } else if (brain->config->playerId == 1) {
-    ty_offset = -0.8;
-  } else if (brain->config->playerId == 2) {
-    ty_offset = 0.8;
-  }
-  ty += ty_offset;
+  double offset = 1.5 * (brain->config->playerId - 1);
+  ty += (brain->data->ball.posToField.y > 0) ? -offset : offset;
 
   // set the theta to face the ball
   Pose2D robotPose = brain->data->robotPoseToField;
