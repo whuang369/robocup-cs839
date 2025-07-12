@@ -50,10 +50,8 @@ class BrainData {
   GameObject ball;  // Records the ball's information, including position, bounding box, etc.
   double robotBallAngleToField;  // The angle between the robot's vector to the ball and the X-axis
                                  // in the field coordinate system, (-PI, PI]
-  
-  std::deque<GameObject> ballHistory;  // Records historical ball information, including position, bounding box, etc.
-  Pose2D ballVelocity;  // The velocity of the ball, in the field coordinate system.
-  double ballIntersectionY;  // The y-coordinate of the ball's intersection with the bottom line of the goal
+  double ballVelocityX;          // The velocity of the ball in the field coordinate system
+  double ballVelocityY;          // The velocity of the ball in the field coordinate system
 
   // 起身
   RobotRecoveryState recoveryState = RobotRecoveryState::IS_READY;
@@ -72,11 +70,6 @@ class BrainData {
   // Team communication
   std::mutex teamCommunicationMutex;
   std::unordered_map<int, TeamCommunicationMsg> teamMemberMessages;  // Records team messages
-
-  // Motion planning
-  double dribbleTargetAngle;     // The direction for dribbling
-  bool dribbleTargetAngleFound;  // Whether the dribbling direction planning was successful
-  double moveTargetAngle;        // Target direction for movement
 
   // A collection of utility functions
   std::vector<FieldMarker> getMarkers();

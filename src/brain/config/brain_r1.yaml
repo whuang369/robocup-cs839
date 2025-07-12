@@ -14,6 +14,7 @@ brain_node:
     game_controller_ip_list:
       - "100.71.55.113"
       - "100.87.107.109"
+      - "100.75.124.56"
 
     robot:
       robot_height: 1.0

@@ -3,7 +3,7 @@
     <include path="./subtrees/subtree_striker_play.xml" />
     <include path="./subtrees/subtree_carrot_striker_play.xml" />
     <include path="./subtrees/subtree_carrot_goalie_play.xml" />
-    <include path="./subtrees/subtree_carrot_freekick.xml" />
+    <include path="./subtrees/subtree_freekick_ready.xml" />
     <include path="./subtrees/subtree_goal_keeper_freekick.xml" />
     <include path="./subtrees/subtree_auto_standup_and_locate.xml" />
     <BehaviorTree ID="MainTree">
@@ -18,6 +18,7 @@
 
             <ReactiveSequence _while="control_state==3" name="control_state-3">
                 <SubTree ID="AutoGetUpAndLocate" _autoremap="true" />
+
                 <ReactiveSequence _while="gc_is_under_penalty" name="penalty">
                     <SetVelocity />
                     <SelfLocate/>
@@ -35,15 +36,16 @@
                         <ReactiveSequence _while="gc_game_state=='READY'" name="ready">
                             <CamScanField />
                             <SelfLocate/>
-                            <MoveToPoseOnField x="-2.0" _while="player_role == 'striker'" vtheta_limit="2.0"  vx_limit="0.4" />
-                            <KeepGoal _while="player_role == 'goal_keeper'" vtheta_limit="2.0"  vx_limit="0.4" />
-                            <WaveHand _while="we_just_scored" action="start" />
+                            <!-- <MoveToPoseOnField x="-2.0" _while="player_role == 'striker'" vtheta_limit="2.0"  vx_limit="0.4" /> -->
+                            <BlockGoal _while="player_role == 'striker'" dist_to_ball="1.6" />
+                            <BlockGoal _while="player_role == 'goal_keeper'" dist_to_ball="3.0" />
+                            <!-- <WaveHand _while="we_just_scored" action="start" /> -->
                         </ReactiveSequence>
 
                         <ReactiveSequence _while="gc_game_state=='SET'" name="set">
                             <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
                             <SetVelocity />
-                            <WaveHand action="stop" />
+                            <!-- <WaveHand action="stop" /> -->
                             <SelfLocate/>
                         </ReactiveSequence>
 
@@ -64,7 +66,7 @@
                             <SetVelocity />
                         </ReactiveSequence>
                         <ReactiveSequence _while="gc_game_sub_state=='GET_READY'">
-                            <SubTree ID="CarrotFreekick" _autoremap="true"/>
+                            <SubTree ID="FreeKickReady" _autoremap="true"/>
                         </ReactiveSequence>
                         <ReactiveSequence _while="gc_game_sub_state=='SET'">
                             <SubTree ID="CamFindAndTrackBall" _autoremap="true" />

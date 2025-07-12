@@ -58,7 +58,7 @@ void Brain::init() {
 
   data = std::make_shared<BrainData>();
   self_locator = std::make_shared<SelfLocator>(this, config->fieldDimensions);
-  // self_locator->init(config->fieldDimensions, config->playerAttackSide, config->playerStartPos);
+  self_locator->init(config->fieldDimensions, config->playerAttackSide, config->playerStartPos);
 
   tree = std::make_shared<BrainTree>(this);
   client = std::make_shared<RobotClient>(this);
@@ -208,37 +208,18 @@ void Brain::updateBallMemory() {
                                            data->ball.posToField.x - data->robotPoseToField.x);
 }
 
-vector<double> Brain::getGoalPostAngles(const double margin) {
-  double leftX, leftY, rightX, rightY;
-  leftX = config->fieldDimensions.length / 2;
-  leftY = config->fieldDimensions.goalWidth / 2;
-  rightX = config->fieldDimensions.length / 2;
-  rightY = -config->fieldDimensions.goalWidth / 2;
-
-  /* TODO: flip if attacking the other direction
-  for (int i = 0; i < data->goalposts.size(); i++)
-  {
-      auto post = data->goalposts[i];
-      if (post.info == "oppo-left")
-      {
-          leftX = post.posToField.x;
-          leftY = post.posToField.y;
-      }
-      else if (post.info == "oppo-right")
-      {
-          rightX = post.posToField.x;
-          rightY = post.posToField.y;
-      }
-  }
-  */
+vector<double> Brain::getGoalPostAngles(const double margin, const bool targetOurGoal) {
+  double goalX = targetOurGoal ? -config->fieldDimensions.length / 2.0  // our goal
+                               : config->fieldDimensions.length / 2.0;  // attack side goal
+  double goalYLeft = config->fieldDimensions.goalWidth / 2.0;
+  double goalYRight = -config->fieldDimensions.goalWidth / 2.0;
 
   const double theta_l =
-      std::atan2(leftY - margin - data->ball.posToField.y, leftX - data->ball.posToField.x);
+      std::atan2(goalYLeft - margin - data->ball.posToField.y, goalX - data->ball.posToField.x);
   const double theta_r =
-      std::atan2(rightY + margin - data->ball.posToField.y, rightX - data->ball.posToField.x);
+      std::atan2(goalYRight + margin - data->ball.posToField.y, goalX - data->ball.posToField.x);
 
-  vector<double> vec = {theta_l, theta_r};
-  return vec;
+  return {theta_l, theta_r};
 }
 
 void Brain::calibrateOdom(double x, double y, double theta) {
@@ -307,6 +288,10 @@ void Brain::joystickCallback(const sensor_msgs::msg::Joy &msg) {
 
 void Brain::gameControlCallback(const game_controller_interface::msg::GameControlData &msg) {
   auto lastGameState = tree->getEntry<string>("gc_game_state");
+  auto lastGameSubState = tree->getEntry<string>("gc_game_sub_state");
+  auto lastGameSubStateType = tree->getEntry<string>("gc_game_sub_state_type");
+  auto lastIsUnderPenalty = tree->getEntry<bool>("gc_is_under_penalty");
+
   vector<string> gameStateMap = {
       "INITIAL",  // Initialization state, players are ready outside the field.
       "READY",    // Ready state, players enter the field and walk to their starting positions.
@@ -321,7 +306,11 @@ void Brain::gameControlCallback(const game_controller_interface::msg::GameContro
   tree->setEntry<bool>("gc_is_kickoff_side", isKickOffSide);
 
   string gameSubStateType = static_cast<int>(msg.secondary_state) == 0 ? "NONE" : "FREE_KICK";
-  vector<string> gameSubStateMap = {"STOP", "GET_READY", "SET"};
+  vector<string> gameSubStateMap = {
+      "STOP",       // stop the robot
+      "GET_READY",  // placement
+      "SET"         // waiting for the gameSubStateType to be None
+  };
   string gameSubState = gameSubStateMap[static_cast<int>(msg.secondary_state_info[1])];
   tree->setEntry<string>("gc_game_sub_state_type", gameSubStateType);
   tree->setEntry<string>("gc_game_sub_state", gameSubState);
@@ -340,6 +329,7 @@ void Brain::gameControlCallback(const game_controller_interface::msg::GameContro
     return;
   }
 
+  // TODO: use number_of_warnings, yellow_card_count, red_card_count
   data->penalty[0] = static_cast<int>(myTeamInfo.players[0].penalty);
   data->penalty[1] = static_cast<int>(myTeamInfo.players[1].penalty);
   data->penalty[2] = static_cast<int>(myTeamInfo.players[2].penalty);
@@ -358,9 +348,26 @@ void Brain::gameControlCallback(const game_controller_interface::msg::GameContro
 
   if (gameState != lastGameState) {
     log->log("brain/gameControlCallback",
-             rerun::TextLog(format("Game state changed: %s -> %s", lastGameState.c_str(),
-                                   gameState.c_str()))
+             rerun::TextLog(format("Game state changed: %s -> %s; isSubStateKickOffSide: %d",
+                                   lastGameState.c_str(), gameState.c_str(),
+                                   tree->getEntry<bool>("gc_is_sub_state_kickoff_side")))
                  .with_color(rerun::Color(0x00FF00FF)));  // Green
+  }
+  if (gameSubState != lastGameSubState) {
+    log->log(
+        "brain/gameControlCallback",
+        rerun::TextLog(
+            format(
+                "Game sub state changed: %s -> %s; sub state type: %s; isSubStateKickOffSide: %d",
+                lastGameSubState.c_str(), gameSubState.c_str(), gameSubStateType.c_str(),
+                tree->getEntry<bool>("gc_is_sub_state_kickoff_side")))
+            .with_color(rerun::Color(0x0000FFFF)));  // Blue
+  }
+  if (isUnderPenalty != lastIsUnderPenalty) {
+    log->log("brain/gameControlCallback",
+             rerun::TextLog(format("Player %d is under penalty: %d", config->playerId,
+                                   data->penalty[config->playerId]))
+                 .with_color(rerun::Color(0xFFAA00FF)));  // Orange
   }
 }
 
@@ -664,74 +671,20 @@ void Brain::detectProcessBalls(const vector<GameObject> &ballObjs) {
 
   if (indexRealBall >= 0) {
     data->ballDetected = true;
+    GameObject oldBall = data->ball;
     data->ball = ballObjs[indexRealBall];
     tree->setEntry<bool>("ball_location_known", true);
 
-    // add to ball history
-    // data->ballHistory.push_back(data->ball);
-    // if (data->ballHistory.size() > 10) {
-    //   data->ballHistory.pop_front();
-    // }
+    double dx = data->ball.posToRobot.x - oldBall.posToRobot.x;
+    double dy = data->ball.posToRobot.y - oldBall.posToRobot.y;
+    double dist = hypot(dx, dy);
+    double dt = (data->ball.timePoint - oldBall.timePoint).seconds();
+    if (dt < 1e-4) dt = 1e-4;
 
-    // // calculate ball velocity
-    // if (data->ballHistory.size() >= 6) {
-    //   // calculate ball velocity based on linear regression
-    //   std::vector<double> t, x, y;
-    //   for (const auto &ball : data->ballHistory) {
-    //     if ((get_clock()->now() - ball.timePoint).seconds() < 4.0) {
-    //       t.push_back(ball.timePoint.seconds());
-    //       x.push_back(ball.posToField.x);
-    //       y.push_back(ball.posToField.y);
-    //     }
-    //   }
+    double alpha = 0.02;
+    data->ballVelocityX = (1 - alpha) * data->ballVelocityX + alpha * (dx / dt);
+    data->ballVelocityY = (1 - alpha) * data->ballVelocityY + alpha * (dy / dt);
 
-    //   double sum_t = 0, sum_x = 0, sum_y = 0;
-    //   for (int i = 0; i < t.size(); i++) {
-    //     sum_t += t[i];
-    //     sum_x += x[i];
-    //     sum_y += y[i];
-    //   }
-
-    //   double n = t.size();
-    //   double mean_t = sum_t / n;
-    //   double mean_x = sum_x / n;
-    //   double mean_y = sum_y / n;
-
-    //   double sum_t2 = 0, sum_tx = 0, sum_ty = 0;
-    //   for (int i = 0; i < t.size(); i++) {
-    //     sum_t2 += (t[i] - mean_t) * (t[i] - mean_t);
-    //     sum_tx += (t[i] - mean_t) * (x[i] - mean_x);
-    //     sum_ty += (t[i] - mean_t) * (y[i] - mean_y);
-    //   }
-
-    //   double slope_x = sum_tx / sum_t2;
-    //   double slope_y = sum_ty / sum_t2;
-
-    //   data->ballVelocity.x = slope_x;
-    //   data->ballVelocity.y = slope_y;
-    //   data->ballVelocity.theta = std::atan2(slope_y, slope_x);
-
-    //   // calculate ball intersection with the bottom line of the goal
-    //   double ballVelocityAngle = data->ballVelocity.theta;
-    //   double ballDistanceX = data->ball.posToField.x + config->fieldDimensions.length / 2.0;
-    //   double ballDistanceY = data->ball.posToField.y;
-    //   double goalLineX = -config->fieldDimensions.length / 2.0;
-    //   double intersectionY = (ballDistanceX - goalLineX) / tan(ballVelocityAngle) +
-    //   ballDistanceY; double intersectionX = goalLineX; data->ballIntersectionY = intersectionY;
-
-    //   log->setTimeNow();
-    //   const auto ballVelocityLine =
-    //       rerun::LineStrip2D({{data->ball.posToField.x, -data->ball.posToField.y},
-    //                           {data->ball.posToField.x + data->ballVelocity.x,
-    //                            -data->ball.posToField.y - data->ballVelocity.y}});
-    //   log->log("field/ball_velocity",
-    //            rerun::LineStrips2D(ballVelocityLine).with_colors({0xFF0000FF}).with_radii({0.01}));
-
-    //   const auto ballIntersectionLine =
-    //       rerun::LineStrip2D({{intersectionX-0.2, -data->ballIntersectionY+0.2},
-    //                           {intersectionX+0.2, -data->ballIntersectionY-0.2}});
-    //   log->log("field/ball_intersection",
-    //            rerun::LineStrips2D(ballIntersectionLine).with_colors({0xFFFF00FF}).with_radii({0.01}));
   } else {
     data->ballDetected = false;
     data->ball.boundingBox.xmin = 0;

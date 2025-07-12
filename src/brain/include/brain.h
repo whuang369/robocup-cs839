@@ -73,7 +73,7 @@ class Brain : public rclcpp::Node {
    * represents the right goalpost. Note that left and right are determined with the direction of
    * the opposing side as the front.
    */
-  vector<double> getGoalPostAngles(const double margin = 0.3);
+  vector<double> getGoalPostAngles(const double margin = 0.3, const bool targetOurGoal = false);
 
   // Calibrate odom according to the ground truth. The parameters x, y, and theta represent the
   // ground truth of the robot's Pose in the coordinate system of the pitch.

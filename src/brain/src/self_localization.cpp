@@ -83,14 +83,14 @@ SelfLocator::SelfLocator(Brain* brain, const FieldDimensions& fd) : brain(brain)
   averageWeighting = 0.5f;
 
   // Create sample set with samples at the typical walk-in positions
-  samples = new SampleSet<UKFRobotPoseHypothesis>(numberOfSamples);
-  for (int i = 0; i < samples->size(); ++i) {
-    samples->at(i).init(
-        {-M_PI / 2, static_cast<float>(((-fd.length / 2) + (-fd.circleRadius)) / 2),
-         static_cast<float>(fd.width / 2 + 0.5)},
-        {M_PI / 6, static_cast<float>(abs((-fd.length / 2) - (-fd.circleRadius)) / 2), 0.5},
-        nextSampleId++, 0.5f);
-  }
+  // samples = new SampleSet<UKFRobotPoseHypothesis>(numberOfSamples);
+  // for (int i = 0; i < samples->size(); ++i) {
+  //   samples->at(i).init(
+  //       {-M_PI / 2, static_cast<float>(((-fd.length / 2) + (-fd.circleRadius)) / 2),
+  //        static_cast<float>(fd.width / 2 + 0.5)},
+  //       {M_PI / 6, static_cast<float>(abs((-fd.length / 2) - (-fd.circleRadius)) / 2), 0.5},
+  //       nextSampleId++, 0.5f);
+  // }
   goalPosts = {
       Vector2f(fd.length / 2, fd.goalWidth / 2),    // left post of left goal
       Vector2f(fd.length / 2, -fd.goalWidth / 2),   // right post of left goal
@@ -132,7 +132,7 @@ SelfLocator::SelfLocator(Brain* brain, const FieldDimensions& fd) : brain(brain)
 
 void SelfLocator::init(const FieldDimensions& fd, std::string& attackSide, float startPos) {
   startPos = std::clamp(startPos, -1.0f, 1.0f);
-  const float sideSign = (attackSide == "left") ? -1.0f : 1.0f;
+  const float sideSign = (attackSide == "right") ? 1.0f : -1.0f;
   const float initX = sideSign * static_cast<float>(fd.length / 2) * startPos;
   const float initY = -sideSign * (static_cast<float>(fd.width / 2) + 0.5);
   const float initTheta = sideSign * M_PI_2;
@@ -141,10 +141,7 @@ void SelfLocator::init(const FieldDimensions& fd, std::string& attackSide, float
   float xNoise = static_cast<float>(fd.length) * 0.1f;
   float yNoise = 0.5;
 
-  if (!samples) {
-    samples = new SampleSet<UKFRobotPoseHypothesis>(numberOfSamples);
-  }
-
+  samples = new SampleSet<UKFRobotPoseHypothesis>(numberOfSamples);
   for (int i = 0; i < numberOfSamples; ++i) {
     samples->at(i).init({initTheta, initX, initY}, {thetaNoise, xNoise, yNoise}, nextSampleId++,
                         0.5f);
