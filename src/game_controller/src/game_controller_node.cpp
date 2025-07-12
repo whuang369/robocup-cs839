@@ -143,7 +143,7 @@ bool GameControllerNode::check_ip_white_list(string ip) {
  * Convert the UDP data format to the custom Ros2 message format (copy field by field).
  * If any changes are needed, be sure to carefully check each field.
  */
-void GameControllerNode::handle_packet(RoboCupGameControlData &data,
+void GameControllerNode::handle_packet(const RoboCupGameControlData &data,
                                        game_controller_interface::msg::GameControlData &msg) {
   // The length of the header is fixed at 4.
   for (int i = 0; i < 4; i++) {
@@ -165,45 +165,59 @@ void GameControllerNode::handle_packet(RoboCupGameControlData &data,
   msg.drop_in_time = data.dropInTime;
   msg.secs_remaining = data.secsRemaining;
   msg.secondary_time = data.secondaryTime;
+
   /// The length of teams is fixed at 2.
   for (int i = 0; i < 2; i++) {
-    msg.teams[i].team_number = data.teams[i].teamNumber;
-    msg.teams[i].team_colour = data.teams[i].teamColour;
-    msg.teams[i].score = data.teams[i].score;
-    msg.teams[i].penalty_shot = data.teams[i].penaltyShot;
-    msg.teams[i].single_shots = data.teams[i].singleShots;
-    msg.teams[i].coach_sequence = data.teams[i].coachSequence;
+    const TeamInfo &team_in = data.teams[i];
+    auto &team_out = msg.teams[i];
 
-    // msg.teams[i].players is defined as an array with variable length. Note that it should be
-    // distinguished from arrays with fixed length.
-    int coach_message_len =
-        sizeof(data.teams[i].coachMessage) / sizeof(data.teams[i].coachMessage[0]);
-    msg.teams[i].coach_message.clear();  // Since the'msg' is reused, remember to call clear() here.
-    for (int j = 0; j < coach_message_len; j++) {
-      msg.teams[i].coach_message.push_back(data.teams[i].coachMessage[j]);
+    // --- Team Info ---
+    team_out.team_number = team_in.teamNumber;
+    team_out.team_colour = team_in.teamColour;
+    team_out.score = team_in.score;
+    team_out.penalty_shot = team_in.penaltyShot;
+    team_out.single_shots = team_in.singleShots;
+    team_out.coach_sequence = team_in.coachSequence;
+
+    // --- Coach Message ---
+    team_out.coach_message.clear();
+    team_out.coach_message.insert(team_out.coach_message.end(), std::begin(team_in.coachMessage),
+                                  std::end(team_in.coachMessage));
+
+    // --- Coach ---
+    team_out.coach.penalty = team_in.coach.penalty;
+    team_out.coach.secs_till_unpenalised = team_in.coach.secsTillUnpenalised;
+    team_out.coach.number_of_warnings = team_in.coach.numberOfWarnings;
+    team_out.coach.yellow_card_count = team_in.coach.yellowCardCount;
+    team_out.coach.red_card_count = team_in.coach.redCardCount;
+    team_out.coach.goal_keeper = team_in.coach.goalKeeper;
+
+    // --- Players ---
+    int players_len = sizeof(data.teams[i].players) / sizeof(data.teams[i].players[0]);
+    RCLCPP_INFO(get_logger(), "team[%d] players_len=%d", i, players_len);
+    team_out.players.clear();
+    for (int j = 0; j < players_len; ++j) {
+      const RobotInfo &player_in = team_in.players[j];
+      game_controller_interface::msg::RobotInfo player_out;
+
+      player_out.penalty = player_in.penalty;
+      player_out.secs_till_unpenalised = player_in.secsTillUnpenalised;
+      player_out.number_of_warnings = player_in.numberOfWarnings;
+      player_out.yellow_card_count = player_in.yellowCardCount;
+      player_out.red_card_count = player_in.redCardCount;
+      player_out.goal_keeper = player_in.goalKeeper;
+
+      team_out.players.push_back(std::move(player_out));
     }
 
-    // msg.teams[i].cocah
-    msg.teams[i].coach.penalty = data.teams[i].coach.penalty;
-    msg.teams[i].coach.secs_till_unpenalised = data.teams[i].coach.secsTillUnpenalised;
-    msg.teams[i].coach.number_of_warnings = data.teams[i].coach.numberOfWarnings;
-    msg.teams[i].coach.yellow_card_count = data.teams[i].coach.yellowCardCount;
-    msg.teams[i].coach.red_card_count = data.teams[i].coach.redCardCount;
-    msg.teams[i].coach.goal_keeper = data.teams[i].coach.goalKeeper;
-
-    // msg.teams[i].coach_message is defined as an array with variable length. Pay attention to the
-    // distinction from fixed-length arrays.
-    int players_len = sizeof(data.teams[i].players) / sizeof(data.teams[i].players[0]);
-    msg.teams[i].players.clear();  // // Since the'msg' is reused, remember to call clear() here.
-    for (int j = 0; j < players_len; j++) {
-      game_controller_interface::msg::RobotInfo rf;
-      rf.penalty = data.teams[i].players[j].penalty;
-      rf.secs_till_unpenalised = data.teams[i].players[j].secsTillUnpenalised;
-      rf.number_of_warnings = data.teams[i].players[j].numberOfWarnings;
-      rf.yellow_card_count = data.teams[i].players[j].yellowCardCount;
-      rf.red_card_count = data.teams[i].players[j].redCardCount;
-      rf.goal_keeper = data.teams[i].players[j].goalKeeper;
-      msg.teams[i].players.push_back(rf);
+    for (int j = 0; j < 3 && j < static_cast<int>(team_out.players.size()); ++j) {
+      RCLCPP_INFO(get_logger(),
+                  "team[%d] player[%d] penalty=%d, secs_till_unpenalised=%d, "
+                  "number_of_warnings=%d, yellow_card_count=%d, red_card_count=%d, "
+                  "goal_keeper=%d",
+                  i, j, team_out.players[j].penalty, team_out.players[j].secs_till_unpenalised,
+                  team_out.players[j].number_of_warnings, team_out.players[j].yellow_card_count,
+                  team_out.players[j].red_card_count, team_out.players[j].goal_keeper);
     }
   }
 }

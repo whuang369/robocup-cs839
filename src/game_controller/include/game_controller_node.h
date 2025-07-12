@@ -28,7 +28,7 @@ class GameControllerNode : public rclcpp::Node {
   bool check_ip_white_list(string ip);
 
   // Process the data packet (copy field by field).
-  void handle_packet(RoboCupGameControlData &data,
+  void handle_packet(const RoboCupGameControlData &data,
                      game_controller_interface::msg::GameControlData &msg);
 
   // The listening port, read from the configuration file.
