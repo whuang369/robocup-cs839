@@ -250,13 +250,15 @@ NodeStatus SetVelocity::tick() {
 }
 
 NodeStatus CamTrackBall::tick() {
-  double pitch, yaw;
-  if (!brain->data->ballDetected) {
-    pitch = brain->data->ball.pitchToRobot;
-    yaw = brain->data->ball.yawToRobot;
-  } else {
-    const double pixTolerance = 10;
+  const double pixTolerance = 10;
+  const double smoother = 2.0;
 
+  // handle motion blur while moving head
+  bool recentlySeen =
+      brain->get_clock()->now().seconds() - brain->data->ball.timePoint.seconds() < 0.5;
+
+  double pitch, yaw;
+  if (brain->data->ballDetected) {
     double deltaX = mean(brain->data->ball.boundingBox.xmax, brain->data->ball.boundingBox.xmin) -
                     brain->config->camPixX * 0.5;
     double deltaY = mean(brain->data->ball.boundingBox.ymax, brain->data->ball.boundingBox.ymin) -
@@ -266,12 +268,17 @@ NodeStatus CamTrackBall::tick() {
       return NodeStatus::SUCCESS;
     }
 
-    double smoother = 2.0;
     double deltaYaw = deltaX / brain->config->camPixX * brain->config->camAngleX / smoother;
     double deltaPitch = deltaY / brain->config->camPixY * brain->config->camAngleY / smoother;
 
     pitch = brain->data->headPitch + deltaPitch;
     yaw = brain->data->headYaw - deltaYaw;
+  } else if (recentlySeen) {
+    pitch = brain->data->headPitch;
+    yaw = brain->data->headYaw;
+  } else {
+    pitch = brain->data->ball.pitchToRobot;
+    yaw = brain->data->ball.yawToRobot;
   }
 
   brain->client->moveHead(pitch, yaw);
@@ -965,7 +972,7 @@ void Kick::onHalted() {
 }
 
 NodeStatus RobotFindBall::onStart() {
-  if (brain->data->ballDetected) {
+  if (brain->tree->getEntry<bool>("ball_location_known")) {
     brain->client->setVelocity(0, 0, 0);
     return NodeStatus::SUCCESS;
   }
@@ -975,7 +982,7 @@ NodeStatus RobotFindBall::onStart() {
 }
 
 NodeStatus RobotFindBall::onRunning() {
-  if (brain->data->ballDetected) {
+  if (brain->tree->getEntry<bool>("ball_location_known")) {
     brain->client->setVelocity(0, 0, 0);
     brain->tree->setEntry<bool>("robot_find_ball", false);
     return NodeStatus::SUCCESS;
@@ -1106,17 +1113,21 @@ NodeStatus BlockGoal::tick() {
   getInput("y_tolerance", yTolerance);
   getInput("theta_tolerance", thetaTolerance);
 
-  double tx, ty;
   // striker keep the goal by standing behind the ball
   double ballGoalDir =
       atan2(-brain->data->ball.posToField.y,
-            -brain->data->ball.posToField.x - brain->config->fieldDimensions.length / 2);
-  tx = brain->data->ball.posToField.x + cos(ballGoalDir) * distToBall;
-  ty = brain->data->ball.posToField.y + sin(ballGoalDir) * distToBall;
+            -brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
 
-  // add offset so the robots won't collide
-  double offset = 1.5 * (brain->config->playerId - 1);
-  ty += (brain->data->ball.posToField.y > 0) ? -offset : offset;
+  // avoid collision
+  double desiredDir = ballGoalDir;
+  if (brain->config->playerId == 2) {
+    const auto angles = brain->getGoalPostAngles(0.2, true);
+    desiredDir = angles[1];
+    distToBall += 0.8;
+  }
+
+  double tx = brain->data->ball.posToField.x + cos(desiredDir) * distToBall;
+  double ty = brain->data->ball.posToField.y + sin(desiredDir) * distToBall;
 
   // set the theta to face the ball
   Pose2D robotPose = brain->data->robotPoseToField;

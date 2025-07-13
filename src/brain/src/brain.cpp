@@ -175,7 +175,6 @@ void Brain::updateBallMemory() {
       }
     }
     tree->setEntry<bool>("ball_location_known", teamMemberBallFound);
-    data->ballDetected = teamMemberBallFound;
     if (!teamMemberBallFound) {
       log->log(
           "brain/updateBallMemory",

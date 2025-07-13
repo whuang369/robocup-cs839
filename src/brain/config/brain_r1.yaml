@@ -17,7 +17,7 @@ brain_node:
       - "100.75.124.56"
 
     robot:
-      robot_height: 1.0
+      robot_height: 1.1
       odom_factor: 1.0
       vx_factor: 1.1
       yaw_offset: -0.1
