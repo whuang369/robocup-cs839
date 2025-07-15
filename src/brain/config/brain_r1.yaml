@@ -2,8 +2,8 @@ brain_node:
   ros__parameters:
     game:
       team_id: 29 # consistant with GameControl
-      player_id: 0 # 0 | 1 | 2 | 3 (NOTE: 0 for goal_keeper)
-      field_type: "gdc" # adult_size | kid_size | gdc
+      player_id: 1 # 0 | 1 | 2 | 3 (NOTE: 0 for goal_keeper)
+      field_type: "adult_size" # adult_size | kid_size | gdc
       player_role: "striker" # striker | goal_keeper
       player_attack_side: "left" # left | right
       player_start_pos: 0.5 # [-1.0, 1.0] -1.0 is left side, 1.0 is right side
@@ -34,4 +34,4 @@ brain_node:
 
     rerunLog:
       enable: true
-      server_addr: "rerun+http://127.0.0.1:9876/proxy"
+      server_addr: "rerun+http://192.168.10.101:9876/proxy" # log to master board
