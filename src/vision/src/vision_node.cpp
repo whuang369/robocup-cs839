@@ -315,10 +315,10 @@ void VisionNode::DepthCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
   depth = depth.clone();
 
   // check if depth image is valid
-  cv::Mat valid_mask = (depth >= 0.1f) & (depth <= 20.0f) & (depth == depth);
+  cv::Mat valid_mask = (depth >= 0.0f) & (depth <= 20.0f) & (depth == depth);
   int valid_pixels = cv::countNonZero(valid_mask);
   float valid_ratio = static_cast<float>(valid_pixels) / (depth.rows * depth.cols);
-  if (valid_ratio < 0.9f) return;
+  // if (valid_ratio < 0.9f) return; // HACK: there are many zeros in openspace
   depth.setTo(0.0f, ~valid_mask);  // Set invalid pixels to 0
 
   // add depth data to syncer
