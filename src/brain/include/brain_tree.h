@@ -385,6 +385,35 @@ class KeepGoal : public SyncActionNode {
   Brain *brain;
 };
 
+class ReEnterField : public SyncActionNode {
+ public:
+  ReEnterField(const std::string &name, const NodeConfig &config, Brain *_brain)
+      : SyncActionNode(name, config), brain(_brain) {}
+
+  static BT::PortsList providedPorts() {
+    return {
+        InputPort<double>("margin", 0.5, "The distance from line to the field"),
+        InputPort<double>("long_range_threshold", 1.5,
+                          "When the distance to the target point exceeds this value, prioritize "
+                          "moving towards it rather than fine-tuning position and orientation"),
+        InputPort<double>("turn_threshold", 0.4,
+                          "For long distances, if the angle to the target point exceeds this "
+                          "threshold, turn towards the target point first"),
+        InputPort<double>("vx_limit", 1.0, "x limit"),
+        InputPort<double>("vy_limit", 1.0, "y limit"),
+        InputPort<double>("vtheta_limit", 1.0, "theta limit"),
+        InputPort<double>("x_tolerance", 0.2, "X tolerance"),
+        InputPort<double>("y_tolerance", 0.2, "y tolerance"),
+        InputPort<double>("theta_tolerance", 0.1, "theta tolerance"),
+    };
+  }
+
+  BT::NodeStatus tick() override;
+
+ private:
+  Brain *brain;
+};
+
 // BlockGoal: Defend the free kick by staying behind the ball on the ball-goal direction
 class BlockGoal : public SyncActionNode {
  public:

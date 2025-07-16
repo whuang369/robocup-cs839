@@ -33,7 +33,7 @@
                         <ReactiveSequence _while="gc_game_state=='READY'" name="ready">
                             <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
                             <SelfLocate/>
-                            <BlockGoal _while="player_role == 'striker'" dist_to_ball="1.6" />
+                            <BlockGoal _while="player_role == 'striker'" dist_to_ball="1.7" />
                             <KeepGoal _while="player_role == 'goal_keeper'" min_ball_dist="3.0" />
                         </ReactiveSequence>
 

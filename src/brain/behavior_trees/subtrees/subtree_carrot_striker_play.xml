@@ -15,11 +15,12 @@
                               kick_dir_out="{kick_dir}"
                               kick_range_threshold="0.7" kick_angle_threshold="0.8" />
                <RobotFindBall _while="decision == 'find'" vtheta_limit="1.0" />
+               <ReEnterField _while="decision == 'reenter'" margin="0.5" />
                <Approach _while="decision == 'approach'"
                            kick_dir="{kick_dir}" min_range="0.3" max_range="0.7"
                            vx_limit="1.0" vy_limit="0.5" vtheta_limit="1.0" />
                <Approach _while="decision == 'scramble'"
-                           kick_dir="{kick_dir}" min_range="0.8" max_range="1.6"
+                           kick_dir="{kick_dir}" min_range="1.8" max_range="2.2"
                            vx_limit="1.0" vy_limit="0.5" vtheta_limit="1.0" />
                <Sequence  _while="decision == 'kick'">
                      <SetVelocity />

@@ -143,11 +143,13 @@ bool isLocalKicker(int playerId, double ballGoalDir, const std::shared_ptr<Brain
 }
 
 bool isOutField(const std::shared_ptr<BrainData> data, const std::shared_ptr<BrainConfig> config) {
-  constexpr double OUT_FIELD_DISTANCE = 0.1;
-  return (data->robotPoseToField.x - config->fieldDimensions.length / 2) > OUT_FIELD_DISTANCE ||
-         (data->robotPoseToField.x + config->fieldDimensions.length / 2) < -OUT_FIELD_DISTANCE ||
-         (data->robotPoseToField.y - config->fieldDimensions.width / 2) > OUT_FIELD_DISTANCE ||
-         (data->robotPoseToField.y + config->fieldDimensions.width / 2) < -OUT_FIELD_DISTANCE;
+  // Re-enter when robot is out of field around goalpost
+  constexpr double X_MARGIN = 0.1;
+  constexpr double Y_MARGIN = 1.0;
+  return (data->robotPoseToField.y < config->fieldDimensions.goalAreaWidth / 2 + Y_MARGIN) &&
+         (data->robotPoseToField.y > -config->fieldDimensions.goalAreaWidth / 2 - Y_MARGIN) &&
+         ((data->robotPoseToField.x > config->fieldDimensions.length / 2 + X_MARGIN) ||
+          (data->robotPoseToField.x < -config->fieldDimensions.length / 2 - X_MARGIN));
 }
 
 }  // namespace
@@ -184,6 +186,7 @@ void BrainTree::init() {
   REGISTER_BUILDER(CheckAndStandUp)
   REGISTER_BUILDER(KeepGoal)
   REGISTER_BUILDER(BlockGoal)
+  REGISTER_BUILDER(ReEnterField)
   REGISTER_BUILDER(RotateForRelocate)
   REGISTER_BUILDER(MoveToPoseOnField)
   REGISTER_BUILDER(GoalieDecide)
@@ -671,7 +674,8 @@ NodeStatus StrikerDecide::tick() {
     newDecision = "reenter";
   } else if (!isKicker) {
     newDecision = "scramble";
-    kickDir = ballGoalDir + M_PI / 2;  // TODO: give teammates a chance to kick
+    // kickDir = ballGoalDir;  // TODO: place behind the robot
+    kickDir = 0;  // place the robot behind the ball
   } else if (shotBlocked && rangeIsGood) {
     // We're the kicker, but can't shoot — fallback to dribbling forward
     newDecision = "dribble";
@@ -693,7 +697,8 @@ NodeStatus StrikerDecide::tick() {
       {"kick", 0xFF0000FF},      // Red
       {"dribble", 0xFFA500FF},   // Orange
       {"approach", 0x00FFFFFF},  // Cyan
-      {"scramble", 0x00FF00FF}   // Green
+      {"scramble", 0x00FF00FF},  // Green
+      {"reenter", 0xFFFF00FF}    // Yellow
   };
 
   auto color = decisionColorMap[newDecision];
@@ -1140,6 +1145,69 @@ NodeStatus BlockGoal::tick() {
       "field/StrikerDecide",
       format("Decision: BlockGoal | tx: %.2f | ty: %.2f | ttheta: %.2f", tx, ty, ttheta),
       0xFFFFFFFF, 0.2);
+  return NodeStatus::SUCCESS;
+}
+
+NodeStatus ReEnterField::tick() {
+  double margin;
+  double longRangeThreshold, turnThreshold, vxLimit, vyLimit, vthetaLimit;
+  double xTolerance, yTolerance, thetaTolerance;
+  getInput("margin", margin);
+  getInput("long_range_threshold", longRangeThreshold);
+  getInput("turn_threshold", turnThreshold);
+  getInput("vx_limit", vxLimit);
+  getInput("vy_limit", vyLimit);
+  getInput("vtheta_limit", vthetaLimit);
+  getInput("x_tolerance", xTolerance);
+  getInput("y_tolerance", yTolerance);
+  getInput("theta_tolerance", thetaTolerance);
+
+  const auto &field = brain->config->fieldDimensions;
+  Pose2D robotPose = brain->data->robotPoseToField;
+
+  double fieldHalfLength = field.length / 2.0;
+  double fieldHalfWidth = field.width / 2.0;
+
+  double dx_left = fabs(robotPose.x + fieldHalfLength);   // our goal
+  double dx_right = fabs(robotPose.x - fieldHalfLength);  // opponent goal
+  double dy_top = fabs(robotPose.y - fieldHalfWidth);     // top side
+  double dy_bottom = fabs(robotPose.y + fieldHalfWidth);  // bottom side
+
+  double min_dist = dx_left;
+  double tx = -fieldHalfLength + margin;
+  double ty = robotPose.y;
+  if (dx_right < min_dist) {
+    min_dist = dx_right;
+    tx = fieldHalfLength - margin;
+    ty = robotPose.y;
+  }
+  if (dy_top < min_dist) {
+    min_dist = dy_top;
+    tx = robotPose.x;
+    ty = fieldHalfWidth - margin;
+  }
+  if (dy_bottom < min_dist) {
+    min_dist = dy_bottom;
+    tx = robotPose.x;
+    ty = -fieldHalfWidth + margin;
+  }
+
+  // set the theta to face the ball
+  Point ballPos = brain->data->ball.posToField;
+  double ttheta = atan2(ballPos.y - robotPose.y, ballPos.x - robotPose.x);
+
+  brain->client->moveToPoseOnField(tx, ty, ttheta, longRangeThreshold, turnThreshold, vxLimit,
+                                   vyLimit, vthetaLimit, xTolerance, yTolerance, thetaTolerance);
+
+  brain->log->log(
+      "field/reenter",
+      rerun::LineStrips2D({
+                              rerun::Collection<rerun::Vec2D>{{tx - 0.2, -ty}, {tx + 0.2, -ty}},
+                              rerun::Collection<rerun::Vec2D>{{tx, -ty - 0.2}, {tx, -ty + 0.2}},
+                          })
+          .with_colors({0xFFFF00FF})
+          .with_radii({0.005})
+          .with_draw_order(30));
   return NodeStatus::SUCCESS;
 }
 
