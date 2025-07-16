@@ -67,15 +67,15 @@ bool isDribbleBlocked(const Pose2D &robotPose, const Point &ballPosToField,
   return blocked;
 }
 
-int getNewKickerId(int playerId, double ballGoalDir, const std::shared_ptr<BrainData> data) {
-  constexpr double MIN_KICKER_DISTANCE = 2.0;
+int getNewKickerId(int playerId, double ballGoalDir, const std::shared_ptr<BrainData> data,
+                   double minKickerDistance) {
   constexpr double SELF_ALIGNMENT_BONUS = 0.1;  // Benefit for current kicker
 
   int bestId = playerId;
   double bestAlignment = std::numeric_limits<double>::max();
 
   // Add self if close enough and not blocked
-  if (data->ball.range < MIN_KICKER_DISTANCE) {
+  if (data->ball.range < minKickerDistance) {
     bool selfBlocked = isDribbleBlocked(data->robotPoseToField, data->ball.posToField, data);
     if (!selfBlocked) {
       double alignment =
@@ -89,7 +89,7 @@ int getNewKickerId(int playerId, double ballGoalDir, const std::shared_ptr<Brain
     double dx = msg.robotPoseToField.x - data->ball.posToField.x;
     double dy = msg.robotPoseToField.y - data->ball.posToField.y;
     double dist = hypot(dx, dy);
-    if (dist > MIN_KICKER_DISTANCE) continue;
+    if (dist > minKickerDistance) continue;
 
     bool blocked = isDribbleBlocked(msg.robotPoseToField, data->ball.posToField, data);
     if (blocked) continue;
@@ -612,9 +612,9 @@ NodeStatus StrikerDecide::tick() {
 
   // only kicker allowed to decide next kicker after few seconds
   double electionAge = brain->get_clock()->now().seconds() - latestKickerTime;
-  if (isKicker && (electionAge > 4.0)) {
+  if (isKicker && (electionAge > 1.0)) {
     brain->data->electedKickerId =
-        getNewKickerId(brain->config->playerId, ballGoalDir, brain->data);
+        getNewKickerId(brain->config->playerId, ballGoalDir, brain->data, 3.0);
     brain->data->kickerElectionTime = brain->get_clock()->now();
   }
 
@@ -686,9 +686,11 @@ NodeStatus StrikerDecide::tick() {
   brain->log->logToField(
       "field/StrikerDecide",
       format("Decision: %s | kickDir: %.2f | rbDir: %.2f | ballRange: %.2f | ballYaw: %.2f | "
-             "goodAngle: %d | goodRange: %d | goodHeading: %d | isShotBlocked: %d | isKicker: %d",
+             "goodAngle: %d | goodRange: %d | goodHeading: %d | isShotBlocked: %d | isKicker: %d | "
+             "latestKickerId: %d | latestKickerTime: %.2f",
              newDecision.c_str(), kickDir, dir_rb_f, ballRange, brain->data->ball.yawToRobot,
-             angleIsGood, rangeIsGood, headingIsGood, shotBlocked, isKicker),
+             angleIsGood, rangeIsGood, headingIsGood, shotBlocked, isKicker, latestKickerId,
+             latestKickerTime),
       color, 0.2);
   return NodeStatus::SUCCESS;
 }
