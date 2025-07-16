@@ -69,77 +69,42 @@ bool isDribbleBlocked(const Pose2D &robotPose, const Point &ballPosToField,
 
 int getNewKickerId(int playerId, double ballGoalDir, const std::shared_ptr<BrainData> data) {
   constexpr double MIN_KICKER_DISTANCE = 2.0;
+  constexpr double SELF_ALIGNMENT_BONUS = 0.1;  // Benefit for current kicker
 
-  // how good the kicker is
-  double selfShootAlignment = fabs(toPInPI(ballGoalDir - data->robotBallAngleToField));
-  bool selfBlocked = isDribbleBlocked(data->robotPoseToField, data->ball.posToField, data);
+  int bestId = playerId;
+  double bestAlignment = std::numeric_limits<double>::max();
 
-  // Store close robots - <playerId, isBlocked, shootAlignment>
-  std::vector<std::tuple<int, bool, double>> closeRobots;
-
+  // Add self if close enough and not blocked
   if (data->ball.range < MIN_KICKER_DISTANCE) {
-    closeRobots.emplace_back(playerId, selfBlocked, selfShootAlignment);
+    bool selfBlocked = isDribbleBlocked(data->robotPoseToField, data->ball.posToField, data);
+    if (!selfBlocked) {
+      double alignment =
+          fabs(toPInPI(ballGoalDir - data->robotBallAngleToField)) - SELF_ALIGNMENT_BONUS;
+      bestAlignment = alignment;
+    }
   }
 
-  // Loop over teammates
+  // Evaluate teammates
   for (const auto &[id, msg] : data->teamMemberMessages) {
     double dx = msg.robotPoseToField.x - data->ball.posToField.x;
     double dy = msg.robotPoseToField.y - data->ball.posToField.y;
     double dist = hypot(dx, dy);
+    if (dist > MIN_KICKER_DISTANCE) continue;
 
-    if (dist > MIN_KICKER_DISTANCE) {
-      continue;  // Ignore teammates that are too far away
-    }
+    bool blocked = isDribbleBlocked(msg.robotPoseToField, data->ball.posToField, data);
+    if (blocked) continue;
 
     double teammateBallDir = atan2(data->ball.posToField.y - msg.robotPoseToField.y,
                                    data->ball.posToField.x - msg.robotPoseToField.x);
-    double shootAlignment = fabs(toPInPI(ballGoalDir - teammateBallDir));
-    bool blocked = isDribbleBlocked(msg.robotPoseToField, data->ball.posToField, data);
+    double alignment = fabs(toPInPI(ballGoalDir - teammateBallDir));
 
-    closeRobots.emplace_back(msg.playerId, blocked, shootAlignment);
-  }
-
-  if (closeRobots.empty()) return playerId;  // No close teammates, self is the kicker
-
-  // Rule application
-  int kickerId = playerId;
-
-  bool shotBlocked = isShotBlocked(ballGoalDir, data->ball.posToField, data);
-  if (!shotBlocked) {
-    double bestAlignment = std::numeric_limits<double>::max();
-    for (const auto &[id, blocked, alignment] : closeRobots) {
-      if (alignment < bestAlignment) {
-        bestAlignment = alignment;
-        kickerId = id;
-      }
-    }
-  } else {
-    // If the shot is blocked, prefer someone with clear robot-ball path and alignment
-    double bestAlignment = std::numeric_limits<double>::max();
-    bool foundUnblocked = false;
-
-    for (const auto &[id, blocked, alignment] : closeRobots) {
-      if (!blocked) {
-        foundUnblocked = true;
-        if (alignment < bestAlignment) {
-          bestAlignment = alignment;
-          kickerId = id;
-        }
-      }
-    }
-
-    if (!foundUnblocked) {
-      bestAlignment = selfShootAlignment;
-      for (const auto &[id, blocked, alignment] : closeRobots) {
-        if (alignment < bestAlignment) {
-          bestAlignment = alignment;
-          kickerId = id;
-        }
-      }
+    if (alignment < bestAlignment) {
+      bestId = id;
+      bestAlignment = alignment;
     }
   }
 
-  return kickerId;
+  return bestId;
 }
 
 bool isOutField(const std::shared_ptr<BrainData> data, const std::shared_ptr<BrainConfig> config) {
@@ -646,7 +611,7 @@ NodeStatus StrikerDecide::tick() {
   bool isKicker = (latestKickerId == brain->config->playerId);
 
   // only kicker allowed to decide next kicker after few seconds
-  double electionAge = (brain->get_clock()->now() - latestKickerTime).seconds();
+  double electionAge = brain->get_clock()->now().seconds() - latestKickerTime;
   if (isKicker && (electionAge > 4.0)) {
     brain->data->electedKickerId =
         getNewKickerId(brain->config->playerId, ballGoalDir, brain->data);
@@ -720,11 +685,10 @@ NodeStatus StrikerDecide::tick() {
 
   brain->log->logToField(
       "field/StrikerDecide",
-      format(
-          "Decision: %s | kickDir: %.2f | rbDir: %.2f | ballRange: %.2f | ballYaw: %.2f | "
-          "goodAngle: %d | goodRange: %d | goodHeading: %d | isShotBlocked: %d | isLocalKicker: %d",
-          newDecision.c_str(), kickDir, dir_rb_f, ballRange, brain->data->ball.yawToRobot,
-          angleIsGood, rangeIsGood, headingIsGood, shotBlocked, brain->data->isKicker),
+      format("Decision: %s | kickDir: %.2f | rbDir: %.2f | ballRange: %.2f | ballYaw: %.2f | "
+             "goodAngle: %d | goodRange: %d | goodHeading: %d | isShotBlocked: %d | isKicker: %d",
+             newDecision.c_str(), kickDir, dir_rb_f, ballRange, brain->data->ball.yawToRobot,
+             angleIsGood, rangeIsGood, headingIsGood, shotBlocked, isKicker),
       color, 0.2);
   return NodeStatus::SUCCESS;
 }
