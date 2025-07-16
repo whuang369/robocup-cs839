@@ -67,7 +67,7 @@ bool isDribbleBlocked(const Pose2D &robotPose, const Point &ballPosToField,
   return blocked;
 }
 
-bool isLocalKicker(int playerId, double ballGoalDir, const std::shared_ptr<BrainData> data) {
+int getNewKickerId(int playerId, double ballGoalDir, const std::shared_ptr<BrainData> data) {
   constexpr double MIN_KICKER_DISTANCE = 2.0;
 
   // how good the kicker is
@@ -99,7 +99,7 @@ bool isLocalKicker(int playerId, double ballGoalDir, const std::shared_ptr<Brain
     closeRobots.emplace_back(msg.playerId, blocked, shootAlignment);
   }
 
-  if (closeRobots.empty()) return true;  // No close teammates, self is the kicker
+  if (closeRobots.empty()) return playerId;  // No close teammates, self is the kicker
 
   // Rule application
   int kickerId = playerId;
@@ -139,7 +139,7 @@ bool isLocalKicker(int playerId, double ballGoalDir, const std::shared_ptr<Brain
     }
   }
 
-  return playerId == kickerId;
+  return kickerId;
 }
 
 bool isOutField(const std::shared_ptr<BrainData> data, const std::shared_ptr<BrainConfig> config) {
@@ -635,22 +635,29 @@ NodeStatus StrikerDecide::tick() {
       atan2(-brain->data->ball.posToField.y,
             brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
 
-  bool isKicker = isLocalKicker(brain->config->playerId, ballGoalDir, brain->data);
-  brain->data->isKicker = isKicker;
-
-  bool foundKicker = isKicker;
+  int latestKickerId = -1;
+  double latestKickerTime = -1;
   for (const auto &[id, msg] : brain->data->teamMemberMessages) {
-    // give in the kicker role two player with lower id
-    if (msg.playerId < brain->config->playerId && msg.isKicker) {
-      isKicker = false;
-      break;
-    }
-    if (msg.isKicker) {
-      foundKicker = true;
+    if (msg.kickerElectionTime.seconds() > latestKickerTime) {
+      latestKickerId = msg.electedKickerId;
+      latestKickerTime = msg.kickerElectionTime.seconds();
     }
   }
-  if (!foundKicker) {
-    isKicker = true;  // if no one is kicker, self is the kicker
+  bool isKicker = (latestKickerId == brain->config->playerId);
+
+  // only kicker allowed to decide next kicker after few seconds
+  double electionAge = (brain->get_clock()->now() - latestKickerTime).seconds();
+  if (isKicker && (electionAge > 4.0)) {
+    brain->data->electedKickerId =
+        getNewKickerId(brain->config->playerId, ballGoalDir, brain->data);
+    brain->data->kickerElectionTime = brain->get_clock()->now();
+  }
+
+  // fallback if election is stale (> 6sec)
+  if (electionAge > 6.0) {
+    brain->data->electedKickerId = brain->config->playerId;  // self is the kicker
+    brain->data->kickerElectionTime = brain->get_clock()->now();
+    isKicker = true;
   }
 
   // ----- Kick direction and Descision making logic -----
@@ -849,14 +856,16 @@ NodeStatus GoalieDecide::tick() {
   double ballGoalDir =
       atan2(-brain->data->ball.posToField.y,
             brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
-  bool isKicker = !ballInDanger && isLocalKicker(brain->config->playerId, ballGoalDir, brain->data);
-  for (const auto &[id, msg] : brain->data->teamMemberMessages) {
-    if (msg.isKicker) {
-      isKicker = false;
-      break;
-    }
-  }
-  brain->data->isKicker = isKicker;
+  bool isKicker = !ballInDanger;
+  // bool isKicker = !ballInDanger && isLocalKicker(brain->config->playerId, ballGoalDir,
+  // brain->data);
+  // for (const auto &[id, msg] : brain->data->teamMemberMessages) {
+  //   if (msg.isKicker) {
+  //     isKicker = false;
+  //     break;
+  //   }
+  // }
+  // brain->data->isKicker = isKicker;
 
   // ----- Kick direction and Descision making logic -----
   double dir_rb_f = brain->data->robotBallAngleToField;

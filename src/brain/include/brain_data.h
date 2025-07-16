@@ -36,7 +36,6 @@ class BrainData {
                             // towards the opponent's goal (forward), and the y-axis pointing to the
                             // left. The positive direction of theta is counterclockwise.
   bool walking;             // Whether the robot is walking
-  bool isKicker;            // Whether the robot is the kicker, used for team communication
 
   // Head position, updated through lowStateCallback
   double headPitch;   // The current head pitch, in radians. 0 is horizontal forward, positive is
@@ -71,6 +70,8 @@ class BrainData {
   // Team communication
   std::mutex teamCommunicationMutex;
   std::unordered_map<int, TeamCommunicationMsg> teamMemberMessages;  // Records team messages
+  int electedKickerId = 1;
+  rclcpp::Time kickerElectionTime;
 
   // A collection of utility functions
   std::vector<FieldMarker> getMarkers();
