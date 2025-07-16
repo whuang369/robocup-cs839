@@ -314,12 +314,17 @@ void VisionNode::DepthCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
   cv::Mat depth(msg->height, msg->width, CV_32FC1, const_cast<float *>(float_ptr));
   depth = depth.clone();
 
-  // check if depth image is valid
-  cv::Mat valid_mask = (depth >= 0.0f) & (depth <= 20.0f) & (depth == depth);
+  // check whether depth image is valid (bottom quarter)
+  cv::Mat bottom_quarter = depth.rowRange(static_cast<int>(depth.rows * 0.75), depth.rows);
+  cv::Mat valid_mask =
+      (bottom_quarter >= 0.1f) & (bottom_quarter <= 20.0f) & (bottom_quarter == bottom_quarter);
   int valid_pixels = cv::countNonZero(valid_mask);
-  float valid_ratio = static_cast<float>(valid_pixels) / (depth.rows * depth.cols);
-  // if (valid_ratio < 0.9f) return; // HACK: there are many zeros in openspace
-  depth.setTo(0.0f, ~valid_mask);  // Set invalid pixels to 0
+  float valid_ratio = static_cast<float>(valid_pixels) / (valid_mask.rows * valid_mask.cols);
+  if (valid_ratio < 0.7f) return;
+
+  // set invalid value to 0.0
+  cv::Mat full_valid_mask = (depth >= 0.0f) & (depth <= 20.0f) & (depth == depth);
+  depth.setTo(0.0f, ~full_valid_mask);
 
   // add depth data to syncer
   double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
