@@ -600,8 +600,8 @@ NodeStatus StrikerDecide::tick() {
       atan2(-brain->data->ball.posToField.y,
             brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
 
-  int latestKickerId = -1;
-  double latestKickerTime = -1;
+  int latestKickerId = brain->data->electedKickerId;
+  double latestKickerTime = brain->data->kickerElectionTime.seconds();
   for (const auto &[id, msg] : brain->data->teamMemberMessages) {
     if (msg.kickerElectionTime.seconds() > latestKickerTime) {
       latestKickerId = msg.electedKickerId;
