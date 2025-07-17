@@ -117,6 +117,33 @@ bool isOutField(const std::shared_ptr<BrainData> data, const std::shared_ptr<Bra
           (data->robotPoseToField.x < -config->fieldDimensions.length / 2 - X_MARGIN));
 }
 
+bool pathIntersectWithGoal(const double &targetPosX, const double &targetPosY,
+                           const double &goalPosY, const std::shared_ptr<BrainData> data,
+                           const std::shared_ptr<BrainConfig> config) {
+  // Field boundaries (end of the field in X direction)
+  double bottomLineX = -config->fieldDimensions.length / 2;
+
+  // Robot's current position
+  double robotPosX = data->robotPoseToField.x;
+  double robotPosY = data->robotPoseToField.y;
+
+  // Calculate intersection points for the robot's path along the X-axis
+  double intersectionX;
+  if (targetPosY != robotPosY) {
+    double slope = (targetPosX - robotPosX) / (targetPosY - robotPosY);
+    intersectionX = robotPosX + (goalPosY - robotPosY) * slope;
+  } else {
+    return false;
+  }
+
+  bool goalPosYInMiddle =
+      (goalPosY >= std::min(robotPosY, targetPosY) && goalPosY <= std::max(robotPosY, targetPosY));
+  if (((intersectionX < bottomLineX) && goalPosYInMiddle)) {
+    return true;
+  }
+  return false;
+}
+
 }  // namespace
 
 /**
@@ -169,6 +196,7 @@ void BrainTree::init() {
 
 void BrainTree::initEntry() {
   setEntry<string>("player_role", brain->config->playerRole);
+  setEntry<int>("player_id", brain->config->playerId);
   setEntry<bool>("ball_location_known", false);
   setEntry<bool>("track_ball", true);
   setEntry<bool>("odom_calibrated", false);
@@ -473,28 +501,31 @@ NodeStatus Approach::tick() {
   }
 
   // Read input parameters
-  double kickDir, vxLimit, vyLimit, vthetaLimit, maxRange, minRange;
+  double kickDir, vxLimit, vyLimit, vthetaLimit, maxRange, minRange, targetBallX, targetBallY;
   getInput("kick_dir", kickDir);
   getInput("vx_limit", vxLimit);
   getInput("vy_limit", vyLimit);
   getInput("vtheta_limit", vthetaLimit);
   getInput("max_range", maxRange);
   getInput("min_range", minRange);
+  getInput("target_ball_x", targetBallX);
+  getInput("target_ball_y", targetBallY);
 
   // Variables for the state machine
   double kickVecX = cos(kickDir);
   double kickVecY = sin(kickDir);
 
   Pose2D robotPose = brain->data->robotPoseToField;
-  Point ballPos = brain->data->ball.posToField;
 
   double targetOffset = (maxRange + minRange) / 2.0;
-  Point2D targetPos = {ballPos.x - targetOffset * kickVecX, ballPos.y - targetOffset * kickVecY};
+  Point2D targetPos = {targetBallX - targetOffset * kickVecX,
+                       targetBallY - targetOffset * kickVecY};
   Point2D toTarget = {targetPos.x - robotPose.x, targetPos.y - robotPose.y};
   double robotTargetAngle = atan2(toTarget.y, toTarget.x);
   double ballRange = brain->data->ball.range;
   double facingAngle = toPInPI(kickDir - brain->data->robotBallAngleToField);
   double approachAngle = toPInPI(kickDir - robotTargetAngle);
+  Point2D carrotPos;
 
   // Determine the phase
   constexpr double GOOD_FACING_ANGLE = 1.0;
@@ -565,8 +596,21 @@ NodeStatus Approach::tick() {
     }
 
     // Get the carrot position by interpolating between the guide position and the target position
-    Point2D carrotPos = {alpha * guidePos.x + (1.0 - alpha) * targetPos.x,
-                         alpha * guidePos.y + (1.0 - alpha) * targetPos.y};
+    carrotPos = {alpha * guidePos.x + (1.0 - alpha) * targetPos.x,
+                 alpha * guidePos.y + (1.0 - alpha) * targetPos.y};
+    double leftGoalPosY = -brain->config->fieldDimensions.goalWidth / 2;
+    if (pathIntersectWithGoal(carrotPos.x, carrotPos.y, leftGoalPosY, brain->data, brain->config)) {
+      // overwrite carrotPos with Intersection point
+      carrotPos.x = -brain->config->fieldDimensions.length / 2 + 1.0;
+      // carrotPos.y = carrotPos.y;
+    }
+    double rightGoalPosY = brain->config->fieldDimensions.goalWidth / 2;
+    if (pathIntersectWithGoal(carrotPos.x, carrotPos.y, rightGoalPosY, brain->data,
+                              brain->config)) {
+      // overwrite carrotPos with Intersection point
+      carrotPos.x = -brain->config->fieldDimensions.length / 2 + 1.0;
+      // carrotPos.y = rightGoalPosY;
+    }
     Point2D toCarrot = {carrotPos.x - robotPose.x, carrotPos.y - robotPose.y};
     double carrotAngle = atan2(toCarrot.y, toCarrot.x);
     double headingAngle = toPInPI(carrotAngle - robotPose.theta);
@@ -580,9 +624,14 @@ NodeStatus Approach::tick() {
   vy = std::clamp(vy, -vyLimit, vyLimit);
   vtheta = std::clamp(vtheta, -vthetaLimit, vthetaLimit);
 
-  brain->log->log("tree/Approach",
-                  rerun::TextLog(format("vx: %.2f  vy: %.2f  vtheta: %.2f  phase: %d", vx, vy,
-                                        vtheta, static_cast<int>(_phase))));
+  brain->log->log(
+      "tree/Approach",
+      rerun::TextLog(
+          format("vx: %.2f  vy: %.2f  vtheta: %.2f  phase: %d  carrotPosX: %.2f  carrotPosY: %.2f",
+                 vx, vy, vtheta, static_cast<int>(_phase), carrotPos.x, carrotPos.y)));
+  brain->log->log("field/carrotPos", rerun::Points2D({{carrotPos.x, -carrotPos.y}})
+                                         .with_radii(0.12)
+                                         .with_colors(rerun::Color(0xFF00FFFF)));  // Purple
   brain->client->setVelocity(vx, vy, vtheta, false, false, false);
   return NodeStatus::SUCCESS;
 }
@@ -596,9 +645,19 @@ NodeStatus StrikerDecide::tick() {
   getInput("position", position);
 
   // ----- Kicker decision logic -----
-  double ballGoalDir =
-      atan2(-brain->data->ball.posToField.y,
-            brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
+  constexpr double STRAIGHT_KICK_DISTANCE = 1.0;
+  double ballGoalDir;
+  double straightKickLine = brain->config->fieldDimensions.length / 2 - STRAIGHT_KICK_DISTANCE;
+  bool inGoalArea =
+      ((brain->data->ball.posToField.y < brain->config->fieldDimensions.goalAreaWidth / 2 &&
+        brain->data->ball.posToField.y > -brain->config->fieldDimensions.goalAreaWidth / 2) &&
+       (brain->data->ball.posToField.x > straightKickLine));
+  if (inGoalArea) {
+    ballGoalDir = 0.0;
+  } else {
+    ballGoalDir = atan2(-brain->data->ball.posToField.y,
+                        straightKickLine * 0.8 - brain->data->ball.posToField.x);
+  }
 
   int latestKickerId = brain->data->electedKickerId;
   double latestKickerTime = brain->data->kickerElectionTime.seconds();
@@ -642,8 +701,8 @@ NodeStatus StrikerDecide::tick() {
   double kickDir = ballGoalDir;  // Default kick direction
   if (!brain->tree->getEntry<bool>("ball_location_known")) {
     newDecision = "find";
-  } else if (outField) {
-    newDecision = "reenter";
+    // } else if (outField) {
+    //   newDecision = "reenter";
   } else if (!isKicker) {
     newDecision = "scramble";
     // kickDir = ballGoalDir;  // TODO: place behind the robot
@@ -662,6 +721,13 @@ NodeStatus StrikerDecide::tick() {
 
   setOutput("decision_out", newDecision);
   setOutput("kick_dir_out", kickDir);
+  if (newDecision == "scramble") {
+    setOutput("target_ball_x_out", brain->data->ball.posToField.x);
+    setOutput("target_ball_y_out", brain->data->ball.posToField.y / 3.0);
+  } else {
+    setOutput("target_ball_x_out", brain->data->ball.posToField.x);
+    setOutput("target_ball_y_out", brain->data->ball.posToField.y);
+  }
 
   // rerun logging
   static std::map<std::string, uint32_t> decisionColorMap = {
@@ -863,6 +929,8 @@ NodeStatus GoalieDecide::tick() {
 
   setOutput("decision_out", newDecision);
   setOutput("kick_dir_out", kickDir);
+  setOutput("target_ball_x_out", brain->data->ball.posToField.x);
+  setOutput("target_ball_y_out", brain->data->ball.posToField.y);
 
   // rerun logging
   static std::map<std::string, uint32_t> decisionColorMap = {

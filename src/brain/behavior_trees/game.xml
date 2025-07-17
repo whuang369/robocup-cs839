@@ -18,23 +18,29 @@
                 <SubTree ID="AutoGetUpAndLocate" _autoremap="true" />
 
                 <ReactiveSequence _while="gc_is_under_penalty" name="penalty">
-                    <SetVelocity />
+                    <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
                     <SelfLocate/>
+                    <SetVelocity />
                 </ReactiveSequence>
 
                 <ReactiveSequence _while="!gc_is_under_penalty" name="normal">
                     <ReactiveSequence _while="gc_game_sub_state_type=='NONE'" name="normal-none">
 
                         <ReactiveSequence _while="gc_game_state=='INITIAL'" name="init">
-                            <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
+                            <!-- <SubTree ID="CamFindAndTrackBall" _autoremap="true" /> -->
+                            <CamScanField high_pitch="0.3" low_pitch="0.9" left_yaw="0.8" right_yaw="-0.8" msec_cycle="4000" />
                             <SelfLocate/>
                         </ReactiveSequence>
 
                         <ReactiveSequence _while="gc_game_state=='READY'" name="ready">
-                            <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
+                            <!-- <SubTree ID="CamFindAndTrackBall" _autoremap="true" /> -->
+                            <CamScanField high_pitch="0.3" low_pitch="0.9" left_yaw="0.8" right_yaw="-0.8" msec_cycle="4000" />
                             <SelfLocate/>
-                            <BlockGoal _while="player_role == 'striker'" dist_to_ball="1.7" />
-                            <KeepGoal _while="player_role == 'goal_keeper'" min_ball_dist="3.0" />
+                            <!-- <BlockGoal _while="player_role == 'striker'" dist_to_ball="1.7" /> -->
+                            <!-- <KeepGoal _while="player_role == 'goal_keeper'" min_ball_dist="3.0" /> -->
+                            <MoveToPoseOnField _while="player_role == 'striker' && player_id == 1" x="-1.7" y="0.0" theta="0.0"/>
+                            <MoveToPoseOnField _while="player_role == 'striker' && player_id == 2" x="-1.7" y="1.0" theta="0.0"/>
+                            <MoveToPoseOnField _while="player_role == 'goal_keeper'" x="-3.0" y="0.0" theta="0.0"/>
                         </ReactiveSequence>
 
                         <ReactiveSequence _while="gc_game_state=='SET'" name="set">

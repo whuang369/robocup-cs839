@@ -60,6 +60,8 @@ class StrikerDecide : public SyncActionNode {
                           "offense | defense, determines the direction to kick the ball"),
         OutputPort<string>("decision_out"),
         OutputPort<double>("kick_dir_out"),
+        OutputPort<double>("target_ball_x_out"),
+        OutputPort<double>("target_ball_y_out"),
     };
   }
 
@@ -85,7 +87,8 @@ class GoalieDecide : public SyncActionNode {
                           "offense | defense, determines the direction to kick the ball"),
         OutputPort<string>("decision_out"),
         OutputPort<double>("kick_dir_out"),
-
+        OutputPort<double>("target_ball_x_out"),
+        OutputPort<double>("target_ball_y_out"),
     };
   }
 
@@ -221,6 +224,8 @@ class Approach : public SyncActionNode {
                           "When the ball range exceeds this value, move slightly forward"),
         InputPort<double>("min_range", 0.6,
                           "When the ball range is smaller than this value, move slightly backward"),
+        InputPort<double>("target_ball_x", 0.0, "Target ball x coordinate for approach"),
+        InputPort<double>("target_ball_y", 0.0, "Target ball y coordinate for approach"),
     };
   }
 

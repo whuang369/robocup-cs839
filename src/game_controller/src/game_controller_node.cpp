@@ -214,10 +214,11 @@ void GameControllerNode::handle_packet(const RoboCupGameControlData &data,
       RCLCPP_INFO(get_logger(),
                   "team[%d] player[%d] penalty=%d, secs_till_unpenalised=%d, "
                   "number_of_warnings=%d, yellow_card_count=%d, red_card_count=%d, "
-                  "goal_keeper=%d",
+                  "goal_keeper=%d"
+                  " state=%d",
                   i, j, team_out.players[j].penalty, team_out.players[j].secs_till_unpenalised,
                   team_out.players[j].number_of_warnings, team_out.players[j].yellow_card_count,
-                  team_out.players[j].red_card_count, team_out.players[j].goal_keeper);
+                  team_out.players[j].red_card_count, team_out.players[j].goal_keeper, data.state);
     }
   }
 }

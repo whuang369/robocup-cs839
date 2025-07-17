@@ -1,25 +1,29 @@
 brain_node:
   ros__parameters:
     game:
-      team_id: 29 # consistant with GameControl
+      team_id: 28 # consistant with GameControl
       player_id: 2 # 0 | 1 | 2 | 3
       field_type: "adult_size" # adult_size | kid_size | gdc
       player_role: "striker" # striker | goal_keeper
-      player_attack_side: "left"
-      player_start_pos: 0.5 # [-1.0, 1.0] -1.0 is left side, 1.0 is right side
+      player_attack_side: "right"
+      player_start_pos: -0.6 # [-1.0, 1.0] -1.0 is left side, 1.0 is right side
 
     discovery_ip_list:
-      - "100.119.183.125"
+      # - "100.119.183.125"
       - "100.124.209.109"
+      # - "192.168.32.1"
+      # - "192.168.32.2"
     game_controller_ip_list:
       - "100.71.55.113"
-      - "100.87.107.109"
+      # - "100.87.107.109"
+      # - "100.75.124.56"
+      # - "192.168.0.2"
 
     robot:
-      robot_height: 1.0
-      odom_factor: 1.2
+      robot_height: 1.1
+      odom_factor: 1.0
       vx_factor: 1.1
-      yaw_offset: 0.0
+      yaw_offset: -0.1
       joystick: "logitech" # logitech | beitong
 
     image:
