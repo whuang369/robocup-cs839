@@ -44,7 +44,7 @@ SyncedDataBlock DataSyncer::getLatestSyncedDataBlock() {
     for (auto d_it = depth_buffer_cp.rbegin(); d_it != depth_buffer_cp.rend(); ++d_it) {
       for (auto c_it = color_buffer_cp.rbegin(); c_it != color_buffer_cp.rend(); ++c_it) {
         double diff = std::abs(d_it->timestamp - c_it->timestamp);
-        if (diff < 0.001) {  // 1ms threshold for sync
+        if (diff < 0.01) {  // 10ms threshold for sync
           synced_data.color_data = *c_it;
           synced_data.depth_data = *d_it;
           c_it->data.copyTo(synced_data.color_data.data);

@@ -191,19 +191,12 @@ void VisionNode::Init(const string &cfg_path, const string &cfg_local_path) {
 }
 
 void VisionNode::ProcessFrame() {
-  auto t0 = this->get_clock()->now().nanoseconds();
-
   // get synced data
   static double last_timestamp = 0.0;
   SyncedDataBlock synced_data = data_syncer_->getLatestSyncedDataBlock();
   if (synced_data.color_data.data.empty()) return;
   if (synced_data.color_data.timestamp <= last_timestamp) return;
   last_timestamp = synced_data.color_data.timestamp;
-
-  double elapsed = this->get_clock()->now().nanoseconds() - t0;
-  log_->setTimeSeconds(last_timestamp);
-  log_->log("ProcessFrame/getLatestSyncedDataBlock",
-            rerun::TextLog(std::to_string(elapsed * 1e-6) + "ms"));
 
   cv::Mat color = synced_data.color_data.data;
   cv::Mat depth = synced_data.depth_data.data;
@@ -291,7 +284,9 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
     return;
   }
 
-  double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
+  // double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) *
+  // 1e-9; uint64_t pose_ns   = latest_pose_ns_.load(std::memory_order_acquire);
+  double timestamp = latest_pose_t_.load(std::memory_order_acquire);
   data_syncer_->AddColor(ColorDataBlock(imgBGR, timestamp));
 }
 
@@ -327,7 +322,9 @@ void VisionNode::DepthCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
   depth.setTo(0.0f, ~full_valid_mask);
 
   // add depth data to syncer
-  double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
+  // double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) *
+  // 1e-9;
+  double timestamp = latest_pose_t_.load(std::memory_order_acquire);
   data_syncer_->AddDepth(DepthDataBlock(depth, timestamp));
 }
 
@@ -338,6 +335,10 @@ void VisionNode::PoseCallBack(const geometry_msgs::msg::PoseStamped::SharedPtr m
   Pose pose(p.x, p.y, p.z, q.x, q.y, q.z, q.w);
 
   data_syncer_->AddPose(PoseDataBlock(pose, timestamp));
+
+  // uint64_t ns = static_cast<uint64_t>(msg->header.stamp.sec) * 1'000'000'000ULL
+  //             + msg->header.stamp.nanosec;
+  latest_pose_t_.store(timestamp, std::memory_order_release);
 }
 
 bool VisionNode::EstimateCameraRollPitch(const cv::Mat &depth_image, float &roll, float &pitch,

@@ -57,6 +57,7 @@ class VisionNode : public rclcpp::Node {
   std::shared_ptr<image_transport::ImageTransport> it_;
   image_transport::Subscriber color_sub_;
   image_transport::Subscriber depth_sub_;
+  std::atomic<double> latest_pose_t_{0};
 
   // components
   std::shared_ptr<VisionLog> log_;
