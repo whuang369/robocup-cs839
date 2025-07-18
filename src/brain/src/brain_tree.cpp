@@ -164,6 +164,8 @@ void BrainTree::init() {
 
   // Action Nodes
   REGISTER_BUILDER(RobotFindBall)
+  REGISTER_BUILDER(TurnOnSpot)
+  REGISTER_BUILDER(GoBackInField)
   REGISTER_BUILDER(Chase)
   REGISTER_BUILDER(SimpleChase)
   REGISTER_BUILDER(Adjust)
@@ -922,9 +924,8 @@ NodeStatus GoalieDecide::tick() {
     newDecision = "find";
   } else if (ballInDanger && behindBall) {
     newDecision = "keepgoal";
-  } else if (shotBlocked && rangeIsGood) {
-    newDecision = "dribble";
-    kickDir = robotBallDir;
+    } else if (shotBlocked && rangeIsGood) {
+      newDecision = "keepgoal";
   } else if (!shotBlocked && angleIsGood && rangeIsGood && headingIsGood) {
     newDecision = "kick";
     kickDir = ballGoalDir;
@@ -1056,6 +1057,73 @@ NodeStatus RobotFindBall::onRunning() {
 void RobotFindBall::onHalted() {
   _turnDir = 1.0;
   brain->tree->setEntry<bool>("robot_find_ball", false);
+}
+
+NodeStatus GoBackInField::tick()
+{
+    double valve;
+    getInput("valve", valve);
+    double vx = 0; 
+    double vy = 0; 
+    double dir = 0;
+    auto fd = brain->config->fieldDimensions;
+    if (brain->data->robotPoseToField.x > fd.length / 2.0 - valve) dir = - M_PI;
+    else if (brain->data->robotPoseToField.x < - fd.length / 2.0 + valve) dir = 0;
+    else if (brain->data->robotPoseToField.y > fd.width / 2.0 + valve) dir = - M_PI / 2.0;
+    else if (brain->data->robotPoseToField.y < - fd.width / 2.0 - valve) dir = M_PI / 2.0;
+    else { // 没出界
+        brain->client->setVelocity(0, 0, 0);
+        return NodeStatus::SUCCESS;
+    }
+
+    // 出界了, 往回走
+    double dir_r = toPInPI(dir - brain->data->robotPoseToField.theta);
+    vx = 0.4 * cos(dir_r);
+    vy = 0.4 * sin(dir_r);
+    brain->client->setVelocity(vx, vy, 0, false, false, false);
+    return NodeStatus::SUCCESS;
+}
+
+NodeStatus TurnOnSpot::onStart()
+{
+    _timeStart = brain->get_clock()->now();
+    _lastAngle = brain->data->robotPoseToOdom.theta;
+    _cumAngle = 0.0;
+
+    bool towardsBall = false;
+    _angle = getInput<double>("rad").value();
+    getInput("towards_ball", towardsBall);
+    if (towardsBall) {
+        double ballPixX = (brain->data->ball.boundingBox.xmin + brain->data->ball.boundingBox.xmax) / 2;
+        _angle = fabs(_angle) * (ballPixX < brain->config->camPixX / 2 ? 1 : -1);
+    }
+
+    brain->client->setVelocity(0, 0, _angle, false, false, true);
+    return NodeStatus::RUNNING;
+}
+
+NodeStatus TurnOnSpot::onRunning()
+{
+    double curAngle = brain->data->robotPoseToOdom.theta;
+    double deltaAngle = toPInPI(curAngle - _lastAngle);
+    _lastAngle = curAngle;
+    _cumAngle += deltaAngle;
+    double turnTime = brain->msecsSince(_timeStart);
+    brain->log->log("debug/turn_on_spot", rerun::TextLog(format(
+        "angle: %.2f, cumAngle: %.2f, deltaAngle: %.2f, time: %.2f",
+        _angle, _cumAngle, deltaAngle, turnTime
+    )));
+    if (
+        fabs(_cumAngle) - fabs(_angle) > -0.1
+        || turnTime > _msecLimit
+    ) {
+        brain->client->setVelocity(0, 0, 0);
+        return NodeStatus::SUCCESS;
+    }
+
+    // else 
+    brain->client->setVelocity(0, 0, (_angle - _cumAngle)*2);
+    return NodeStatus::RUNNING;
 }
 
 NodeStatus SelfLocate::tick() {

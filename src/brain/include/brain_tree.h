@@ -154,6 +154,55 @@ class RobotFindBall : public StatefulActionNode {
   Brain *brain;
 };
 
+// GoBackInField
+class GoBackInField : public SyncActionNode
+{
+public:
+    GoBackInField(const string &name, const NodeConfig &config, Brain *_brain) : SyncActionNode(name, config), brain(_brain) {}
+
+    static PortsList providedPorts()
+    {
+        return {
+            InputPort<double>("valve", 0.5, "回到场内距离边界多远可以停止"),
+        };
+    }
+
+    NodeStatus tick() override;
+
+private:
+    Brain *brain;
+};
+
+
+// TurnOnSpot
+class TurnOnSpot : public StatefulActionNode
+{
+public:
+    TurnOnSpot(const string &name, const NodeConfig &config, Brain *_brain) : StatefulActionNode(name, config), brain(_brain) {}
+
+    static PortsList providedPorts()
+    {
+        return {
+            InputPort<double>("rad", 0, "转多少弧度, 向左为正"),
+            InputPort<bool>("towards_ball", false, "为 true 时, 不考虑 rad 的正负号, 而是转向上一次看到不球的方向.")
+        };
+    }
+
+    NodeStatus onStart() override;
+
+    NodeStatus onRunning() override;
+
+    void onHalted() override {};
+
+private:
+    double _lastAngle; // 上个 tick 的弧度
+    double _angle; // 转多少弧度
+    double _cumAngle; // 共转了多少弧度
+    double _msecLimit = 5000;  // 最多执行多少毫秒 (防止卡死)
+    rclcpp::Time _timeStart; // 进入节点的时间 
+    Brain *brain;
+};
+
 // Chasing the ball: If the ball is behind the robot, it will move around to the back of the ball.
 class Chase : public SyncActionNode {
  public:
