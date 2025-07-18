@@ -10,9 +10,8 @@
             <RunOnce> <Script code="treat_person_as_robot:=true" /> </RunOnce>
 
             <ReactiveSequence _while="control_state==2" name="pickup">
-                <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
-                <!-- <InitializeSelfLocate/> -->
-                <SelfLocate/>
+                <!-- <SubTree ID="CamFindAndTrackBall" _autoremap="true" /> -->
+                <InitializeSelfLocate/>
                 <SetVelocity />
             </ReactiveSequence>
 
@@ -20,9 +19,8 @@
                 <SubTree ID="AutoGetUpAndLocate" _autoremap="true" />
 
                 <ReactiveSequence _while="gc_is_under_penalty" name="penalty">
-                    <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
-                    <!-- <InitializeSelfLocate/> -->
-                    <SelfLocate/>
+                    <!-- <SubTree ID="CamFindAndTrackBall" _autoremap="true" /> -->
+                    <InitializeSelfLocate/>
                     <SetVelocity />
                 </ReactiveSequence>
 

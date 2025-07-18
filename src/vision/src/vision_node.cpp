@@ -276,6 +276,9 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
   }
 
   cv::Mat imgBGR;
+  double timestamp = latest_pose_t_.load(std::memory_order_acquire);
+  // double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) *
+  // 1e-9;
 
   try {
     imgBGR = toBGRMat(*msg);
@@ -284,9 +287,6 @@ void VisionNode::ColorCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
     return;
   }
 
-  // double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) *
-  // 1e-9; uint64_t pose_ns   = latest_pose_ns_.load(std::memory_order_acquire);
-  double timestamp = latest_pose_t_.load(std::memory_order_acquire);
   data_syncer_->AddColor(ColorDataBlock(imgBGR, timestamp));
 }
 
@@ -297,6 +297,10 @@ void VisionNode::DepthCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
     std::cerr << "Unsupported depth image encoding: " << msg->encoding << std::endl;
     return;
   }
+
+  double timestamp = latest_pose_t_.load(std::memory_order_acquire);
+  // double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) *
+  // 1e-9;
 
   // check message size and alignment
   const uint8_t *raw = msg->data.data();
@@ -309,10 +313,9 @@ void VisionNode::DepthCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
   cv::Mat depth(msg->height, msg->width, CV_32FC1, const_cast<float *>(float_ptr));
   depth = depth.clone();
 
-  // check whether depth image is valid (bottom quarter)
-  cv::Mat bottom_quarter = depth.rowRange(static_cast<int>(depth.rows * 0.75), depth.rows);
-  cv::Mat valid_mask =
-      (bottom_quarter >= 0.1f) & (bottom_quarter <= 20.0f) & (bottom_quarter == bottom_quarter);
+  // check whether depth image is valid (bottom 25% for field)
+  cv::Mat bottom = depth.rowRange(static_cast<int>(depth.rows * 0.75), depth.rows);
+  cv::Mat valid_mask = (bottom >= 0.1f) & (bottom <= 20.0f) & (bottom == bottom);
   int valid_pixels = cv::countNonZero(valid_mask);
   float valid_ratio = static_cast<float>(valid_pixels) / (valid_mask.rows * valid_mask.cols);
   if (valid_ratio < 0.7f) return;
@@ -322,15 +325,13 @@ void VisionNode::DepthCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
   depth.setTo(0.0f, ~full_valid_mask);
 
   // add depth data to syncer
-  // double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) *
-  // 1e-9;
-  double timestamp = latest_pose_t_.load(std::memory_order_acquire);
   data_syncer_->AddDepth(DepthDataBlock(depth, timestamp));
 }
 
 void VisionNode::PoseCallBack(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
   // NOTE: DO NOT USE MOTION BOARD TIME (two boards are likely to have different time)
   double timestamp = this->get_clock()->now().seconds();
+
   const auto &p = msg->pose.position;
   const auto &q = msg->pose.orientation;
   Pose pose(p.x, p.y, p.z, q.x, q.y, q.z, q.w);

@@ -19,8 +19,11 @@
 
 #include <rerun.hpp>
 
+namespace {
+constexpr float BASE_VALIDITY_WEIGHTING = 0.1f;
+}
+
 const int SelfLocator::numberOfSamples = 35;
-const float SelfLocator::baseValidityWeighting = 0.1f;
 const float SelfLocator::movedDistWeightRotationNoise = 0.0005;
 const float SelfLocator::movedAngleWeightRotationNoise = 0.25;
 const float SelfLocator::majorDirTransWeight = 2;
@@ -40,6 +43,7 @@ void UKFRobotPoseHypothesis::init(const Pose2f& pose, const Pose2f& poseDeviatio
                                   float validity) {
   this->id = id;
   this->validity = validity;
+  this->weighting = std::max(validity, BASE_VALIDITY_WEIGHTING);
   mean << pose.translation.x(), pose.translation.y(), pose.rotation;
   cov = Matrix3f::Zero();
   cov(0, 0) = sqr(poseDeviation.translation.x());
@@ -141,6 +145,7 @@ void SelfLocator::init(const FieldDimensions& fd, std::string& attackSide, float
   const int thetaMid = headingsPerX / 2;
 
   samples = new SampleSet<UKFRobotPoseHypothesis>(numberOfSamples);
+  nextSampleId = 0;
   for (int i = 0; i < numberOfSamples; ++i) {
     const int xBucket = i / headingsPerX;
     const int thetaBucket = i % headingsPerX;
@@ -151,7 +156,9 @@ void SelfLocator::init(const FieldDimensions& fd, std::string& attackSide, float
                         nextSampleId++, 0.5f);
   }
 
-  averageWeighting = 0.0f;
+  const int centreIndex = xMid * headingsPerX + thetaMid;
+  idOfLastBestSample = samples->at(centreIndex).id;
+  averageWeighting = 0.5f;
 }
 
 Pose2f SelfLocator::getPose() {
@@ -280,7 +287,7 @@ void SelfLocator::sensorUpdate(const std::vector<GameObject>& detectedGoalPosts,
   // compute weights
   float weightingSum = 0.f;
   for (int i = 0; i < numberOfSamples; ++i) {
-    samples->at(i).computeWeightingBasedOnValidity(baseValidityWeighting);
+    samples->at(i).computeWeightingBasedOnValidity(BASE_VALIDITY_WEIGHTING);
     const float w = samples->at(i).weighting;
     weightingSum += w;
   }
@@ -319,7 +326,6 @@ void SelfLocator::resampling() {
   // fill up missing samples
   const Pose2f fallbackPose = getMostValidSample().getPose();
   for (; j < numberOfSamples; ++j) {
-    prtDebug("SelfLocator: Filling up missing samples with fallback pose.");
     samples->at(j).init(fallbackPose, defaultPoseDeviation, nextSampleId++, averageWeighting);
   }
 }
@@ -378,6 +384,9 @@ UKFRobotPoseHypothesis& SelfLocator::getMostValidSample() {
       }
     }
   }
+
+  if (lastBestSample == nullptr) return samples->at(0);
+
   UKFRobotPoseHypothesis* returnSample = &(samples->at(0));
   float maxValidity = -1.0f;
   float minVariance = 0.0f;  // Initial value does not matter
@@ -433,13 +442,11 @@ void SelfLocator::logLandmarks() {
 }
 
 void SelfLocator::logSamples() {
-  prtDebug("logSamples");
   for (int i = 0; i < numberOfSamples; ++i) {
     const Pose2f pose = samples->at(i).getPose();
     float x = pose.translation.x();
     float y = pose.translation.y();
     float theta = pose.rotation;
-    prtDebug(format("x=%2f y=%2f theta=%2f", x, y, theta));
     brain->log->log("field/pose_samples/" + std::to_string(i),
                     rerun::Points2D({{x, -y}, {x + 0.05 * cos(theta), -y - 0.05 * sin(theta)}})
                         .with_radii({0.1, 0.05})

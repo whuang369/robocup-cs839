@@ -126,7 +126,6 @@ class SelfLocator {
   bool odomInitialized;
 
   static const int numberOfSamples;
-  static const float baseValidityWeighting;
   static const float movedDistWeightRotationNoise;
   static const float movedAngleWeightRotationNoise;
   static const float majorDirTransWeight;

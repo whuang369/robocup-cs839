@@ -1079,6 +1079,11 @@ NodeStatus SelfLocate::tick() {
 NodeStatus InitializeSelfLocate::tick() {
   brain->self_locator->init(brain->config->fieldDimensions, brain->config->playerAttackSide,
                             brain->config->playerStartPos);
+
+  auto pose = brain->self_locator->getPose();
+  brain->calibrateOdom(pose.translation.x(), pose.translation.y(), pose.rotation);
+
+  return NodeStatus::SUCCESS;
 }
 
 NodeStatus MoveToPoseOnField::tick() {
