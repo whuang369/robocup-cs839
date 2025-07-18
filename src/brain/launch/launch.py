@@ -31,12 +31,15 @@ def handle_configuration(context, *args, **kwargs):
     tree = context.perform_substitution(LaunchConfiguration("tree"))
     config["tree_file_path"] = make_tree_path(tree)
 
-    start_pos = context.perform_substitution(LaunchConfiguration("pos"))
-    if not start_pos == "":
-        config["game.player_start_pos"] = start_pos
     role = context.perform_substitution(LaunchConfiguration("role"))
     if not role == "":
         config["game.player_role"] = role
+    attack_side = context.perform_substitution(LaunchConfiguration("attack"))
+    if not attack_side == "":
+        config["game.player_attack_side"] = attack_side
+    start_pos = context.perform_substitution(LaunchConfiguration("pos"))
+    if not start_pos == "":
+        config["game.player_start_pos"] = float(start_pos)
     rerun = context.perform_substitution(LaunchConfiguration("rerun"))
     if not rerun == "":
         config["rerunLog.server_addr"] = f"rerun+http://{rerun}/proxy"
@@ -71,14 +74,19 @@ def generate_launch_description():
                 description="Specify behavior tree file name. DO NOT include full path, file should be in src/brain/config/behavior_trees",
             ),
             DeclareLaunchArgument(
-                "pos",
-                default_value="",
-                description="If you need to override the game.player_start_pos in the config.yaml, you can specify the parameter pos:=left when launching.",
-            ),
-            DeclareLaunchArgument(
                 "role",
                 default_value="",
                 description="If you need to override the game.player_role in the config.yaml, you can specify the parameter role:=striker when launching",
+            ),
+            DeclareLaunchArgument(
+                "attack",
+                default_value="",
+                description="If you need to override the game.player_attack_side in the config.yaml"
+            ),
+            DeclareLaunchArgument(
+                "pos",
+                default_value="",
+                description="If you need to override the game.player_start_pos in the config.yaml, you can specify the parameter pos:=left when launching.",
             ),
             DeclareLaunchArgument(
                 "rerun", default_value="", description="Override the rerunLog server address"

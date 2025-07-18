@@ -402,8 +402,27 @@ void BrainCommunication::spinCommunicationReceiver() {
                 msg.robotPoseToField.x, msg.robotPoseToField.y, msg.robotPoseToField.theta)
          << RESET_CODE << endl;
 
+    // log other player pos
+    double x = msg.robotPoseToField.x;
+    double y = msg.robotPoseToField.y;
+    brain->log->setTimeNow();
+    brain->log->log(
+        "field/other",
+        rerun::LineStrips2D({
+                                rerun::Collection<rerun::Vec2D>{{x - 0.2, -y}, {x + 0.2, -y}},
+                                rerun::Collection<rerun::Vec2D>{{x, -y - 0.2}, {x, -y + 0.2}},
+                            })
+            .with_colors({0xFFFF00FF})
+            .with_radii({0.005})
+            .with_draw_order(30));
+
     std::lock_guard<std::mutex> lock(brain->data->teamCommunicationMutex);
     brain->data->teamMemberMessages[msg.playerId] = msg;
+
+    // override message timestamp
+    // rclcpp::Duration offset = msg.ballTimePoint - msg.timePoint;
+    msg.ballTimePoint = brain->get_clock()->now();
+    msg.timePoint = brain->get_clock()->now();
 
     // kicker decision
     if (msg.electionSeq > brain->data->electionSeq ||
@@ -411,8 +430,8 @@ void BrainCommunication::spinCommunicationReceiver() {
          msg.electedKickerId < brain->data->electedKickerId)) {
       brain->data->electedKickerId = msg.electedKickerId;
       brain->data->electionSeq = msg.electionSeq;
+      brain->data->lastElectionHeardTime = brain->get_clock()->now();
     }
-    brain->data->lastElectionHeardTime = brain->get_clock()->now();
   }
 }
 

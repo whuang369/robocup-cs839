@@ -759,10 +759,10 @@ NodeStatus StrikerDecide::tick() {
       "field/StrikerDecide",
       format("Decision: %s | kickDir: %.2f | rbDir: %.2f | ballRange: %.2f | ballYaw: %.2f | "
              "goodAngle: %d | goodRange: %d | goodHeading: %d | isShotBlocked: %d | isKicker: %d | "
-             "electedKickerId: %d | lastElectionHeardTime: %.2f",
+             "electedKickerId: %d | electionAge: %.2f",
              newDecision.c_str(), kickDir, dir_rb_f, ballRange, brain->data->ball.yawToRobot,
              angleIsGood, rangeIsGood, headingIsGood, shotBlocked, isKicker,
-             brain->data->electedKickerId, brain->data->lastElectionHeardTime.seconds()),
+             brain->data->electedKickerId, electionAge),
       color, 0.2);
   return NodeStatus::SUCCESS;
 }

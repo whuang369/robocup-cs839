@@ -14,7 +14,7 @@ for arg in "$@"; do
       VISION_ARGS+=("$arg")
       BRAIN_ARGS+=("$arg")
       ;;
-    tree:=*|pos:=*|role:=*)
+    tree:=*|role:=*|attack:=*|pos:=*)
       BRAIN_ARGS+=("$arg")
       ;;
     port:=*)
