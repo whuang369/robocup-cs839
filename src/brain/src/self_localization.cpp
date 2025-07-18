@@ -159,6 +159,8 @@ void SelfLocator::init(const FieldDimensions& fd, std::string& attackSide, float
   const int centreIndex = xMid * headingsPerX + thetaMid;
   idOfLastBestSample = samples->at(centreIndex).id;
   averageWeighting = 0.5f;
+
+  odomInitialized = false;
 }
 
 Pose2f SelfLocator::getPose() {

@@ -304,7 +304,7 @@ void BrainCommunication::unicastCommunication() {
     msg.ballPosToField = brain->data->ball.posToField;
     msg.robotPoseToField = brain->data->robotPoseToField;
     msg.electedKickerId = brain->data->electedKickerId;
-    msg.kickerElectionTime = brain->data->kickerElectionTime;
+    msg.electionSeq = brain->data->electionSeq;
 
     std::lock_guard<std::mutex> lock(_teammate_addresses_mutex);
     for (auto it = _teammate_addresses.begin(); it != _teammate_addresses.end(); ++it) {
@@ -404,6 +404,15 @@ void BrainCommunication::spinCommunicationReceiver() {
 
     std::lock_guard<std::mutex> lock(brain->data->teamCommunicationMutex);
     brain->data->teamMemberMessages[msg.playerId] = msg;
+
+    // kicker decision
+    if (msg.electionSeq > brain->data->electionSeq ||
+        (msg.electionSeq == brain->data->electionSeq &&
+         msg.electedKickerId < brain->data->electedKickerId)) {
+      brain->data->electedKickerId = msg.electedKickerId;
+      brain->data->electionSeq = msg.electionSeq;
+    }
+    brain->data->lastElectionHeardTime = brain->get_clock()->now();
   }
 }
 

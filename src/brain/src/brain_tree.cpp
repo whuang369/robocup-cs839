@@ -660,28 +660,33 @@ NodeStatus StrikerDecide::tick() {
                         brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
   }
 
-  int latestKickerId = brain->data->electedKickerId;
-  double latestKickerTime = brain->data->kickerElectionTime.seconds();
-  for (const auto &[id, msg] : brain->data->teamMemberMessages) {
-    if (msg.kickerElectionTime.seconds() > latestKickerTime) {
-      latestKickerId = msg.electedKickerId;
-      latestKickerTime = msg.kickerElectionTime.seconds();
-    }
-  }
-  bool isKicker = (latestKickerId == brain->config->playerId);
+  // int latestKickerId = brain->data->electedKickerId;
+  // double latestKickerTime = brain->data->kickerElectionTime.seconds();
+  // for (const auto &[id, msg] : brain->data->teamMemberMessages) {
+  //   if (msg.kickerElectionTime.seconds() > latestKickerTime) {
+  //     latestKickerId = msg.electedKickerId;
+  //     latestKickerTime = msg.kickerElectionTime.seconds();
+  //   }
+  // }
+  bool isKicker = (brain->data->electedKickerId == brain->config->playerId);
 
   // only kicker allowed to decide next kicker after few seconds
-  double electionAge = brain->get_clock()->now().seconds() - latestKickerTime;
+  double now = brain->get_clock()->now().seconds();
+  double electionAge = now - brain->data->lastElectionHeardTime.seconds();
   if (isKicker && (electionAge > 1.0)) {
-    brain->data->electedKickerId =
-        getNewKickerId(brain->config->playerId, ballGoalDir, brain->data, 3.0);
-    brain->data->kickerElectionTime = brain->get_clock()->now();
+    int newKicker = getNewKickerId(brain->config->playerId, ballGoalDir, brain->data, 3.0);
+    if (newKicker != brain->data->electedKickerId) {
+      brain->data->electedKickerId = newKicker;
+      brain->data->electionSeq++;
+    }
+    brain->data->lastElectionHeardTime = brain->get_clock()->now();
   }
 
   // fallback if election is stale (> 6sec)
   if (electionAge > 6.0) {
     brain->data->electedKickerId = brain->config->playerId;  // self is the kicker
-    brain->data->kickerElectionTime = brain->get_clock()->now();
+    brain->data->electionSeq++;
+    brain->data->lastElectionHeardTime = brain->get_clock()->now();
     isKicker = true;
   }
 
@@ -754,10 +759,10 @@ NodeStatus StrikerDecide::tick() {
       "field/StrikerDecide",
       format("Decision: %s | kickDir: %.2f | rbDir: %.2f | ballRange: %.2f | ballYaw: %.2f | "
              "goodAngle: %d | goodRange: %d | goodHeading: %d | isShotBlocked: %d | isKicker: %d | "
-             "latestKickerId: %d | latestKickerTime: %.2f",
+             "electedKickerId: %d | lastElectionHeardTime: %.2f",
              newDecision.c_str(), kickDir, dir_rb_f, ballRange, brain->data->ball.yawToRobot,
-             angleIsGood, rangeIsGood, headingIsGood, shotBlocked, isKicker, latestKickerId,
-             latestKickerTime),
+             angleIsGood, rangeIsGood, headingIsGood, shotBlocked, isKicker,
+             brain->data->electedKickerId, brain->data->lastElectionHeardTime.seconds()),
       color, 0.2);
   return NodeStatus::SUCCESS;
 }

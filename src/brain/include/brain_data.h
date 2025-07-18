@@ -71,7 +71,8 @@ class BrainData {
   std::mutex teamCommunicationMutex;
   std::unordered_map<int, TeamCommunicationMsg> teamMemberMessages;  // Records team messages
   int electedKickerId = 1;
-  rclcpp::Time kickerElectionTime;
+  uint32_t electionSeq = 0;
+  rclcpp::Time lastElectionHeardTime;
 
   // A collection of utility functions
   std::vector<FieldMarker> getMarkers();

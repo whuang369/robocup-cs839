@@ -14,7 +14,7 @@ struct TeamCommunicationMsg {
   rclcpp::Time ballTimePoint;
   Point ballPosToField;
   Pose2D robotPoseToField;
-  rclcpp::Time kickerElectionTime;
+  uint32_t electionSeq;
   int electedKickerId;
 };
 
