@@ -165,7 +165,8 @@ void Brain::updateBallMemory() {
     // use team member's ball memory if available
     bool teamMemberBallFound = false;
     // for (const auto &it : data->teamMemberMessages) {
-    //   if (get_clock()->now().seconds() - it.second.ballTimePoint.seconds() < config->memoryLength) {
+    //   if (get_clock()->now().seconds() - it.second.ballTimePoint.seconds() <
+    //   config->memoryLength) {
     //     data->ball.timePoint = it.second.ballTimePoint;
     //     data->ball.posToField = it.second.ballPosToField;
     //     teamMemberBallFound = true;
@@ -174,7 +175,7 @@ void Brain::updateBallMemory() {
     //     break;
     //   }
     // }
-    // tree->setEntry<bool>("ball_location_known", teamMemberBallFound);
+    tree->setEntry<bool>("ball_location_known", teamMemberBallFound);
     if (!teamMemberBallFound) {
       log->log(
           "brain/updateBallMemory",
@@ -660,6 +661,12 @@ void Brain::detectProcessBalls(const vector<GameObject> &ballObjs) {
 
     // Prevent the lights in the sky from being recognized as balls.
     if (ballObj.posToRobot.x < -0.5 || ballObj.posToRobot.x > 10.0) continue;
+
+    const float margin = 0.3;
+    if (ballObj.posToField.x > config->fieldDimensions.length / 2 + margin) continue;
+    if (ballObj.posToField.x < -config->fieldDimensions.length / 2 - margin) continue;
+    if (ballObj.posToField.y > config->fieldDimensions.width / 2 + margin) continue;
+    if (ballObj.posToField.y < -config->fieldDimensions.width / 2 - margin) continue;
 
     // Find the one with the highest confidence among the remaining balls.
     if (ballObj.confidence > bestConfidence) {
