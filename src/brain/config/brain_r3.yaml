@@ -2,18 +2,18 @@ brain_node:
   ros__parameters:
     game:
       team_id: 32 # consistant with GameControl
-      player_id: 2 # 0 | 1 | 2 | 3
+      player_id: 0 # 0 | 1 | 2 | 3
       field_type: "adult_size" # adult_size | kid_size | gdc
-      player_role: "striker" # striker | goal_keeper
-      player_attack_side: "left"
-      player_start_pos: -1.0 # [-1.0, 1.0] -1.0 is left side, 1.0 is right side
+      player_role: "goal_keeper" # striker | goal_keeper
+      player_attack_side: "right"
+      player_start_pos: -0.9 # [-1.0, 1.0] -1.0 is left side, 1.0 is right side
 
     discovery_ip_list:
+      # - "100.119.183.125"
+      # - "100.124.209.109"
       - "192.168.32.1"
       - "192.168.32.2"
       - "192.168.32.3"
-      # - "100.119.183.125"
-      # - "100.124.209.109"
     game_controller_ip_list:
       # - "100.71.55.113"
       # - "100.87.107.109"
