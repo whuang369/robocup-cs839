@@ -174,6 +174,7 @@ void BrainTree::init() {
   REGISTER_BUILDER(CamFindBall)
   REGISTER_BUILDER(CamScanField)
   REGISTER_BUILDER(SelfLocate)
+  REGISTER_BUILDER(InitializeSelfLocate)
   REGISTER_BUILDER(SetVelocity)
   REGISTER_BUILDER(CheckAndStandUp)
   REGISTER_BUILDER(KeepGoal)
@@ -645,7 +646,7 @@ NodeStatus StrikerDecide::tick() {
   getInput("position", position);
 
   // ----- Kicker decision logic -----
-  constexpr double STRAIGHT_KICK_DISTANCE = 1.0;
+  constexpr double STRAIGHT_KICK_DISTANCE = 0.4;
   double ballGoalDir;
   double straightKickLine = brain->config->fieldDimensions.length / 2 - STRAIGHT_KICK_DISTANCE;
   bool inGoalArea =
@@ -656,7 +657,7 @@ NodeStatus StrikerDecide::tick() {
     ballGoalDir = 0.0;
   } else {
     ballGoalDir = atan2(-brain->data->ball.posToField.y,
-                        straightKickLine * 0.8 - brain->data->ball.posToField.x);
+                        brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
   }
 
   int latestKickerId = brain->data->electedKickerId;
@@ -1070,16 +1071,14 @@ NodeStatus SelfLocate::tick() {
     brain->tree->setEntry<bool>("odom_calibrated", false);
   }
 
-  brain->log->log("field/robot_pose_sample",
-                  rerun::Points2D({{pose.translation.x(), -pose.translation.y()},
-                                   {pose.translation.x() + 0.1 * cos(pose.rotation),
-                                    -pose.translation.y() - 0.1 * sin(pose.rotation)}})
-                      .with_radii({0.2, 0.1})
-                      .with_colors({0x00FFFFFF, 0xFF0000FF}));
-
   brain->self_locator->logSamples();
 
   return NodeStatus::SUCCESS;
+}
+
+NodeStatus InitializeSelfLocate::tick() {
+  brain->self_locator->init(brain->config->fieldDimensions, brain->config->playerAttackSide,
+                            brain->config->playerStartPos);
 }
 
 NodeStatus MoveToPoseOnField::tick() {

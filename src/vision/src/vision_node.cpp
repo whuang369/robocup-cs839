@@ -329,15 +329,14 @@ void VisionNode::DepthCallback(const sensor_msgs::msg::Image::ConstSharedPtr &ms
 }
 
 void VisionNode::PoseCallBack(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
-  double timestamp = msg->header.stamp.sec + static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
+  // NOTE: DO NOT USE MOTION BOARD TIME (two boards are likely to have different time)
+  double timestamp = this->get_clock()->now().seconds();
   const auto &p = msg->pose.position;
   const auto &q = msg->pose.orientation;
   Pose pose(p.x, p.y, p.z, q.x, q.y, q.z, q.w);
 
   data_syncer_->AddPose(PoseDataBlock(pose, timestamp));
 
-  // uint64_t ns = static_cast<uint64_t>(msg->header.stamp.sec) * 1'000'000'000ULL
-  //             + msg->header.stamp.nanosec;
   latest_pose_t_.store(timestamp, std::memory_order_release);
 }
 

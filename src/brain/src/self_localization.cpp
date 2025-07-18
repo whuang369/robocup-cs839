@@ -19,7 +19,7 @@
 
 #include <rerun.hpp>
 
-const int SelfLocator::numberOfSamples = 30;
+const int SelfLocator::numberOfSamples = 35;
 const float SelfLocator::baseValidityWeighting = 0.1f;
 const float SelfLocator::movedDistWeightRotationNoise = 0.0005;
 const float SelfLocator::movedAngleWeightRotationNoise = 0.25;
@@ -82,15 +82,6 @@ SelfLocator::SelfLocator(Brain* brain, const FieldDimensions& fd) : brain(brain)
   nextSampleId = 0;
   averageWeighting = 0.5f;
 
-  // Create sample set with samples at the typical walk-in positions
-  // samples = new SampleSet<UKFRobotPoseHypothesis>(numberOfSamples);
-  // for (int i = 0; i < samples->size(); ++i) {
-  //   samples->at(i).init(
-  //       {-M_PI / 2, static_cast<float>(((-fd.length / 2) + (-fd.circleRadius)) / 2),
-  //        static_cast<float>(fd.width / 2 + 0.5)},
-  //       {M_PI / 6, static_cast<float>(abs((-fd.length / 2) - (-fd.circleRadius)) / 2), 0.5},
-  //       nextSampleId++, 0.5f);
-  // }
   goalPosts = {
       Vector2f(fd.length / 2, fd.goalWidth / 2),    // left post of left goal
       Vector2f(fd.length / 2, -fd.goalWidth / 2),   // right post of left goal
@@ -137,15 +128,30 @@ void SelfLocator::init(const FieldDimensions& fd, std::string& attackSide, float
   const float initY = -sideSign * (static_cast<float>(fd.width / 2) + 0.5);
   const float initTheta = sideSign * M_PI_2;
 
+  // UKF Covariance
   float thetaNoise = M_PI / 6;
   float xNoise = static_cast<float>(fd.length) * 0.1f;
   float yNoise = 0.5;
 
+  // spread UKF particles
+  constexpr int headingsPerX = 5;
+  constexpr float DX_STEP = 0.10f;                   // 10 cm between X columns
+  constexpr float DTHETA_STEP = 5.f * M_PI / 180.f;  // 5 deg between headings
+  const int xMid = (numberOfSamples / headingsPerX) / 2;
+  const int thetaMid = headingsPerX / 2;
+
   samples = new SampleSet<UKFRobotPoseHypothesis>(numberOfSamples);
   for (int i = 0; i < numberOfSamples; ++i) {
-    samples->at(i).init({initTheta, initX, initY}, {thetaNoise, xNoise, yNoise}, nextSampleId++,
-                        0.5f);
+    const int xBucket = i / headingsPerX;
+    const int thetaBucket = i % headingsPerX;
+    const float dx = (xBucket - xMid) * DX_STEP;
+    const float dTheta = (thetaBucket - thetaMid) * DTHETA_STEP;
+
+    samples->at(i).init({initTheta + dTheta, initX + dx, initY}, {thetaNoise, xNoise, yNoise},
+                        nextSampleId++, 0.5f);
   }
+
+  averageWeighting = 0.0f;
 }
 
 Pose2f SelfLocator::getPose() {
@@ -313,6 +319,7 @@ void SelfLocator::resampling() {
   // fill up missing samples
   const Pose2f fallbackPose = getMostValidSample().getPose();
   for (; j < numberOfSamples; ++j) {
+    prtDebug("SelfLocator: Filling up missing samples with fallback pose.");
     samples->at(j).init(fallbackPose, defaultPoseDeviation, nextSampleId++, averageWeighting);
   }
 }
@@ -426,11 +433,13 @@ void SelfLocator::logLandmarks() {
 }
 
 void SelfLocator::logSamples() {
+  prtDebug("logSamples");
   for (int i = 0; i < numberOfSamples; ++i) {
     const Pose2f pose = samples->at(i).getPose();
     float x = pose.translation.x();
     float y = pose.translation.y();
     float theta = pose.rotation;
+    prtDebug(format("x=%2f y=%2f theta=%2f", x, y, theta));
     brain->log->log("field/pose_samples/" + std::to_string(i),
                     rerun::Points2D({{x, -y}, {x + 0.05 * cos(theta), -y - 0.05 * sin(theta)}})
                         .with_radii({0.1, 0.05})

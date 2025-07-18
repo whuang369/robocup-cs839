@@ -11,7 +11,9 @@
 
             <ReactiveSequence _while="control_state==2" name="pickup">
                 <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
+                <!-- <InitializeSelfLocate/> -->
                 <SelfLocate/>
+                <SetVelocity />
             </ReactiveSequence>
 
             <ReactiveSequence _while="control_state==3" name="control_state-3">
@@ -19,6 +21,7 @@
 
                 <ReactiveSequence _while="gc_is_under_penalty" name="penalty">
                     <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
+                    <!-- <InitializeSelfLocate/> -->
                     <SelfLocate/>
                     <SetVelocity />
                 </ReactiveSequence>

@@ -323,6 +323,17 @@ class SelfLocate : public SyncActionNode {
   Brain *brain;
 };
 
+class InitializeSelfLocate : public SyncActionNode {
+ public:
+  InitializeSelfLocate(const string &name, const NodeConfig &config, Brain *_brain)
+      : SyncActionNode(name, config), brain(_brain) {}
+
+  NodeStatus tick() override;
+
+ private:
+  Brain *brain;
+};
+
 // Move to a Pose in the Field coordinate system, including the final target orientation.
 // It is recommended to use this together with CamScanField and SelfLocate for a more accurate final
 // position.

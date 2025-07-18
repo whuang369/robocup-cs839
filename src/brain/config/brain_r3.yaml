@@ -1,0 +1,44 @@
+brain_node:
+  ros__parameters:
+    game:
+      team_id: 32 # consistant with GameControl
+      player_id: 1 # 0 | 1 | 2 | 3
+      field_type: "adult_size" # adult_size | kid_size | gdc
+      player_role: "striker" # striker | goal_keeper
+      player_attack_side: "left"
+      player_start_pos: -0.5 # [-1.0, 1.0] -1.0 is left side, 1.0 is right side
+
+    discovery_ip_list:
+      - "192.168.32.1"
+      - "192.168.32.2"
+      - "192.168.32.3"
+      # - "100.119.183.125"
+      # - "100.124.209.109"
+    game_controller_ip_list:
+      # - "100.71.55.113"
+      # - "100.87.107.109"
+      - "192.168.0.2"
+
+    robot:
+      robot_height: 1.0
+      odom_factor: 1.2
+      vx_factor: 1.1
+      yaw_offset: 0.0
+      joystick: "logitech" # logitech | beitong
+
+    image:
+      width: 640
+      height: 360
+
+    visual_odom:
+      topic: "/camera/camera/pose"
+
+    enable_com: true
+
+    rerunLog:
+      enable: true
+      server_addr: "rerun+http://192.168.10.101:9876/proxy" # log to master board
+
+
+
+
