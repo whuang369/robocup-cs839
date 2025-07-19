@@ -4,7 +4,7 @@
       <ReactiveSequence>
          <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
          <SelfLocate />
-         <KeepGoal min_ball_dist="3.0" />
+         <KeepGoal min_ball_dist="1.0" />
       </ReactiveSequence>
    </BehaviorTree>
 </root>

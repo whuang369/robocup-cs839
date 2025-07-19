@@ -250,7 +250,7 @@ NodeStatus SetVelocity::tick() {
 
 NodeStatus CamTrackBall::tick() {
   const double pixTolerance = 10;
-  const double smoother = 2.0;
+  const double smoother = 5.0;
 
   // handle motion blur while moving head
   bool recentlySeen =
@@ -290,7 +290,7 @@ NodeStatus CamTrackBall::tick() {
 CamFindBall::CamFindBall(const string &name, const NodeConfig &config, Brain *_brain)
     : SyncActionNode(name, config), brain(_brain) {
   double lowPitch = 0.8;
-  double highPitch = 0.4;
+  double highPitch = 0.3;
   double leftYaw = 0.55;
   double rightYaw = -0.55;
 
@@ -884,18 +884,26 @@ NodeStatus GoalieDecide::tick() {
   getInput("position", position);
 
   // ----- Goalie decision logic -----
+  Point ballPos = brain->data->ball.posToField;
+  bool ballInPenaltyArea = (ballPos.x < -brain->config->fieldDimensions.length / 2 +
+                                            brain->config->fieldDimensions.penaltyAreaLength) &&
+                           (fabs(ballPos.y) < brain->config->fieldDimensions.penaltyAreaWidth / 2);
+
   bool ballInDangerArea = brain->data->ball.posToField.x < -1.0;
   double velThreshold = (lastDecision == "keepgoal") ? 0.1 : 0.2;
   bool ballStopped = hypot(brain->data->ballVelocityX, brain->data->ballVelocityY) < velThreshold;
 
   double currTime = brain->get_clock()->now().seconds();
-  bool opponentAroundBall = (currTime - brain->data->lastOpponentNearBallTime.seconds()) < 2.0;
+  bool opponentAroundBall = (currTime - brain->data->lastOpponentNearBallTime.seconds()) < 1.0;
   bool ballInDanger = ballInDangerArea && (!ballStopped || opponentAroundBall);
   bool behindBall = (brain->data->robotPoseToField.x - brain->data->ball.posToField.x) < 0.0;
 
   double ballGoalDir =
       atan2(-brain->data->ball.posToField.y,
             brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
+  double goalBallDir =
+      atan2(brain->data->ball.posToField.y,
+            brain->data->ball.posToField.x + brain->config->fieldDimensions.length / 2);
   bool isKicker = !ballInDanger;
   // bool isKicker = !ballInDanger && isLocalKicker(brain->config->playerId, ballGoalDir,
   // brain->data);
@@ -914,25 +922,54 @@ NodeStatus GoalieDecide::tick() {
   auto goalPostAngles = brain->getGoalPostAngles(0.3);
 
   bool shotBlocked = isShotBlocked(ballGoalDir, brain->data->ball.posToField, brain->data);
-  bool angleIsGood = (goalPostAngles[0] > dir_rb_f && goalPostAngles[1] < dir_rb_f);
+  // bool angleIsGood = (goalPostAngles[0] > dir_rb_f && goalPostAngles[1] < dir_rb_f);
+  bool angleIsGood = fabs(dir_rb_f) < M_PI / 2;
   bool rangeIsGood = (ballRange < kickRangeThreshold);
   bool headingIsGood = (fabs(brain->data->ball.yawToRobot) < kickAngleThreshold);
 
+  /*
+  If ball position is not known:
+      Go to center of goal and look around.
+  Else: // We know ball location
+     If ball not in penalty area:
+        // Stand in front of goal blocking the ball
+     Else: // Ball is in penalty area:
+        If opponent robot near ball:
+           // Block direction to goal
+        Else:
+           // Kick the ball out of penalty area
+    // Position to block the goal:
+    1. Find middle angle from ball to goal
+    2. Stand at that middle angle at most 0.5 m from goal
+  */
   string newDecision;
-  double kickDir = ballGoalDir;  // Default kick direction
+  double kickDir = goalBallDir;
+
   if (!brain->tree->getEntry<bool>("ball_location_known")) {
     newDecision = "find";
-  } else if (ballInDanger && behindBall) {
+  } else if (!ballInPenaltyArea || opponentAroundBall) {
     newDecision = "keepgoal";
-  } else if (shotBlocked && rangeIsGood) {
-    newDecision = "keepgoal";
-  } else if (!shotBlocked && angleIsGood && rangeIsGood && headingIsGood) {
+  } else if (angleIsGood && rangeIsGood && headingIsGood) {
     newDecision = "kick";
-    kickDir = ballGoalDir;
+    kickDir = dir_rb_f;
   } else {
     newDecision = "approach";
-    kickDir = ballGoalDir;
+    kickDir = goalBallDir;
   }
+
+  // if (!brain->tree->getEntry<bool>("ball_location_known")) {
+  //   newDecision = "find";
+  // } else if (ballInDanger && behindBall) {
+  //   newDecision = "keepgoal";
+  // } else if (shotBlocked && rangeIsGood) {
+  //   newDecision = "keepgoal";
+  // } else if (!shotBlocked && angleIsGood && rangeIsGood && headingIsGood) {
+  //   newDecision = "kick";
+  //   kickDir = ballGoalDir;
+  // } else {
+  //   newDecision = "approach";
+  //   kickDir = ballGoalDir;
+  // }
 
   setOutput("decision_out", newDecision);
   setOutput("kick_dir_out", kickDir);
@@ -1118,6 +1155,11 @@ NodeStatus TurnOnSpot::onRunning() {
     return NodeStatus::SUCCESS;
   }
 
+  if (brain->tree->getEntry<bool>("ball_location_known")) {
+    brain->client->setVelocity(0, 0, 0);
+    return NodeStatus::SUCCESS;
+  }
+
   // else
   brain->client->setVelocity(0, 0, (_angle - _cumAngle) * 2);
   return NodeStatus::RUNNING;
@@ -1196,11 +1238,14 @@ NodeStatus KeepGoal::tick() {
   double ballGoalDist =
       hypot(brain->data->ball.posToField.x + brain->config->fieldDimensions.length / 2,
             brain->data->ball.posToField.y);
-  double goalieDist = std::clamp(brain->data->ball.range, minBallDist, ballGoalDist);
+  // double goalieDist = std::clamp(brain->data->ball.range, minBallDist, ballGoalDist);
+  const double maxGoalieDist = 1.5;
+  double boundaryDist = ballGoalDist - maxGoalieDist;  // prevent goalie get out from goal area
+  double goalieDist = std::clamp(boundaryDist, minBallDist, ballGoalDist);
 
   Point ballPos = brain->data->ball.posToField;
   double tx = ballPos.x + goalieDist * cos(midAngle);
-  tx = max(tx, -brain->config->fieldDimensions.length / 2 + 0.5);
+  tx = max(tx, -brain->config->fieldDimensions.length / 2 - 0.1);
   double ty = ballPos.y + goalieDist * sin(midAngle);
 
   // set the theta to face the ball

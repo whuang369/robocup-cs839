@@ -6,14 +6,13 @@
         <ReactiveSequence>
             <GoBackInField />
         </ReactiveSequence>
-        <TurnOnSpot rad="3.14"  towards_ball="true"/>
+        <TurnOnSpot rad="3.14" towards_ball="true"/>
         <ReactiveSequence>
             <GoBackInField />
         </ReactiveSequence>
         <ReactiveSequence>
-          <MoveToPoseOnField x="-2.0" _while="player_role == 'striker'" vtheta_limit="2.0"  vx_limit="0.4" />
-          <MoveToPoseOnField x="-5.5" _while="player_role == 'goal_keeper'" vtheta_limit="2.0"  vx_limit="0.4" />
-          <Sleep msec="5000" />
+          <MoveToPoseOnField x="-2.0" _while="player_role == 'striker'" vtheta_limit="2.0"  vx_limit="1.0" />
+          <Sleep _while="!ball_location_known" msec="5000" />
         </ReactiveSequence>
       </Sequence>
   </BehaviorTree>
