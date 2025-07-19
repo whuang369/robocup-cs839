@@ -250,7 +250,7 @@ NodeStatus SetVelocity::tick() {
 
 NodeStatus CamTrackBall::tick() {
   const double pixTolerance = 10;
-  const double smoother = 5.0;
+  const double smoother = 2.0;
 
   // handle motion blur while moving head
   bool recentlySeen =
@@ -649,18 +649,13 @@ NodeStatus StrikerDecide::tick() {
 
   // ----- Kicker decision logic -----
   constexpr double STRAIGHT_KICK_DISTANCE = 0.4;
-  double ballGoalDir;
   double straightKickLine = brain->config->fieldDimensions.length / 2 - STRAIGHT_KICK_DISTANCE;
   bool inGoalArea =
       ((brain->data->ball.posToField.y < brain->config->fieldDimensions.goalAreaWidth / 2 &&
         brain->data->ball.posToField.y > -brain->config->fieldDimensions.goalAreaWidth / 2) &&
        (brain->data->ball.posToField.x > straightKickLine));
-  if (inGoalArea) {
-    ballGoalDir = 0.0;
-  } else {
-    ballGoalDir = atan2(-brain->data->ball.posToField.y,
-                        brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
-  }
+  double ballGoalDir = atan2(-brain->data->ball.posToField.y,
+                             brain->config->fieldDimensions.length / 2 - brain->data->ball.posToField.x);
 
   // int latestKickerId = brain->data->electedKickerId;
   // double latestKickerTime = brain->data->kickerElectionTime.seconds();
@@ -697,11 +692,15 @@ NodeStatus StrikerDecide::tick() {
   double ballRange = brain->data->ball.range;
   double robotBallDir = brain->data->robotBallAngleToField;
   auto goalPostAngles = brain->getGoalPostAngles(0.3);
+  double midAngle = atan2(sin(goalPostAngles[0]) + sin(goalPostAngles[1]),
+                          cos(goalPostAngles[0]) + cos(goalPostAngles[1]));
 
   // TODO: check outfield decision
   bool outField = isOutField(brain->data, brain->config);
   bool shotBlocked = isShotBlocked(ballGoalDir, brain->data->ball.posToField, brain->data);
-  bool angleIsGood = (goalPostAngles[0] > dir_rb_f && goalPostAngles[1] < dir_rb_f);
+  // bool angleIsGood = (goalPostAngles[0] > dir_rb_f && goalPostAngles[1] < dir_rb_f);
+  bool angleIsGood = (fabs(dir_rb_f - midAngle) < 0.3) ||
+                     (goalPostAngles[0] > dir_rb_f && goalPostAngles[1] < dir_rb_f);
   bool rangeIsGood = (ballRange < kickRangeThreshold);
   bool headingIsGood = (fabs(brain->data->ball.yawToRobot) < kickAngleThreshold);
 

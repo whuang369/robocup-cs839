@@ -24,6 +24,7 @@ def handle_configuration(context, *args, **kwargs):
     rerun = context.perform_substitution(LaunchConfiguration("rerun"))
     if not rerun == "":
         config["rerunLog.server_addr"] = f"rerun+http://{rerun}/proxy"
+        config["rerunLog.enable"] = True
 
     return [
         Node(

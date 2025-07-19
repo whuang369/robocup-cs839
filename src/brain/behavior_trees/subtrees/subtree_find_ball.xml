@@ -10,10 +10,13 @@
         <ReactiveSequence>
             <GoBackInField />
         </ReactiveSequence>
-        <ReactiveSequence>
-          <MoveToPoseOnField x="-2.0" _while="player_role == 'striker'" vtheta_limit="2.0"  vx_limit="1.0" />
-          <Sleep _while="!ball_location_known" msec="5000" />
-        </ReactiveSequence>
+        <ReactiveSequence _while="!ball_location_known">
+          <MoveToPoseOnField _while="player_role == 'striker' && player_id == 1"
+            x="-1.7" y="-1.0" theta="0.0" />
+          <MoveToPoseOnField _while="player_role == 'striker' && player_id == 2"
+            x="-1.7" y="1.0" theta="0.0" />
+          <Sleep msec="5000" />
+      </ReactiveSequence>
       </Sequence>
   </BehaviorTree>
 </root>

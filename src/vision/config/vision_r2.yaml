@@ -8,10 +8,10 @@ camera:
     # fy: 526.727234
     # cx: 483.142609
     # cy: 293.299622
-    fx: 262.411712
-    fy: 262.411712
-    cx: 320.864258
-    cy: 191.949326
+    fx: 260.255249
+    fy: 260.255249
+    cx: 319.872070
+    cy: 180.871933
     distortion_coeffs: [0., 0., 0., 0., 0., 0., 0., 0.] # /camera/camera/rgb
     distortion_model: 0 # 0: none, 1: opencv format, 2: for rs d455 only
   extrin:
@@ -37,5 +37,5 @@ human_like_pose_estimator:
   down_sample_leaf_size: 0.01
   fitting_distance_threshold: 0.01
   statistic_outlier_multiplier: 0.01
-rerun_log: true
+rerun_log: false
 rerun_id: "r2"
