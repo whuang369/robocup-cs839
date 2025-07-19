@@ -23,7 +23,7 @@ brain_node:
     robot:
       robot_height: 1.1
       odom_factor: 1.0
-      vx_factor: 1.1
+      vx_factor: 1.0
       yaw_offset: -0.1
       joystick: "logitech" # logitech | beitong
 

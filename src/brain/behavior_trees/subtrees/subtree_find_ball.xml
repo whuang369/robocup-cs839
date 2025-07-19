@@ -6,7 +6,7 @@
         <ReactiveSequence>
             <GoBackInField />
         </ReactiveSequence>
-        <TurnOnSpot rad="3.14" towards_ball="true"/>
+        <TurnOnSpot rad="3.14" towards_ball="false"/>
         <ReactiveSequence>
             <GoBackInField />
         </ReactiveSequence>
@@ -17,7 +17,7 @@
             x="-1.7" y="1.0" theta="0.0" />
           <MoveToPoseOnField _while="player_id == 2"
             x="-1.7" y="-1.0" theta="0.0" />
-          <Sleep msec="5000" />
+          <Sleep msec="7000" />
       </ReactiveSequence>
       </Sequence>
   </BehaviorTree>

@@ -30,6 +30,7 @@
          </ReactiveSequence>
          <ReactiveSequence _while="!gc_is_sub_state_kickoff_side" name="move to defender position">
             <SubTree ID="CamFindAndTrackBall" _autoremap="true" />
+            <SubTree ID="FindBall" _while="!ball_location_known" _autoremap="true" />
             <SelfLocate />
             <BlockGoal dist_to_ball="1.6" />
          </ReactiveSequence>

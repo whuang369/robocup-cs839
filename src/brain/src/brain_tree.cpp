@@ -290,7 +290,7 @@ NodeStatus CamTrackBall::tick() {
 CamFindBall::CamFindBall(const string &name, const NodeConfig &config, Brain *_brain)
     : SyncActionNode(name, config), brain(_brain) {
   double lowPitch = 0.8;
-  double highPitch = 0.3;
+  double highPitch = 0.1;
   double leftYaw = 0.55;
   double rightYaw = -0.55;
 
