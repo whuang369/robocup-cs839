@@ -11,10 +11,12 @@
             <GoBackInField />
         </ReactiveSequence>
         <ReactiveSequence _while="!ball_location_known">
-          <MoveToPoseOnField _while="player_role == 'striker' && player_id == 1"
-            x="-1.7" y="-1.0" theta="0.0" />
-          <MoveToPoseOnField _while="player_role == 'striker' && player_id == 2"
+          <MoveToPoseOnField _while="player_id == 0"
+            x="-1.7" y="0.0" theta="0.0" />
+          <MoveToPoseOnField _while="player_id == 1"
             x="-1.7" y="1.0" theta="0.0" />
+          <MoveToPoseOnField _while="player_id == 2"
+            x="-1.7" y="-1.0" theta="0.0" />
           <Sleep msec="5000" />
       </ReactiveSequence>
       </Sequence>

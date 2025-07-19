@@ -39,8 +39,9 @@
                             <SelfLocate/>
                             <!-- <BlockGoal _while="player_role == 'striker'" dist_to_ball="1.7" /> -->
                             <!-- <KeepGoal _while="player_role == 'goal_keeper'" min_ball_dist="3.0" /> -->
+                            <MoveToPoseOnField _while="player_role == 'striker' && player_id == 0" x="-1.7" y="1.0" theta="0.0"/>
                             <MoveToPoseOnField _while="player_role == 'striker' && player_id == 1" x="-1.7" y="0.0" theta="0.0"/>
-                            <MoveToPoseOnField _while="player_role == 'striker' && player_id == 2" x="-1.7" y="1.0" theta="0.0"/>
+                            <MoveToPoseOnField _while="player_role == 'striker' && player_id == 2" x="-1.7" y="-1.0" theta="0.0"/>
                             <MoveToPoseOnField _while="player_role == 'goal_keeper'" x="-6.0" y="0.0" theta="0.0"/>
                         </ReactiveSequence>
 

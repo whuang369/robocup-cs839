@@ -16,7 +16,7 @@
                               kick_dir_out="{kick_dir}"
                               target_ball_x_out="{target_ball_x}"
                               target_ball_y_out="{target_ball_y}"
-                              kick_range_threshold="0.7" kick_angle_threshold="0.8" />
+                              kick_range_threshold="0.7" kick_angle_threshold="0.6" />
                <SubTree ID="FindBall" _while="decision=='find'" _autoremap="true" />
                <!-- <GoBackInField _while="decision == 'reenter'"" /> -->
                <Approach _while="decision == 'approach'"
