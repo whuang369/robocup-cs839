@@ -73,6 +73,7 @@ int getNewKickerId(int playerId, double ballGoalDir, const std::shared_ptr<Brain
 
   int bestId = playerId;
   double bestAlignment = std::numeric_limits<double>::max();
+  double minLoss = std::numeric_limits<double>::max();
 
   // Add self if close enough and not blocked
   if (data->ball.range < minKickerDistance) {
@@ -81,6 +82,7 @@ int getNewKickerId(int playerId, double ballGoalDir, const std::shared_ptr<Brain
       double alignment =
           fabs(toPInPI(ballGoalDir - data->robotBallAngleToField)) - SELF_ALIGNMENT_BONUS;
       bestAlignment = alignment;
+      minLoss = alignment + data->ball.range;
     }
   }
 
@@ -97,10 +99,15 @@ int getNewKickerId(int playerId, double ballGoalDir, const std::shared_ptr<Brain
     double teammateBallDir = atan2(data->ball.posToField.y - msg.robotPoseToField.y,
                                    data->ball.posToField.x - msg.robotPoseToField.x);
     double alignment = fabs(toPInPI(ballGoalDir - teammateBallDir));
+    double loss = alignment + dist;
 
-    if (alignment < bestAlignment) {
+    // if (alignment < bestAlignment) {
+    //   bestId = id;
+    //   bestAlignment = alignment;
+    // }
+    if (loss < minLoss){
       bestId = id;
-      bestAlignment = alignment;
+      minLoss = loss;
     }
   }
 
