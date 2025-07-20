@@ -698,7 +698,7 @@ NodeStatus StrikerDecide::tick() {
   double dir_rb_f = brain->data->robotBallAngleToField;
   double ballRange = brain->data->ball.range;
   double robotBallDir = brain->data->robotBallAngleToField;
-  auto goalPostAngles = brain->getGoalPostAngles(0.3);
+  auto goalPostAngles = brain->getGoalPostAngles(0.4);
   double midAngle = atan2(sin(goalPostAngles[0]) + sin(goalPostAngles[1]),
                           cos(goalPostAngles[0]) + cos(goalPostAngles[1]));
 
@@ -706,7 +706,7 @@ NodeStatus StrikerDecide::tick() {
   bool outField = isOutField(brain->data, brain->config);
   bool shotBlocked = isShotBlocked(ballGoalDir, brain->data->ball.posToField, brain->data);
   // bool angleIsGood = (goalPostAngles[0] > dir_rb_f && goalPostAngles[1] < dir_rb_f);
-  bool angleIsGood = (fabs(dir_rb_f - midAngle) < 0.3) ||
+  bool angleIsGood = (fabs(dir_rb_f - ballGoalDir) < 0.3) ||
                      (goalPostAngles[0] > dir_rb_f && goalPostAngles[1] < dir_rb_f);
   bool rangeIsGood = (ballRange < kickRangeThreshold);
   bool headingIsGood = (fabs(brain->data->ball.yawToRobot) < kickAngleThreshold);
