@@ -8,10 +8,10 @@ camera:
     # fy: 540.932129
     # cx: 478.401062
     # cy: 258.701477
-    fx: 265.876801
-    fy: 265.876801
-    cx: 317.860718
-    cy: 173.117950
+    fx: 266.0755310
+    fy: 266.0755310
+    cx: 317.8575439
+    cy: 173.1196289
     distortion_coeffs: [0., 0., 0., 0., 0., 0., 0., 0.] # /camera/camera/rgb
     distortion_model: 0 # 0: none, 1: opencv format, 2: for rs d455 only
   extrin:
